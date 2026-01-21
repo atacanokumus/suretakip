@@ -426,6 +426,13 @@ function updateQuarterlyChart() {
     for (let i = 0; i < 4; i++) {
         const bar = document.getElementById(`q${i + 1}Bar`);
         const value = document.getElementById(`q${i + 1}Value`);
+        const label = document.querySelector(`#quarterlyChart .quarter-bar:nth-child(${i + 1}) .bar-label`);
+
+        // Update label with year
+        if (label) {
+            label.textContent = `${currentYear} Q${i + 1}`;
+        }
+
         bar.style.setProperty('--width', `${(quarters[i] / max) * 100}%`);
         bar.style.cssText = `--width: ${(quarters[i] / max) * 100}%`;
         bar.setAttribute('style', `--width: ${(quarters[i] / max) * 100}%`);

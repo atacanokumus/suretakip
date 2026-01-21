@@ -1047,15 +1047,20 @@ function initializeApp() {
     // Excel import
     const excelInput = document.getElementById('excelInput');
 
-    document.getElementById('importBtn').addEventListener('click', () => excelInput.click());
-    document.getElementById('settingsImportBtn').addEventListener('click', () => excelInput.click());
+    // Note: importBtn was removed from sidebar, only settingsImportBtn remains
+    const settingsImportBtn = document.getElementById('settingsImportBtn');
+    if (settingsImportBtn) {
+        settingsImportBtn.addEventListener('click', () => excelInput.click());
+    }
 
-    excelInput.addEventListener('change', function (e) {
-        if (this.files && this.files[0]) {
-            handleExcelImport(this.files[0]);
-            this.value = '';
-        }
-    });
+    if (excelInput) {
+        excelInput.addEventListener('change', function (e) {
+            if (this.files && this.files[0]) {
+                handleExcelImport(this.files[0]);
+                this.value = '';
+            }
+        });
+    }
 
     // Export
     document.getElementById('exportBtn').addEventListener('click', exportToExcel);

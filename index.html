@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPDK Süre Takip Platformu</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+
+<body>
+    <!-- Password Protection Login Screen -->
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-container">
+            <div class="login-logo">
+                <span class="login-logo-icon">⚡</span>
+                <h1>Süre Takip</h1>
+                <p class="login-subtitle">EPDK Süre Takip Platformu</p>
+            </div>
+            <form class="login-form" id="loginForm">
+                <div class="login-input-group">
+                    <label for="passwordInput">🔒 Şifre</label>
+                    <input type="password" id="passwordInput" placeholder="Şifrenizi giriniz..." autocomplete="off"
+                        autofocus>
+                    <span class="login-error" id="loginError"></span>
+                </div>
+                <button type="submit" class="login-btn">
+                    <span>Giriş Yap</span>
+                    <span class="login-btn-icon">→</span>
+                </button>
+            </form>
+            <p class="login-footer">Yetkili personel için erişim</p>
+        </div>
+    </div>
+
+    <div class="app-container" id="appContainer" style="display: none;">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">Süre Takip</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-page="dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-page="obligations">
+                    <span class="nav-icon">📋</span>
+                    <span>Yükümlülükler</span>
+                </a>
+                <a href="#" class="nav-item" data-page="projects">
+                    <span class="nav-icon">🏭</span>
+                    <span>Projeler</span>
+                </a>
+                <a href="#" class="nav-item" data-page="analytics">
+                    <span class="nav-icon">📈</span>
+                    <span>Analiz</span>
+                </a>
+                <a href="#" class="nav-item" data-page="settings">
+                    <span class="nav-icon">⚙️</span>
+                    <span>Ayarlar</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="import-btn" id="importBtn">
+                    <span>📤</span> Excel Yükle
+                </button>
+                <input type="file" id="excelInput" accept=".xlsx,.xls" hidden>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <h1 id="pageTitle">Dashboard</h1>
+                    <p class="header-date" id="currentDate"></p>
+                </div>
+                <div class="header-right">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="globalSearch" placeholder="Proje veya yükümlülük ara...">
+                    </div>
+                </div>
+            </header>
+
+            <!-- Pages Container -->
+            <div class="pages-container">
+                <!-- Dashboard Page -->
+                <div class="page active" id="dashboardPage">
+                    <!-- Stats Cards -->
+                    <div class="stats-grid">
+                        <div class="stat-card warning">
+                            <div class="stat-icon">🟠</div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="thisWeekCount">0</span>
+                                <span class="stat-label">Bu Hafta</span>
+                            </div>
+                        </div>
+                        <div class="stat-card info">
+                            <div class="stat-icon">🟡</div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="thisMonthCount">0</span>
+                                <span class="stat-label">Bu Ay</span>
+                            </div>
+                        </div>
+                        <div class="stat-card upcoming">
+                            <div class="stat-icon">🔵</div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="upcomingCount">0</span>
+                                <span class="stat-label">Gelecek</span>
+                            </div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="completedCount">0</span>
+                                <span class="stat-label">Tamamlananlar</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Two Column Layout -->
+                    <div class="dashboard-grid">
+                        <!-- Upcoming Obligations -->
+                        <div class="card upcoming-card">
+                            <div class="card-header">
+                                <h2>🔥 En Yakın 30 Yükümlülük</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="obligations-list" id="upcomingList">
+                                    <div class="empty-state">
+                                        <span>📤</span>
+                                        <p>Excel dosyası yükleyerek başlayın</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quarterly Overview -->
+                        <div class="card quarterly-card">
+                            <div class="card-header">
+                                <h2>📅 Çeyrek Bazlı Yoğunluk</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="quarterly-chart" id="quarterlyChart">
+                                    <div class="quarter-bar" data-quarter="Q1">
+                                        <div class="bar-fill" id="q1Bar"></div>
+                                        <span class="bar-label">Q1</span>
+                                        <span class="bar-value" id="q1Value">0</span>
+                                    </div>
+                                    <div class="quarter-bar" data-quarter="Q2">
+                                        <div class="bar-fill" id="q2Bar"></div>
+                                        <span class="bar-label">Q2</span>
+                                        <span class="bar-value" id="q2Value">0</span>
+                                    </div>
+                                    <div class="quarter-bar" data-quarter="Q3">
+                                        <div class="bar-fill" id="q3Bar"></div>
+                                        <span class="bar-label">Q3</span>
+                                        <span class="bar-value" id="q3Value">0</span>
+                                    </div>
+                                    <div class="quarter-bar" data-quarter="Q4">
+                                        <div class="bar-fill" id="q4Bar"></div>
+                                        <span class="bar-label">Q4</span>
+                                        <span class="bar-value" id="q4Value">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Obligations Page -->
+                <div class="page" id="obligationsPage">
+                    <div class="filters-bar">
+                        <div class="filter-group">
+                            <label>Yükümlülük Türü:</label>
+                            <select id="typeFilter">
+                                <option value="">Tümü</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Durum:</label>
+                            <select id="statusFilter">
+                                <option value="">Tümü</option>
+                                <option value="overdue">Geciken</option>
+                                <option value="thisWeek">Bu Hafta</option>
+                                <option value="thisMonth">Bu Ay</option>
+                                <option value="upcoming">Gelecek</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Tarih Aralığı:</label>
+                            <input type="date" id="startDate">
+                            <span>-</span>
+                            <input type="date" id="endDate">
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Durum</th>
+                                    <th>Proje</th>
+                                    <th>Yükümlülük Türü</th>
+                                    <th>Yükümlülük</th>
+                                    <th>Son Tarih</th>
+                                    <th>Kalan Gün</th>
+                                    <th>Notlar</th>
+                                </tr>
+                            </thead>
+                            <tbody id="obligationsTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Projects Page -->
+                <div class="page" id="projectsPage">
+                    <div class="projects-search">
+                        <input type="text" id="projectSearch" placeholder="Proje ara...">
+                    </div>
+                    <div class="projects-grid" id="projectsGrid">
+                    </div>
+                </div>
+
+                <!-- Analytics Page -->
+                <div class="page" id="analyticsPage">
+                    <div class="analytics-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>📊 Yükümlülük Türü Dağılımı</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="type-distribution" id="typeDistribution"></div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>📅 Aylık Yoğunluk</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="monthly-chart" id="monthlyChart"></div>
+                            </div>
+                        </div>
+                        <div class="card full-width">
+                            <div class="card-header">
+                                <h2>🏭 Proje Bazlı Yükümlülük Sayısı</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="project-distribution" id="projectDistribution"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Page -->
+                <div class="page" id="settingsPage">
+                    <div class="settings-container">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>⚙️ Veri Yönetimi</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="settings-item">
+                                    <div class="settings-info">
+                                        <h3>Excel Dosyası Yükle</h3>
+                                        <p>Mevcut Excel dosyanızı yükleyin</p>
+                                    </div>
+                                    <button class="btn btn-primary" id="settingsImportBtn">📤 Yükle</button>
+                                </div>
+                                <div class="settings-item">
+                                    <div class="settings-info">
+                                        <h3>Verileri Dışa Aktar</h3>
+                                        <p>Tüm verileri Excel olarak indirin</p>
+                                    </div>
+                                    <button class="btn btn-secondary" id="exportBtn">📥 İndir</button>
+                                </div>
+                                <div class="settings-item danger">
+                                    <div class="settings-info">
+                                        <h3>Tüm Verileri Sil</h3>
+                                        <p>Dikkat: Bu işlem geri alınamaz!</p>
+                                    </div>
+                                    <button class="btn btn-danger" id="clearDataBtn">🗑️ Sil</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>📋 Veri Durumu</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="data-stats">
+                                    <div class="data-stat">
+                                        <span class="data-stat-label">Toplam Kayıt:</span>
+                                        <span class="data-stat-value" id="totalRecords">0</span>
+                                    </div>
+                                    <div class="data-stat">
+                                        <span class="data-stat-label">Proje Sayısı:</span>
+                                        <span class="data-stat-value" id="totalProjects">0</span>
+                                    </div>
+                                    <div class="data-stat">
+                                        <span class="data-stat-label">Son Güncelleme:</span>
+                                        <span class="data-stat-value" id="lastUpdate">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <span class="toast-icon"></span>
+        <span class="toast-message"></span>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle"></h3>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="embeddedData.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>

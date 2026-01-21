@@ -750,6 +750,81 @@ function closeModal() {
 }
 
 // ==========================================
+// Add Obligation Modal
+// ==========================================
+
+function showAddObligationModal() {
+    const modal = document.getElementById('addObligationModal');
+    modal.classList.add('show');
+
+    // Reset form
+    document.getElementById('addObligationForm').reset();
+
+    // Focus on first input
+    setTimeout(() => {
+        document.getElementById('projectName').focus();
+    }, 100);
+}
+
+function closeAddObligationModal() {
+    document.getElementById('addObligationModal').classList.remove('show');
+}
+
+function handleAddObligation(e) {
+    e.preventDefault();
+
+    // Get form values
+    const obligationData = {
+        projectName: document.getElementById('projectName').value.trim(),
+        projectLink: document.getElementById('projectLink').value.trim() || null,
+        obligationType: document.getElementById('obligationType').value.trim(),
+        obligationDescription: document.getElementById('obligationDescription').value.trim(),
+        deadline: document.getElementById('deadline').value,
+        notes: document.getElementById('notes').value.trim() || ''
+    };
+
+    // Validate required fields
+    if (!obligationData.projectName || !obligationData.obligationType ||
+        !obligationData.obligationDescription || !obligationData.deadline) {
+        showToast('Lütfen tüm zorunlu alanları doldurun', 'error');
+        return;
+    }
+
+    // Add new obligation
+    addNewObligation(obligationData);
+}
+
+function addNewObligation(data) {
+    const newObligation = {
+        id: generateId(),
+        projectName: data.projectName,
+        projectLink: data.projectLink,
+        obligationType: data.obligationType,
+        obligationDescription: data.obligationDescription,
+        deadline: new Date(data.deadline),
+        notes: data.notes,
+        status: 'pending',
+        createdAt: new Date(),
+        updatedAt: new Date()
+    };
+
+    // Add to obligations array
+    obligations.push(newObligation);
+
+    // Save to localStorage
+    saveData();
+
+    // Refresh all views
+    refreshAllViews();
+
+    // Close modal
+    closeAddObligationModal();
+
+    // Show success message
+    showToast(`Yeni yükümlülük eklendi: ${data.projectName}`, 'success');
+}
+
+// ==========================================
 // Toast Notifications
 // ==========================================
 
@@ -909,7 +984,18 @@ function initializeApp() {
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
             closeModal();
+            closeAddObligationModal();
         }
+    });
+
+    // Add Obligation Modal
+    document.getElementById('addObligationBtn').addEventListener('click', showAddObligationModal);
+    document.getElementById('addObligationModalClose').addEventListener('click', closeAddObligationModal);
+    document.getElementById('cancelAddObligation').addEventListener('click', closeAddObligationModal);
+    document.getElementById('addObligationForm').addEventListener('submit', handleAddObligation);
+
+    document.getElementById('addObligationModal').addEventListener('click', function (e) {
+        if (e.target === this) closeAddObligationModal();
     });
 }
 

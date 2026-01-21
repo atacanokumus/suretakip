@@ -228,29 +228,111 @@
 
                 <!-- Analytics Page -->
                 <div class="page" id="analyticsPage">
-                    <div class="analytics-grid">
-                        <div class="card">
-                            <div class="card-header">
-                                <h2>📊 Yükümlülük Türü Dağılımı</h2>
+                    <!-- Filter Panel - Header Section -->
+                    <div class="analytics-header">
+                        <h2 class="analytics-title">📊 Parametrik Analiz Araçları</h2>
+                        <p class="analytics-subtitle">İki grafiği istediğiniz parametrelerle özelleştirin ve karş
+
+                            ılaştırmalı analizler yapın</p>
+                    </div>
+
+                    <!-- Two Chart Grid -->
+                    <div class="analytics-charts-grid">
+                        <!-- Chart 1 -->
+                        <div class="chart-container">
+                            <div class="chart-controls">
+                                <h3 class="chart-title">📈 Grafik 1</h3>
+                                <div class="chart-filters">
+                                    <div class="filter-row">
+                                        <div class="filter-group">
+                                            <label>Analiz Türü:</label>
+                                            <select id="chart1AnalysisType" class="filter-select">
+                                                <option value="quarter">Çeyrek Bazlı</option>
+                                                <option value="type">Yükümlülük Türü</option>
+                                                <option value="company">Firma</option>
+                                                <option value="parentCompany">Ana Firma</option>
+                                                <option value="month">Aylık</option>
+                                            </select>
+                                        </div>
+                                        <div class="filter-group">
+                                            <label>Grafik Türü:</label>
+                                            <select id="chart1ChartType" class="filter-select">
+                                                <option value="bar">Bar Grafik</option>
+                                                <option value="pie">Pasta Grafik</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="filter-row">
+                                        <div class="filter-group">
+                                            <label>Yıl:</label>
+                                            <select id="chart1Year" class="filter-select">
+                                                <option value="2026">2026</option>
+                                                <option value="2025">2025</option>
+                                                <option value="2027">2027</option>
+                                                <option value="all">Tüm Yıllar</option>
+                                            </select>
+                                        </div>
+                                        <div class="filter-group">
+                                            <button class="btn btn-primary btn-small"
+                                                id="chart1Update">Güncelle</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="card-body">
-                                <div class="type-distribution" id="typeDistribution"></div>
+                            <div class="chart-body" id="chart1Container">
+                                <div class="chart-placeholder">
+                                    <span>📊</span>
+                                    <p>Parametreleri ayarlayıp "Güncelle" butonuna tıklayın</p>
+                                </div>
                             </div>
                         </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <h2>📅 Aylık Yoğunluk</h2>
+
+                        <!-- Chart 2 -->
+                        <div class="chart-container">
+                            <div class="chart-controls">
+                                <h3 class="chart-title">📉 Grafik 2</h3>
+                                <div class="chart-filters">
+                                    <div class="filter-row">
+                                        <div class="filter-group">
+                                            <label>Analiz Türü:</label>
+                                            <select id="chart2AnalysisType" class="filter-select">
+                                                <option value="quarter">Çeyrek Bazlı</option>
+                                                <option value="type" selected>Yükümlülük Türü</option>
+                                                <option value="company">Firma</option>
+                                                <option value="parentCompany">Ana Firma</option>
+                                                <option value="month">Aylık</option>
+                                            </select>
+                                        </div>
+                                        <div class="filter-group">
+                                            <label>Grafik Türü:</label>
+                                            <select id="chart2ChartType" class="filter-select">
+                                                <option value="bar">Bar Grafik</option>
+                                                <option value="pie" selected>Pasta Grafik</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="filter-row">
+                                        <div class="filter-group">
+                                            <label>Yıl:</label>
+                                            <select id="chart2Year" class="filter-select">
+                                                <option value="2026">2026</option>
+                                                <option value="2025">2025</option>
+                                                <option value="2027">2027</option>
+                                                <option value="all">Tüm Yıllar</option>
+                                            </select>
+                                        </div>
+                                        <div class="filter-group">
+                                            <button class="btn btn-primary btn-small"
+                                                id="chart2Update">Güncelle</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="card-body">
-                                <div class="monthly-chart" id="monthlyChart"></div>
-                            </div>
-                        </div>
-                        <div class="card full-width">
-                            <div class="card-header">
-                                <h2>🏭 Proje Bazlı Yükümlülük Sayısı</h2>
-                            </div>
-                            <div class="card-body">
-                                <div class="project-distribution" id="projectDistribution"></div>
+                            <div class="chart-body" id="chart2Container">
+                                <div class="chart-placeholder">
+                                    <span>📊</span>
+                                    <p>Parametreleri ayarlayıp "Güncelle" butonuna tıklayın</p>
+                                </div>
                             </div>
                         </div>
                     </div>

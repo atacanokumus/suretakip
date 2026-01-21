@@ -608,87 +608,197 @@ function updateProjectsGrid() {
 }
 
 // ==========================================
-// Analytics Page
+// Analytics Page - Parametric Charts
 // ==========================================
 
-function updateAnalytics() {
-    updateTypeDistribution();
-    updateMonthlyChart();
-    updateProjectDistribution();
-}
-
-function updateTypeDistribution() {
-    const container = document.getElementById('typeDistribution');
-
-    // Group by type
-    const types = {};
-    obligations.forEach(o => {
-        const type = o.obligationType || 'Belirtilmemiş';
-        types[type] = (types[type] || 0) + 1;
+// Enrich obligations with company data
+function enrichObligationsWithCompanyData() {
+    return obligations.map(o => {
+        const companyInfo = matchProjectToCompany(o.projectName);
+        return {
+            ...o,
+            company: companyInfo ? companyInfo.company : 'Belirtilmemiş',
+            parentCompany: companyInfo ? companyInfo.parentCompany : 'Belirtilmemiş'
+        };
     });
-
-    const sorted = Object.entries(types).sort((a, b) => b[1] - a[1]);
-    const max = sorted.length > 0 ? sorted[0][1] : 1;
-
-    container.innerHTML = sorted.map(([type, count]) => `
-        <div class="distribution-item">
-            <span class="distribution-label" title="${escapeHtml(type)}">${escapeHtml(type)}</span>
-            <div class="distribution-bar">
-                <div class="distribution-bar-fill" style="width: ${(count / max) * 100}%"></div>
-            </div>
-            <span class="distribution-value">${count}</span>
-        </div>
-    `).join('');
 }
 
-function updateMonthlyChart() {
-    const container = document.getElementById('monthlyChart');
-    const currentYear = new Date().getFullYear();
-    const months = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
-    const monthlyCounts = new Array(12).fill(0);
+// Group data based on analysis type
+function groupDataByType(enrichedObligations, analysisType, year) {
+    const groups = {};
 
-    obligations.forEach(o => {
-        const year = new Date(o.deadline).getFullYear();
-        if (year === currentYear) {
-            const month = new Date(o.deadline).getMonth();
-            monthlyCounts[month]++;
+    enrichedObligations.forEach(o => {
+        // Year filter
+        const oblYear = new Date(o.deadline).getFullYear();
+        if (year !== 'all' && oblYear !== parseInt(year)) {
+            return;
         }
+
+        let key;
+        switch (analysisType) {
+            case 'quarter':
+                const quarter = getQuarter(o.deadline);
+                const qYear = new Date(o.deadline).getFullYear();
+                key = `${qYear} Q${quarter}`;
+                break;
+            case 'type':
+                key = o.obligationType || 'Belirtilmemiş';
+                break;
+            case 'company':
+                key = o.company;
+                break;
+            case 'parentCompany':
+                key = o.parentCompany;
+                break;
+            case 'month':
+                const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+                    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+                const monthIndex = new Date(o.deadline).getMonth();
+                key = months[monthIndex];
+                break;
+            default:
+                key = 'Unknown';
+        }
+
+        groups[key] = (groups[key] || 0) + 1;
     });
 
-    const max = Math.max(...monthlyCounts, 1);
-
-    container.innerHTML = months.map((month, i) => `
-        <div class="month-bar">
-            <div class="month-bar-fill" style="height: ${(monthlyCounts[i] / max) * 150}px">
-                ${monthlyCounts[i] > 0 ? `<span class="month-bar-value">${monthlyCounts[i]}</span>` : ''}
-            </div>
-            <span class="month-bar-label">${month}</span>
-        </div>
-    `).join('');
+    return groups;
 }
 
-function updateProjectDistribution() {
-    const container = document.getElementById('projectDistribution');
+// Render bar chart
+function renderBarChart(containerId, data) {
+    const container = document.getElementById(containerId);
+    const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
+    const max = entries.length > 0 ? Math.max(...entries.map(e => e[1])) : 1;
 
-    // Group by project
-    const projects = {};
-    obligations.forEach(o => {
-        projects[o.projectName] = (projects[o.projectName] || 0) + 1;
-    });
-
-    const sorted = Object.entries(projects).sort((a, b) => b[1] - a[1]).slice(0, 10);
-    const max = sorted.length > 0 ? sorted[0][1] : 1;
-
-    container.innerHTML = sorted.map(([project, count]) => `
-        <div class="distribution-item">
-            <span class="distribution-label" title="${escapeHtml(project)}">${escapeHtml(project)}</span>
-            <div class="distribution-bar">
-                <div class="distribution-bar-fill" style="width: ${(count / max) * 100}%"></div>
+    if (entries.length === 0) {
+        container.innerHTML = `
+            <div class="chart-placeholder">
+                <span>📊</span>
+                <p>Seçilen parametrelere göre veri bulunamadı</p>
             </div>
-            <span class="distribution-value">${count}</span>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="chart-bars">
+            ${entries.map(([label, value]) => `
+                <div class="chart-bar-item">
+                    <div class="chart-bar-label">${escapeHtml(label)}</div>
+                    <div class="chart-bar-track">
+                        <div class="chart-bar-fill" style="width: ${(value / max) * 100}%">
+                            <span class="chart-bar-value">${value}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
         </div>
-    `).join('');
+    `;
 }
+
+// Render pie chart
+function renderPieChart(containerId, data) {
+    const container = document.getElementById(containerId);
+    const entries = Object.entries(data).sort((a, b) => b[1] - a[1]).slice(0, 10); // Top 10
+
+    if (entries.length === 0) {
+        container.innerHTML = `
+            <div class="chart-placeholder">
+                <span>📊</span>
+                <p>Seçilen parametrelere göre veri bulunamadı</p>
+            </div>
+        `;
+        return;
+    }
+
+    const total = entries.reduce((sum, [, value]) => sum + value, 0);
+    const colors = [
+        '#667eea', '#764ba2', '#f093fb', '#f5576c',
+        '#4facfe', '#00f2fe', '#43e97b', '#38f9d7',
+        '#fa709a', '#fee140'
+    ];
+
+    // Simple pie chart using div-based approach
+    container.innerHTML = `
+        <div class="chart-pie">
+            <div class="pie-canvas-container">
+                <svg width="300" height="300" viewBox="0 0 300 300">
+                    ${createPieSlices(entries, total, colors)}
+                </svg>
+            </div>
+            <div class="pie-legend">
+                ${entries.map(([label, value], index) => `
+                    <div class="pie-legend-item">
+                        <div class="pie-legend-color" style="background: ${colors[index % colors.length]}"></div>
+                        <div class="pie-legend-label">${escapeHtml(label)}</div>
+                        <div class="pie-legend-value">${value} (${Math.round(value / total * 100)}%)</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function createPieSlices(entries, total, colors) {
+    let currentAngle = -90; // Start from top
+    const centerX = 150;
+    const centerY = 150;
+    const radius = 120;
+
+    return entries.map(([, value], index) => {
+        const percentage = value / total;
+        const angle = percentage * 360;
+        const endAngle = currentAngle + angle;
+
+        const startX = centerX + radius * Math.cos((currentAngle * Math.PI) / 180);
+        const startY = centerY + radius * Math.sin((currentAngle * Math.PI) / 180);
+        const endX = centerX + radius * Math.cos((endAngle * Math.PI) / 180);
+        const endY = centerY + radius * Math.sin((endAngle * Math.PI) / 180);
+
+        const largeArcFlag = angle > 180 ? 1 : 0;
+
+        const pathData = `
+            M ${centerX} ${centerY}
+            L ${startX} ${startY}
+            A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY}
+            Z
+        `;
+
+        currentAngle = endAngle;
+
+        return `<path d="${pathData}" fill="${colors[index % colors.length]}" stroke="#1a1a2e" stroke-width="2"/>`;
+    }).join('');
+}
+
+// Generate chart based on config
+function generateChart(chartNumber) {
+    const analysisType = document.getElementById(`chart${chartNumber}AnalysisType`).value;
+    const chartType = document.getElementById(`chart${chartNumber}ChartType`).value;
+    const year = document.getElementById(`chart${chartNumber}Year`).value;
+    const containerId = `chart${chartNumber}Container`;
+
+    // Enrich data
+    const enrichedData = enrichObligationsWithCompanyData();
+
+    // Group data
+    const groupedData = groupDataByType(enrichedData, analysisType, year);
+
+    // Render chart
+    if (chartType === 'bar') {
+        renderBarChart(containerId, groupedData);
+    } else if (chartType === 'pie') {
+        renderPieChart(containerId, groupedData);
+    }
+}
+
+// Initialize analytics page (called when navigating to analytics)
+function updateAnalytics() {
+    // Initialize charts with default state (placeholder)
+    // Users will click "Güncelle" to generate charts
+}
+
 
 // ==========================================
 // Settings Page
@@ -994,6 +1104,17 @@ function initializeApp() {
             closeAddObligationModal();
         }
     });
+
+    // Parametric Analytics Charts
+    const chart1UpdateBtn = document.getElementById('chart1Update');
+    const chart2UpdateBtn = document.getElementById('chart2Update');
+
+    if (chart1UpdateBtn) {
+        chart1UpdateBtn.addEventListener('click', () => generateChart(1));
+    }
+    if (chart2UpdateBtn) {
+        chart2UpdateBtn.addEventListener('click', () => generateChart(2));
+    }
 
     // Add Obligation Modal
     document.getElementById('addObligationBtn').addEventListener('click', showAddObligationModal);

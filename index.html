@@ -64,6 +64,12 @@
                     <span>Ayarlar</span>
                 </a>
             </nav>
+            <div class="sidebar-footer">
+                <button class="help-btn" id="sidebarHelpBtn" style="width: 100%;">
+                    <span>❓</span>
+                    <span>Nasıl Kullanılır?</span>
+                </button>
+            </div>
         </aside>
 
         <!-- Main Content -->
@@ -75,6 +81,10 @@
                     <p class="header-date" id="currentDate"></p>
                 </div>
                 <div class="header-right">
+                    <button class="help-btn" id="headerHelpBtn" title="Nasıl Kullanılır?">
+                        <span class="btn-icon">❓</span>
+                        <span>Nasıl Kullanılır?</span>
+                    </button>
                     <button class="add-obligation-btn" id="addObligationBtn">
                         <span class="btn-icon">➕</span>
                         <span>Yeni Yükümlülük</span>
@@ -400,6 +410,121 @@
     <div class="toast" id="toast">
         <span class="toast-icon"></span>
         <span class="toast-message"></span>
+    </div>
+
+    <!-- Help / Tutorial Modal -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal help-modal-content">
+            <div class="help-header">
+                <h2>📖 Kullanım Kılavuzu</h2>
+                <button class="modal-close" id="helpModalClose">&times;</button>
+            </div>
+            <div class="help-body">
+                <!-- Section 0: Intro Video -->
+                <section class="tutorial-section">
+                    <h3><span class="step-badge">1</span> Uygulamaya Hızlı Bakış</h3>
+                    <div class="tutorial-content">
+                        <div class="tutorial-text">
+                            <p>EPDK Süre Takip Platformu, projelerinize ait yükümlülükleri ve kritik tarihleri merkezi
+                                bir yerden yönetmenizi sağlar.</p>
+                            <ul>
+                                <li>Güvenli giriş ve yetkilendirme.</li>
+                                <li>Anlık durum takibi ve süre sayaçları.</li>
+                                <li>Gelişmiş veri görselleştirme araçları.</li>
+                            </ul>
+                        </div>
+                        <div class="tutorial-media">
+                            <video src="assets/tutorial/intro_vid.webp" autoplay loop muted playsinline></video>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 1: Dashboard -->
+                <section class="tutorial-section">
+                    <h3><span class="step-badge">2</span> Dashboard Paneli</h3>
+                    <div class="tutorial-content">
+                        <div class="tutorial-text">
+                            <p>Uygulamaya giriş yaptığınızda sizi <strong>Dashboard</strong> karşılar. Burada:</p>
+                            <ul>
+                                <li><strong>Özet Kartları:</strong> Bu hafta, bu ay ve gelecekteki yükümlülük sayılarını
+                                    anlık görün.</li>
+                                <li><strong>En Yakın 30 Yükümlülük:</strong> Tarihi en yakın olan işleri süre sayacı ile
+                                    birlikte takip edin.</li>
+                                <li><strong>Çeyrek Bazlı Yoğunluk:</strong> Yılın hangi döneminde iş yükünüzün ne kadar
+                                    olduğunu grafiksel olarak görün.</li>
+                            </ul>
+                        </div>
+                        <div class="tutorial-media">
+                            <img src="assets/tutorial/dashboard.png" alt="Dashboard Tutorial">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 2: Yükümlülükler -->
+                <section class="tutorial-section">
+                    <h3><span class="step-badge">3</span> Yükümlülük Yönetimi</h3>
+                    <div class="tutorial-content">
+                        <div class="tutorial-text">
+                            <p>Sol menüden <strong>Yükümlülükler</strong> sayfasına geçerek tüm kayıtları
+                                yönetebilirsiniz:</p>
+                            <ul>
+                                <li><strong>Filtreleme:</strong> Üstteki butonlarla tür bazlı hızlı filtreleme yapın.
+                                </li>
+                                <li><strong>Arama:</strong> Sağ üstteki arama çubuğu ile proje veya yükümlülük adına
+                                    göre arama yapın.</li>
+                                <li><strong>Detaylar:</strong> Listeden bir kayda tıklayarak tüm detayları ve M-Files
+                                    linkini görüntüleyin.</li>
+                            </ul>
+                        </div>
+                        <div class="tutorial-media">
+                            <img src="assets/tutorial/obligations.png" alt="Yükümlülükler Tutorial">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 3: Analiz -->
+                <section class="tutorial-section">
+                    <h3><span class="step-badge">4</span> Gelişmiş Analiz Araçları</h3>
+                    <div class="tutorial-content">
+                        <div class="tutorial-text">
+                            <p><strong>Analiz</strong> sayfası ile verilerinizi farklı boyutlarda karşılaştırın:</p>
+                            <ul>
+                                <li><strong>Çift Grafik:</strong> İki farklı grafiği yan yana getirerek karşılaştırmalı
+                                    analiz yapın.</li>
+                                <li><strong>Esnek Parametreler:</strong> Ana Firma, Şirket, Çeyrek veya Aylık bazda
+                                    analiz türünü seçin.</li>
+                                <li><strong>Grafik Türleri:</strong> Veriye göre Pasta veya Bar grafik seçeneğini
+                                    kullanın.</li>
+                            </ul>
+                        </div>
+                        <div class="tutorial-media">
+                            <img src="assets/tutorial/analytics.png" alt="Analiz Tutorial">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section 4: Yeni Kayıt -->
+                <section class="tutorial-section">
+                    <h3><span class="step-badge">5</span> Yeni Kayıt Ekleme</h3>
+                    <div class="tutorial-content">
+                        <div class="tutorial-text">
+                            <p>Herhangi bir sayfadayken sağ üstteki <strong>➕ Yeni Yükümlülük</strong> butonunu
+                                kullanabilirsiniz:</p>
+                            <ul>
+                                <li>Gerekli alanları doldurun (Yıldızlı alanlar zorunludur).</li>
+                                <li>Kaydettiğiniz veriler anlık olarak listeye eklenir ve Dashboard güncellenir.</li>
+                            </ul>
+                        </div>
+                        <div class="tutorial-media">
+                            <img src="assets/tutorial/add_new.png" alt="Yeni Kayıt Tutorial">
+                        </div>
+                    </div>
+                </section>
+            </div>
+            <div class="tutorial-footer">
+                <button class="btn btn-primary" id="helpModalOk">Anladım</button>
+            </div>
+        </div>
     </div>
 
     <!-- Add Obligation Modal -->

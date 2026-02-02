@@ -86,22 +86,202 @@ document.head.appendChild(shakeStyle);
 // ==========================================
 
 const STORAGE_KEY = 'epdk_obligations';
+const MAX_STORAGE_SIZE_MB = 5; // LocalStorage limit warning threshold
 
 let obligations = [];
 
+// ==========================================
+// Validation Utilities
+// ==========================================
+
+/**
+ * Validates and sanitizes a string input
+ * @param {*} input - Input to validate
+ * @param {number} maxLength - Maximum allowed length
+ * @returns {string} Sanitized string
+ */
+function validateString(input, maxLength = 500) {
+    if (input === null || input === undefined) return '';
+    const str = String(input).trim();
+    // Remove potentially dangerous characters but keep Turkish characters
+    const sanitized = str.replace(/[<>]/g, '');
+    return sanitized.substring(0, maxLength);
+}
+
+/**
+ * Validates a date value
+ * @param {*} value - Date value to validate
+ * @returns {{valid: boolean, date: Date|null, error: string|null}}
+ */
+function validateDate(value) {
+    if (!value) {
+        return { valid: false, date: null, error: 'Tarih boş olamaz' };
+    }
+
+    const parsed = parseExcelDate(value);
+    if (!parsed || isNaN(parsed.getTime())) {
+        return { valid: false, date: null, error: 'Geçersiz tarih formatı' };
+    }
+
+    // Check for reasonable date range (1900-2100)
+    const year = parsed.getFullYear();
+    if (year < 1900 || year > 2100) {
+        return { valid: false, date: null, error: 'Tarih mantıklı aralıkta değil' };
+    }
+
+    return { valid: true, date: parsed, error: null };
+}
+
+/**
+ * Validates an obligation object
+ * @param {Object} obligation - Obligation to validate
+ * @returns {{valid: boolean, errors: string[]}}
+ */
+function validateObligation(obligation) {
+    const errors = [];
+
+    if (!obligation.projectName || obligation.projectName.trim() === '') {
+        errors.push('Proje adı zorunludur');
+    }
+
+    const dateResult = validateDate(obligation.deadline);
+    if (!dateResult.valid) {
+        errors.push(dateResult.error);
+    }
+
+    return { valid: errors.length === 0, errors };
+}
+
+// ==========================================
+// Safe Storage Operations
+// ==========================================
+
+/**
+ * Safely gets item from localStorage with error handling
+ * @param {string} key - Storage key
+ * @returns {*} Parsed value or null
+ */
+function safeGetStorage(key) {
+    try {
+        const item = localStorage.getItem(key);
+        return item ? JSON.parse(item) : null;
+    } catch (error) {
+        console.error(`LocalStorage okuma hatası (${key}):`, error);
+        return null;
+    }
+}
+
+/**
+ * Safely sets item to localStorage with error handling
+ * @param {string} key - Storage key
+ * @param {*} value - Value to store
+ * @returns {boolean} Success status
+ */
+function safeSetStorage(key, value) {
+    try {
+        const serialized = JSON.stringify(value);
+
+        // Check storage size before saving
+        const sizeInMB = new Blob([serialized]).size / (1024 * 1024);
+        if (sizeInMB > MAX_STORAGE_SIZE_MB) {
+            console.warn(`Veri boyutu uyarısı: ${sizeInMB.toFixed(2)}MB`);
+        }
+
+        localStorage.setItem(key, serialized);
+        return true;
+    } catch (error) {
+        console.error(`LocalStorage yazma hatası (${key}):`, error);
+
+        // Handle quota exceeded error
+        if (error.name === 'QuotaExceededError' || error.code === 22) {
+            showToast('Depolama alanı dolu! Eski verileri temizlemeyi deneyin.', 'error');
+        } else {
+            showToast('Veri kaydedilemedi. Lütfen tekrar deneyin.', 'error');
+        }
+        return false;
+    }
+}
+
+// ==========================================
+// Error Handling Utilities
+// ==========================================
+
+/**
+ * Wraps an async function with error handling
+ * @param {Function} fn - Async function to wrap
+ * @param {string} errorMessage - User-friendly error message
+ * @returns {Function} Wrapped function
+ */
+function withErrorHandling(fn, errorMessage = 'Bir hata oluştu') {
+    return async function (...args) {
+        try {
+            return await fn.apply(this, args);
+        } catch (error) {
+            console.error('İşlem hatası:', error);
+            showToast(errorMessage, 'error');
+            throw error;
+        }
+    };
+}
+
+/**
+ * Logs error with context for debugging
+ * @param {string} context - Error context
+ * @param {Error} error - Error object
+ * @param {Object} additionalData - Extra data for debugging
+ */
+function logError(context, error, additionalData = {}) {
+    const errorLog = {
+        timestamp: new Date().toISOString(),
+        context,
+        message: error.message,
+        stack: error.stack,
+        ...additionalData
+    };
+    console.error('Hata Detayı:', errorLog);
+
+    // Store last 10 errors for debugging
+    try {
+        const errors = JSON.parse(localStorage.getItem('epdk_error_log') || '[]');
+        errors.unshift(errorLog);
+        localStorage.setItem('epdk_error_log', JSON.stringify(errors.slice(0, 10)));
+    } catch (e) {
+        // Silent fail for error logging
+    }
+}
+
 function loadData() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-        obligations = JSON.parse(saved);
-        // Convert date strings back to Date objects
-        obligations.forEach(o => {
-            o.deadline = new Date(o.deadline);
-            o.createdAt = new Date(o.createdAt);
-            o.updatedAt = new Date(o.updatedAt);
-        });
-    } else if (typeof EMBEDDED_DATA !== 'undefined' && EMBEDDED_DATA.length > 0) {
-        // Load embedded data if no saved data exists
-        loadEmbeddedData();
+    try {
+        const saved = safeGetStorage(STORAGE_KEY);
+        if (saved && Array.isArray(saved)) {
+            obligations = saved.map(o => {
+                // Validate and convert date strings back to Date objects safely
+                try {
+                    return {
+                        ...o,
+                        projectName: validateString(o.projectName, 200),
+                        obligationType: validateString(o.obligationType, 200),
+                        obligationDescription: validateString(o.obligationDescription, 500),
+                        notes: validateString(o.notes, 1000),
+                        deadline: new Date(o.deadline),
+                        createdAt: o.createdAt ? new Date(o.createdAt) : new Date(),
+                        updatedAt: o.updatedAt ? new Date(o.updatedAt) : new Date()
+                    };
+                } catch (e) {
+                    logError('loadData.parseItem', e, { item: o });
+                    return null;
+                }
+            }).filter(o => o !== null && o.deadline && !isNaN(o.deadline.getTime()));
+        } else if (typeof EMBEDDED_DATA !== 'undefined' && EMBEDDED_DATA.length > 0) {
+            // Load embedded data if no saved data exists
+            loadEmbeddedData();
+        }
+    } catch (error) {
+        logError('loadData', error);
+        showToast('Veri yükleme hatası. Varsayılan veriler kullanılıyor.', 'error');
+        if (typeof EMBEDDED_DATA !== 'undefined' && EMBEDDED_DATA.length > 0) {
+            loadEmbeddedData();
+        }
     }
     return obligations;
 }
@@ -125,8 +305,15 @@ function loadEmbeddedData() {
 }
 
 function saveData() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(obligations));
-    localStorage.setItem('epdk_lastUpdate', new Date().toISOString());
+    const success = safeSetStorage(STORAGE_KEY, obligations);
+    if (success) {
+        try {
+            localStorage.setItem('epdk_lastUpdate', new Date().toISOString());
+        } catch (e) {
+            // Non-critical, silent fail
+        }
+    }
+    return success;
 }
 
 function clearAllData() {
@@ -144,11 +331,37 @@ function clearAllData() {
 // ==========================================
 
 function handleExcelImport(file) {
+    // Validate file before processing
+    if (!file) {
+        showToast('Dosya seçilmedi', 'error');
+        return;
+    }
+
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    const fileName = file.name.toLowerCase();
+    if (!validExtensions.some(ext => fileName.endsWith(ext))) {
+        showToast('Geçersiz dosya formatı. Excel veya CSV dosyası seçin.', 'error');
+        return;
+    }
+
     const reader = new FileReader();
+
+    // Handle file read errors
+    reader.onerror = function (e) {
+        logError('handleExcelImport.fileRead', new Error('Dosya okunamadı'), { fileName: file.name });
+        showToast('Dosya okunamadı. Lütfen tekrar deneyin.', 'error');
+    };
+
     reader.onload = function (e) {
         try {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
+
+            if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+                showToast('Excel dosyasında sayfa bulunamadı', 'error');
+                return;
+            }
+
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
 
@@ -156,40 +369,54 @@ function handleExcelImport(file) {
             const startRow = isHeaderRow(jsonData[0]) ? 1 : 0;
 
             obligations = [];
+            let skippedRows = 0;
+
             for (let i = startRow; i < jsonData.length; i++) {
                 const row = jsonData[i];
                 if (!row || row.length === 0 || !row[0]) continue;
 
-                // Parse the row
-                const projectCell = row[0] || '';
-                const { name: projectName, link: projectLink } = parseProjectCell(projectCell);
-                const obligationType = row[1] || '';
-                const obligationDescription = row[2] || '';
-                const deadline = parseExcelDate(row[3]);
-                const notes = row[4] || '';
+                try {
+                    // Parse and validate the row with sanitization
+                    const projectCell = row[0] || '';
+                    const { name: projectName, link: projectLink } = parseProjectCell(projectCell);
+                    const obligationType = validateString(row[1], 200);
+                    const obligationDescription = validateString(row[2], 500);
+                    const dateResult = validateDate(row[3]);
+                    const notes = validateString(row[4], 1000);
 
-                if (projectName && deadline) {
-                    obligations.push({
-                        id: generateId(),
-                        projectName,
-                        projectLink,
-                        obligationType,
-                        obligationDescription,
-                        deadline,
-                        notes,
-                        status: 'pending',
-                        createdAt: new Date(),
-                        updatedAt: new Date()
-                    });
+                    if (projectName && dateResult.valid) {
+                        obligations.push({
+                            id: generateId(),
+                            projectName: validateString(projectName, 200),
+                            projectLink,
+                            obligationType,
+                            obligationDescription,
+                            deadline: dateResult.date,
+                            notes,
+                            status: 'pending',
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        });
+                    } else {
+                        skippedRows++;
+                    }
+                } catch (rowError) {
+                    logError('handleExcelImport.parseRow', rowError, { rowIndex: i });
+                    skippedRows++;
                 }
             }
 
-            saveData();
-            refreshAllViews();
-            showToast(`${obligations.length} kayıt başarıyla yüklendi`, 'success');
+            if (saveData()) {
+                refreshAllViews();
+                let message = `${obligations.length} kayıt başarıyla yüklendi`;
+                if (skippedRows > 0) {
+                    message += `. ${skippedRows} satır atlandı.`;
+                }
+                showToast(message, 'success');
+            }
         } catch (error) {
-            console.error('Excel import error:', error);
-            showToast('Excel dosyası okunamadı', 'error');
+            logError('handleExcelImport', error, { fileName: file.name });
+            showToast('Excel dosyası işlenirken hata oluştu. Format doğru mu?', 'error');
         }
     };
     reader.readAsArrayBuffer(file);
@@ -870,6 +1097,22 @@ function closeModal() {
 // Add Obligation Modal
 // ==========================================
 
+function showHelpModal() {
+    const modal = document.getElementById('helpModal');
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+
+    // Reset scroll to top
+    const body = modal.querySelector('.help-body');
+    if (body) body.scrollTop = 0;
+}
+
+function closeHelpModal() {
+    const modal = document.getElementById('helpModal');
+    modal.classList.remove('show');
+    document.body.style.overflow = '';
+}
+
 function showAddObligationModal() {
     const modal = document.getElementById('addObligationModal');
     modal.classList.add('show');
@@ -1102,11 +1345,27 @@ function initializeApp() {
         searchTimeout = setTimeout(updateProjectsGrid, 300);
     });
 
+    // Help Modal
+    document.querySelectorAll('.help-btn').forEach(btn => {
+        btn.addEventListener('click', showHelpModal);
+    });
+
+    const helpClose = document.getElementById('helpModalClose');
+    if (helpClose) helpClose.addEventListener('click', closeHelpModal);
+
+    const helpOk = document.getElementById('helpModalOk');
+    if (helpOk) helpOk.addEventListener('click', closeHelpModal);
+
+    document.getElementById('helpModal').addEventListener('click', function (e) {
+        if (e.target === this) closeHelpModal();
+    });
+
     // Keyboard shortcuts
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
             closeModal();
             closeAddObligationModal();
+            closeHelpModal();
         }
     });
 

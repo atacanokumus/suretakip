@@ -1480,7 +1480,9 @@ body {
 
 .btn-secondary:hover {
     background: var(--bg-card);
-}/* ==========================================
+}
+
+/* ==========================================
    Advanced Analytics Page
    ========================================== */
 
@@ -1684,6 +1686,173 @@ body {
 /* Responsive */
 @media (max-width: 1400px) {
     .analytics-charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ==========================================
+   Help / Tutorial Modal
+   ========================================== */
+
+.help-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+    padding: 10px 18px;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all var(--transition-normal);
+}
+
+.help-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+}
+
+.help-modal-content {
+    max-width: 1000px !important;
+    width: 90% !important;
+    padding: 0 !important;
+    background: var(--bg-main) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    overflow: hidden;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.help-header {
+    padding: 24px 32px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-card);
+}
+
+.help-header h2 {
+    font-size: 22px;
+    margin: 0;
+    background: var(--accent-gradient);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.help-body {
+    padding: 32px;
+    overflow-y: auto;
+    background: var(--bg-main);
+}
+
+.tutorial-section {
+    margin-bottom: 60px;
+    padding-bottom: 60px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tutorial-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.tutorial-section h3 {
+    font-size: 20px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-primary);
+}
+
+.tutorial-section h3 .step-badge {
+    background: var(--accent-gradient);
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.tutorial-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    align-items: start;
+}
+
+.tutorial-text {
+    color: var(--text-secondary);
+    line-height: 1.7;
+    font-size: 15px;
+}
+
+.tutorial-text p {
+    margin-bottom: 16px;
+}
+
+.tutorial-text ul {
+    margin-top: 12px;
+    padding-left: 20px;
+}
+
+.tutorial-text li {
+    margin-bottom: 12px;
+    position: relative;
+    list-style: none;
+}
+
+.tutorial-text li::before {
+    content: "•";
+    color: var(--accent-primary);
+    font-weight: bold;
+    display: inline-block;
+    width: 1em;
+    margin-left: -1em;
+}
+
+.tutorial-media {
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    transition: transform var(--transition-normal);
+}
+
+.tutorial-media:hover {
+    transform: scale(1.02);
+}
+
+.tutorial-media img,
+.tutorial-media video {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.tutorial-footer {
+    padding: 24px 32px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    text-align: right;
+    background: var(--bg-card);
+}
+
+@media (max-width: 900px) {
+    .tutorial-content {
         grid-template-columns: 1fr;
     }
 }

@@ -32,12 +32,16 @@ export function showToast(message, type = 'info') {
  * Handles application view navigation
  */
 export function initNavigation() {
-    const navItems = document.querySelectorAll('.nav-items .nav-item');
+    const navItems = document.querySelectorAll('.nav-menu .nav-item');
     const pages = document.querySelectorAll('.page');
 
     navItems.forEach(item => {
-        item.addEventListener('click', () => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
             const pageId = item.getAttribute('data-page');
+            const targetPage = document.getElementById(pageId);
+
+            if (!targetPage) return;
 
             // Update nav active state
             navItems.forEach(nav => nav.classList.remove('active'));
@@ -45,15 +49,16 @@ export function initNavigation() {
 
             // Show current page
             pages.forEach(page => {
-                if (page.id === pageId) {
-                    page.classList.add('active');
-                } else {
-                    page.classList.remove('active');
-                }
+                page.classList.remove('active');
             });
+            targetPage.classList.add('active');
 
-            // Close mobile sidebar if necessary
-            // (Wait for future mobile improvements)
+            // Update header title
+            const pageTitle = document.getElementById('pageTitle');
+            if (pageTitle) {
+                const spanText = item.querySelector('span:last-child');
+                pageTitle.textContent = spanText ? spanText.textContent : 'Dashboard';
+            }
         });
     });
 }
@@ -77,18 +82,26 @@ export function showApp() {
  * Initializes modal close handlers
  */
 export function initModals() {
+    // Close on background click
     window.addEventListener('click', (event) => {
-        const modals = document.querySelectorAll('.modal');
-        modals.forEach(modal => {
-            if (event.target === modal) {
-                modal.classList.remove('show');
-            }
+        if (event.target.classList.contains('modal-overlay')) {
+            event.target.classList.remove('show');
+        }
+    });
+
+    // Close on button click
+    document.querySelectorAll('.modal-close').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const overlay = btn.closest('.modal-overlay');
+            if (overlay) overlay.classList.remove('show');
         });
     });
 
-    document.querySelectorAll('.close-modal').forEach(btn => {
+    // Handle cancel buttons in forms
+    document.querySelectorAll('.btn-secondary[id^="cancel"]').forEach(btn => {
         btn.addEventListener('click', () => {
-            btn.closest('.modal').classList.remove('show');
+            const overlay = btn.closest('.modal-overlay');
+            if (overlay) overlay.classList.remove('show');
         });
     });
 }

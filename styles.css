@@ -128,13 +128,14 @@ body {
     }
 }
 
-.login-logo h1 {
-    font-size: 32px;
-    font-weight: 700;
+.logo-text {
+    font-size: 22px;
+    font-weight: 800;
     background: var(--accent-gradient);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.04em;
 }
 
 .login-subtitle {
@@ -1460,33 +1461,69 @@ tr:hover td {
 }
 
 /* ==========================================
-   Add Obligation Button
+   Premium Buttons & Animations
    ========================================== */
 
 .add-obligation-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
+    padding: 12px 20px;
     background: var(--accent-gradient);
     border: none;
     border-radius: var(--border-radius);
     color: white;
-    font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
-    transition: all var(--transition-normal);
-    box-shadow: var(--shadow-glow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s var(--transition-subtle);
+    box-shadow: 0 8px 20px -5px rgba(99, 102, 241, 0.4);
     margin-right: 16px;
 }
 
 .add-obligation-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 0 30px rgba(102, 126, 234, 0.5);
+    box-shadow: 0 12px 35px -5px rgba(99, 102, 241, 0.6);
 }
 
-.add-obligation-btn .btn-icon {
-    font-size: 16px;
+.help-btn {
+    padding: 10px 16px;
+    background: var(--surface-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--border-radius);
+    color: var(--text-secondary);
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s var(--transition-subtle);
+}
+
+.help-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-8px);
+    }
+
+    50% {
+        transform: translateX(8px);
+    }
+
+    75% {
+        transform: translateX(-8px);
+    }
 }
 
 /* ==========================================

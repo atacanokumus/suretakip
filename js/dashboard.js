@@ -1,10 +1,7 @@
-/**
- * Dashboard module for EPDK Süre Takip Platformu
- */
-
+import { auth } from './firebase-config.js';
 import { Store } from './store.js';
 import {
-    getDaysUntil, getStatus, getStatusText, formatDate, getQuarter, escapeHtml
+    getDaysUntil, getStatus, getStatusText, formatDate, getQuarter, escapeHtml, isInThisCalendarMonth
 } from './utils.js';
 
 /**
@@ -12,24 +9,39 @@ import {
  */
 export function updateDashboard() {
     const obligations = Store.obligations;
+    const jobs = Store.jobs || [];
+    const currentUserEmail = auth.currentUser?.email;
 
-    // Calculate stats
-    let completed = 0, thisWeek = 0, thisMonth = 0, upcoming = 0;
+    // 1. My Pending Jobs
+    const myPendingJobs = jobs.filter(j =>
+        j.assignee === currentUserEmail &&
+        j.status !== 'completed'
+    ).length;
 
-    obligations.forEach(o => {
-        const days = getDaysUntil(o.deadline);
-        if (days < 0) completed++;
-        else if (days <= 7) thisWeek++;
-        else if (days <= 30) thisMonth++;
-        else upcoming++;
-    });
+    // 2. All Pending Jobs
+    const allPendingJobs = jobs.filter(j =>
+        j.status !== 'completed'
+    ).length;
+
+    // 3. This Week Obligations
+    const thisWeekObs = obligations.filter(o => {
+        const status = getStatus(o.deadline, o.status);
+        return status === 'this-week' || status === 'overdue'; // Including overdue if any
+    }).length;
+
+    // 4. This Month Obligations (Inclusive of This Week)
+    const thisMonthObs = obligations.filter(o => {
+        const isThisMonth = isInThisCalendarMonth(o.deadline);
+        const isNotCompleted = o.status !== 'completed' && new Date(o.deadline) >= new Date().setHours(0, 0, 0, 0);
+        return isThisMonth && isNotCompleted;
+    }).length;
 
     // Update stat cards
     const elements = {
-        thisWeekCount: thisWeek,
-        thisMonthCount: thisMonth,
-        upcomingCount: upcoming,
-        completedCount: completed
+        myPendingJobsCount: myPendingJobs,
+        allPendingJobsCount: allPendingJobs,
+        thisWeekObsCount: thisWeekObs,
+        thisMonthObsCount: thisMonthObs
     };
 
     for (const [id, value] of Object.entries(elements)) {
@@ -38,6 +50,7 @@ export function updateDashboard() {
     }
 
     updateUpcomingList();
+    updateMonthlyChart();
     updateQuarterlyChart();
 }
 
@@ -58,17 +71,22 @@ export function updateUpcomingList() {
         return;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
+    // List only pending/overdue items and sort by deadline urgency
     const sorted = [...Store.obligations]
-        .filter(o => new Date(o.deadline) >= today)
-        .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+        .filter(o => getStatus(o.deadline, o.status) !== 'completed')
+        .sort((a, b) => {
+            const dateA = new Date(a.deadline);
+            const dateB = new Date(b.deadline);
+            // Handle invalid dates just in case
+            if (isNaN(dateA)) return 1;
+            if (isNaN(dateB)) return -1;
+            return dateA - dateB;
+        })
         .slice(0, 30);
 
     list.innerHTML = sorted.map(o => {
-        const status = getStatus(o.deadline);
-        const statusText = getStatusText(o.deadline);
+        const status = getStatus(o.deadline, o.status);
+        const statusText = getStatusText(o.deadline, o.status);
 
         return `
             <div class="obligation-item" data-id="${o.id}">
@@ -88,15 +106,82 @@ export function updateUpcomingList() {
         `;
     }).join('');
 
-    // Attach click listeners
-    list.querySelectorAll('.obligation-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-            if (e.target.tagName === 'A') return;
-            const id = item.getAttribute('data-id');
-            // detail view will be handled via global app instance or events
-            const event = new CustomEvent('show-detail', { detail: { id } });
-            window.dispatchEvent(event);
+    // Use event delegation for better reliability
+    list.onclick = (e) => {
+        const item = e.target.closest('.obligation-item');
+        if (!item || e.target.tagName === 'A') return;
+
+        const id = item.getAttribute('data-id');
+        const event = new CustomEvent('show-detail', { detail: { id } });
+        window.dispatchEvent(event);
+    };
+}
+
+/**
+ * Updates the monthly intensity chart (Rolling 6 Months)
+ */
+export function updateMonthlyChart() {
+    const container = document.getElementById('monthlyChart');
+    if (!container) return;
+
+    const now = new Date();
+    const rollingMonths = [];
+    const monthNames = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+
+    // Generate rolling 6 months
+    for (let i = 0; i < 6; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        rollingMonths.push({
+            month: d.getMonth(),
+            year: d.getFullYear(),
+            label: `${monthNames[d.getMonth()]} '${String(d.getFullYear()).slice(-2)}`,
+            count: 0
         });
+    }
+
+    // Count obligations for these months
+    Store.obligations.forEach(o => {
+        const date = new Date(o.deadline);
+        rollingMonths.forEach(m => {
+            if (date.getMonth() === m.month && date.getFullYear() === m.year) {
+                m.count++;
+            }
+        });
+    });
+
+    const max = Math.max(...rollingMonths.map(m => m.count), 1);
+
+    container.innerHTML = rollingMonths.map((m, i) => {
+        const height = (m.count / max) * 100;
+        const isPeak = m.count === max && max > 0;
+
+        return `
+            <div class="month-bar">
+                <span class="month-bar-label">${m.label}</span>
+                <div class="month-bar-fill ${isPeak ? 'peak' : ''}" style="height: ${height}%" id="m${i + 1}Bar"></div>
+                <span class="month-bar-value">${m.count}</span>
+            </div>
+        `;
+    }).join('');
+
+    // Staggered animation
+    rollingMonths.forEach((m, i) => {
+        const height = (m.count / max) * 100;
+        setTimeout(() => {
+            const styleId = `m${i + 1}BarStyle`;
+            let styleEl = document.getElementById(styleId);
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = styleId;
+                document.head.appendChild(styleEl);
+            }
+            styleEl.textContent = `
+                #m${i + 1}Bar::after { 
+                    height: ${height}% !important; 
+                    transition-delay: ${i * 0.1}s !important; 
+                }
+            `;
+        }, 300);
     });
 }
 
@@ -127,9 +212,14 @@ export function updateQuarterlyChart() {
 
         if (bar) {
             const width = (quarters[i] / max) * 100;
+            const isPeak = quarters[i] === max && max > 0;
+
+            if (isPeak) bar.classList.add('peak');
+            else bar.classList.remove('peak');
+
             bar.style.setProperty('--width', `${width}%`);
 
-            // Fix for chart rendering
+            // Enhanced Animation: Staggered Fill
             setTimeout(() => {
                 const styleId = `q${i + 1}BarStyle`;
                 let styleEl = document.getElementById(styleId);
@@ -138,8 +228,14 @@ export function updateQuarterlyChart() {
                     styleEl.id = styleId;
                     document.head.appendChild(styleEl);
                 }
-                styleEl.textContent = `#q${i + 1}Bar::after { width: ${width}% !important; }`;
-            }, 100);
+                // Use a staggered delay based on the index (i)
+                styleEl.textContent = `
+                    #q${i + 1}Bar::after { 
+                        width: ${width}% !important; 
+                        transition-delay: ${i * 0.15}s !important; 
+                    }
+                `;
+            }, 300); // Wait for page transition to finish
         }
     }
 }

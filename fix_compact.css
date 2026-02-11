@@ -1,0 +1,7 @@
+/* Fix Compact Card Height in Grid */
+.job-card.completed {
+    align-self: flex-start !important;
+    /* Stop stretching vertically in grid */
+    height: auto !important;
+    min-height: unset !important;
+}

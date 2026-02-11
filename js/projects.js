@@ -14,27 +14,37 @@ export function updateProjectsGrid() {
 
     const searchTerm = document.getElementById('projectSearch').value.toLowerCase();
 
-    // Group by project
-    const projects = {};
+    // Primary list comes from central projects definition (Phase 4)
+    const projectList = (Store.projects || []).map(definedProj => {
+        const obligations = Store.obligations.filter(o => o.projectName.toLowerCase() === definedProj.name.toLowerCase());
+        return {
+            ...definedProj,
+            obligations: obligations
+        };
+    });
+
+    // Handle any legacy projects that might not be defined in settings yet (Safety fallback)
+    const definedNames = new Set(projectList.map(p => p.name.toLowerCase()));
     Store.obligations.forEach(o => {
-        if (!projects[o.projectName]) {
-            projects[o.projectName] = {
+        if (!definedNames.has(o.projectName.toLowerCase())) {
+            projectList.push({
                 name: o.projectName,
-                link: o.projectLink,
-                obligations: []
-            };
+                company: 'Tanımsız',
+                parentCompany: '',
+                obligations: Store.obligations.filter(x => x.projectName === o.projectName)
+            });
+            definedNames.add(o.projectName.toLowerCase());
         }
-        projects[o.projectName].obligations.push(o);
     });
 
     // Filter and sort
-    let projectList = Object.values(projects);
+    let filteredList = projectList;
     if (searchTerm) {
-        projectList = projectList.filter(p => p.name.toLowerCase().includes(searchTerm));
+        filteredList = filteredList.filter(p => p.name.toLowerCase().includes(searchTerm) || (p.company && p.company.toLowerCase().includes(searchTerm)));
     }
-    projectList.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+    filteredList.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
 
-    if (projectList.length === 0) {
+    if (filteredList.length === 0) {
         grid.innerHTML = `
             <div class="empty-state">
                 <span>🏭</span>
@@ -44,16 +54,17 @@ export function updateProjectsGrid() {
         return;
     }
 
-    grid.innerHTML = projectList.map(p => `
+    grid.innerHTML = filteredList.map(p => `
         <div class="project-card" data-name="${p.name}">
             <div class="project-card-header">
                 <div class="project-card-title">
-                    ${p.link ? `<a href="${p.link}" target="_blank" onclick="event.stopPropagation()">${escapeHtml(p.name)}</a>` : escapeHtml(p.name)}
+                    <span style="font-size: 0.75rem; color: var(--text-muted); display: block; font-weight: normal;">${escapeHtml(p.company || '-')}</span>
+                    ${escapeHtml(p.name)}
                 </div>
                 <div class="project-card-count">${p.obligations.length} Yükümlülük</div>
             </div>
             <div class="project-card-body">
-                <p>${escapeHtml(p.obligations[0]?.obligationType || '')}...</p>
+                <p>${escapeHtml(p.obligations[0]?.obligationType || 'İşlem bekleyen yükümlülük yok.')}</p>
             </div>
             <div class="project-card-footer">
                 <button class="btn btn-secondary btn-sm">Detayları Gör</button>

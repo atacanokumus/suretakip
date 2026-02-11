@@ -4,30 +4,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EPDK Süre Takip Platformu</title>
+    <title>DaVinci Lisans Süre Takip Platformu</title>
+    <link rel="icon" type="image/png" href="assets/logo.png">
+    <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="stylesheet" href="modern_job_modal.css">
+    <link rel="stylesheet" href="profile_styles.css">
+    <link rel="stylesheet" href="button_polish.css?v=2">
+    <link rel="stylesheet" href="bulk_job_styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
 </head>
 
 <body>
+    <!-- Dynamic Background Layer -->
+    <div class="dynamic-bg">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
     <!-- Password Protection Login Screen -->
     <div class="login-overlay" id="loginOverlay">
         <div class="login-container">
             <div class="login-logo">
-                <span class="login-logo-icon">⚡</span>
-                <h1>Süre Takip</h1>
-                <p class="login-subtitle">EPDK Süre Takip Platformu</p>
+                <img src="assets/logo.png" alt="DaVinci Logo" class="login-logo-img">
+                <h1>DaVinci Enerji</h1>
+                <p class="login-subtitle">Lisans Müdürlüğü Süre Takip Platformu</p>
             </div>
             <form class="login-form" id="loginForm">
                 <div class="login-input-group">
-                    <label for="passwordInput">🔒 Şifre</label>
-                    <input type="password" id="passwordInput" placeholder="Şifrenizi giriniz..." autocomplete="off"
+                    <label for="emailInput">📧 E-posta</label>
+                    <input type="email" id="emailInput" placeholder="E-posta adresinizi giriniz..." autocomplete="email"
                         autofocus>
+                </div>
+                <div class="login-input-group">
+                    <label for="passwordInput">🔒 Şifre</label>
+                    <input type="password" id="passwordInput" placeholder="Şifrenizi giriniz..."
+                        autocomplete="current-password">
                     <span class="login-error" id="loginError"></span>
+                </div>
+                <div class="login-options">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="rememberMe" checked>
+                        <span class="checkmark"></span>
+                        Beni Hatırla
+                    </label>
                 </div>
                 <button type="submit" class="login-btn">
                     <span>Giriş Yap</span>
@@ -41,14 +70,23 @@
     <div class="app-container" id="appContainer" style="display: none;">
         <!-- Sidebar -->
         <aside class="sidebar">
-            <div class="logo">
-                <span class="logo-icon">⚡</span>
-                <span class="logo-text">Süre Takip</span>
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <img src="assets/logo.png" alt="DaVinci logo" class="logo-img">
+                </div>
+                <div class="brand-name">
+                    <span class="brand-top">DaVinci Enerji</span>
+                    <span class="brand-bottom">Lisans Müdürlüğü</span>
+                </div>
             </div>
             <nav class="nav-menu">
                 <a href="#" class="nav-item active" data-page="dashboard">
                     <span class="nav-icon">📊</span>
-                    <span>Dashboard</span>
+                    <span>Ana Sayfa</span>
+                </a>
+                <a href="#" class="nav-item" data-page="jobs">
+                    <span class="nav-icon">💼</span>
+                    <span>İş Takibi</span>
                 </a>
                 <a href="#" class="nav-item" data-page="obligations">
                     <span class="nav-icon">📋</span>
@@ -62,40 +100,59 @@
                     <span class="nav-icon">📈</span>
                     <span>Analiz</span>
                 </a>
+                <!-- Profile moved to footer -->
                 <a href="#" class="nav-item" data-page="settings">
                     <span class="nav-icon">⚙️</span>
                     <span>Ayarlar</span>
                 </a>
+                <a href="#" class="nav-item" id="logoutBtn">
+                    <span class="nav-icon">🚪</span>
+                    <span>Çıkış Yap</span>
+                </a>
             </nav>
             <div class="sidebar-footer">
-                <button class="help-btn" id="sidebarHelpBtn" style="width: 100%;">
+                <div class="user-profile-trigger" id="userProfileTrigger" title="Profil Ayarlarını Düzenle">
+                    <div class="user-avatar-small" id="footerUserAvatar">
+                        <span>👤</span>
+                    </div>
+                    <div class="user-info-text">
+                        <span class="user-name-display" id="footerUserName">Kullanıcı</span>
+                    </div>
+                </div>
+
+                <button class="help-btn" id="sidebarHelpBtn" style="width: 100%; margin-top: 12px;">
                     <span>❓</span>
                     <span>Nasıl Kullanılır?</span>
                 </button>
             </div>
         </aside>
 
+        <!-- Sidebar Overlay (Mobile) -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
         <!-- Main Content -->
         <main class="main-content">
             <!-- Header -->
             <header class="header">
                 <div class="header-left">
-                    <h1 id="pageTitle">Dashboard</h1>
+                    <button class="hamburger-btn" id="hamburgerBtn" aria-label="Menu">☰</button>
+                    <h1 id="pageTitle">Ana Sayfa</h1>
                     <p class="header-date" id="currentDate"></p>
                 </div>
                 <div class="header-right">
-                    <button class="help-btn" id="headerHelpBtn" title="Nasıl Kullanılır?">
-                        <span class="btn-icon">❓</span>
-                        <span>Nasıl Kullanılır?</span>
+                    <button class="add-job-btn btn-primary" id="addJobBtn"
+                        style="background: var(--surface-glass); border-color: var(--border-glass);">
+                        <span class="btn-icon">💼</span>
+                        <span>Yeni İş Ekle</span>
                     </button>
                     <button class="add-obligation-btn" id="addObligationBtn">
                         <span class="btn-icon">➕</span>
                         <span>Yeni Yükümlülük</span>
                     </button>
-                    <div class="search-box">
-                        <span class="search-icon">🔍</span>
-                        <input type="text" id="globalSearch" placeholder="Proje veya yükümlülük ara...">
-                    </div>
+                    <button class="btn btn-secondary" id="generateReportBtn" style="padding: 10px 16px;">
+                        <span class="btn-icon">📄</span>
+                        <span>Rapor Al</span>
+                    </button>
                 </div>
             </header>
 
@@ -103,34 +160,50 @@
             <div class="pages-container">
                 <!-- Dashboard Page -->
                 <div class="page active" id="dashboard">
-                    <!-- Stats Cards -->
-                    <div class="stats-grid">
-                        <div class="stat-card warning">
-                            <div class="stat-icon">🟠</div>
-                            <div class="stat-content">
-                                <span class="stat-value" id="thisWeekCount">0</span>
-                                <span class="stat-label">Bu Hafta</span>
+                    <!-- Stats Cards Grouped -->
+                    <div class="dashboard-stats-container">
+                        <!-- Group: Jobs -->
+                        <div class="stat-group">
+                            <h3 class="stat-group-header">İŞLERİM</h3>
+                            <div class="stats-grid-mini">
+                                <div class="stat-card info clickable-card" data-filter="my-pending-jobs">
+                                    <div class="stat-icon">👤</div>
+                                    <div class="stat-content">
+                                        <span class="stat-value" id="myPendingJobsCount">0</span>
+                                        <span class="stat-label">İşlerim</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card upcoming clickable-card" data-filter="all-pending-jobs">
+                                    <div class="stat-icon">💼</div>
+                                    <div class="stat-content">
+                                        <span class="stat-value" id="allPendingJobsCount">0</span>
+                                        <span class="stat-label">Tüm Bekleyenler</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="stat-card info">
-                            <div class="stat-icon">🟡</div>
-                            <div class="stat-content">
-                                <span class="stat-value" id="thisMonthCount">0</span>
-                                <span class="stat-label">Bu Ay</span>
-                            </div>
-                        </div>
-                        <div class="stat-card upcoming">
-                            <div class="stat-icon">🔵</div>
-                            <div class="stat-content">
-                                <span class="stat-value" id="upcomingCount">0</span>
-                                <span class="stat-label">Gelecek</span>
-                            </div>
-                        </div>
-                        <div class="stat-card success">
-                            <div class="stat-icon">✅</div>
-                            <div class="stat-content">
-                                <span class="stat-value" id="completedCount">0</span>
-                                <span class="stat-label">Tamamlananlar</span>
+
+                        <!-- Divider -->
+                        <div class="stat-v-divider"></div>
+
+                        <!-- Group: Obligations -->
+                        <div class="stat-group">
+                            <h3 class="stat-group-header">YÜKÜMLÜLÜKLER</h3>
+                            <div class="stats-grid-mini">
+                                <div class="stat-card warning clickable-card" data-filter="this-week-obs">
+                                    <div class="stat-icon">📅</div>
+                                    <div class="stat-content">
+                                        <span class="stat-value" id="thisWeekObsCount">0</span>
+                                        <span class="stat-label">Bu Hafta</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card success clickable-card" data-filter="this-month-obs">
+                                    <div class="stat-icon">🗓️</div>
+                                    <div class="stat-content">
+                                        <span class="stat-value" id="thisMonthObsCount">0</span>
+                                        <span class="stat-label">Bu Ay</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -152,32 +225,44 @@
                             </div>
                         </div>
 
-                        <!-- Quarterly Overview -->
-                        <div class="card quarterly-card">
+                        <!-- Combined Intensity Analysis -->
+                        <div class="card intensity-card">
                             <div class="card-header">
-                                <h2>📅 Çeyrek Bazlı Yoğunluk</h2>
+                                <h2>📊 Yoğunluk Analizi</h2>
                             </div>
                             <div class="card-body">
-                                <div class="quarterly-chart" id="quarterlyChart">
-                                    <div class="quarter-bar" data-quarter="Q1">
-                                        <div class="bar-fill" id="q1Bar"></div>
-                                        <span class="bar-label">Q1</span>
-                                        <span class="bar-value" id="q1Value">0</span>
+                                <div class="intensity-section">
+                                    <h3 class="section-subtitle">📅 Önümüzdeki 6 Ay</h3>
+                                    <div class="monthly-chart" id="monthlyChart">
+                                        <!-- Rolling 6 months will be injected here -->
                                     </div>
-                                    <div class="quarter-bar" data-quarter="Q2">
-                                        <div class="bar-fill" id="q2Bar"></div>
-                                        <span class="bar-label">Q2</span>
-                                        <span class="bar-value" id="q2Value">0</span>
-                                    </div>
-                                    <div class="quarter-bar" data-quarter="Q3">
-                                        <div class="bar-fill" id="q3Bar"></div>
-                                        <span class="bar-label">Q3</span>
-                                        <span class="bar-value" id="q3Value">0</span>
-                                    </div>
-                                    <div class="quarter-bar" data-quarter="Q4">
-                                        <div class="bar-fill" id="q4Bar"></div>
-                                        <span class="bar-label">Q4</span>
-                                        <span class="bar-value" id="q4Value">0</span>
+                                </div>
+
+                                <div class="intensity-divider"></div>
+
+                                <div class="intensity-section">
+                                    <h3 class="section-subtitle">🗓️ Çeyrek Bazlı Bakış</h3>
+                                    <div class="quarterly-chart" id="quarterlyChart">
+                                        <div class="quarter-bar" data-quarter="Q1">
+                                            <span class="bar-label">Q1</span>
+                                            <div class="bar-fill" id="q1Bar"></div>
+                                            <span class="bar-value" id="q1Value">0</span>
+                                        </div>
+                                        <div class="quarter-bar" data-quarter="Q2">
+                                            <span class="bar-label">Q2</span>
+                                            <div class="bar-fill" id="q2Bar"></div>
+                                            <span class="bar-value" id="q2Value">0</span>
+                                        </div>
+                                        <div class="quarter-bar" data-quarter="Q3">
+                                            <span class="bar-label">Q3</span>
+                                            <div class="bar-fill" id="q3Bar"></div>
+                                            <span class="bar-value" id="q3Value">0</span>
+                                        </div>
+                                        <div class="quarter-bar" data-quarter="Q4">
+                                            <span class="bar-label">Q4</span>
+                                            <div class="bar-fill" id="q4Bar"></div>
+                                            <span class="bar-value" id="q4Value">0</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -198,10 +283,11 @@
                             <label>Durum:</label>
                             <select id="statusFilter">
                                 <option value="">Tümü</option>
-                                <option value="overdue">Geciken</option>
-                                <option value="thisWeek">Bu Hafta</option>
-                                <option value="thisMonth">Bu Ay</option>
-                                <option value="upcoming">Gelecek</option>
+                                <option value="completed">✅ Tamamlananlar</option>
+                                <option value="overdue">🔴 Gecikmiş</option>
+                                <option value="thisWeek">🟠 Bu Hafta</option>
+                                <option value="thisMonth">🟡 Bu Ay</option>
+                                <option value="upcoming">🟢 Yaklaşan</option>
                             </select>
                         </div>
                         <div class="filter-group">
@@ -227,6 +313,71 @@
                             <tbody id="obligationsTable">
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- Jobs Page (Phase 2) -->
+                <div class="page" id="jobs">
+
+                    <!-- Job Stats Grid -->
+                    <div class="job-stats-grid">
+                        <div class="stat-card warning clickable-card" data-job-filter="my-pending">
+                            <div class="stat-icon">👤</div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="jobStatMyPending">0</span>
+                                <span class="stat-label">Bana Atanan (Bekleyen)</span>
+                            </div>
+                        </div>
+                        <div class="stat-card info clickable-card" data-job-filter="all-pending">
+                            <div class="stat-icon">⏳</div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="jobStatAllPending">0</span>
+                                <span class="stat-label">Toplam Bekleyen</span>
+                            </div>
+                        </div>
+                        <div class="stat-card success clickable-card" data-job-filter="completed">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="jobStatCompleted">0</span>
+                                <span class="stat-label">Tamamlanan İşler</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="filters-bar">
+                        <div class="filter-group">
+                            <label>Proje:</label>
+                            <select id="jobProjectFilter">
+                                <option value="all">Tüm Projeler</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Atanan:</label>
+                            <select id="jobAssigneeFilter">
+                                <option value="all">Tümü</option>
+                                <option value="me">Bana Atananlar</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Durum:</label>
+                            <select id="jobStatusFilter">
+                                <option value="all">Tümü</option>
+                                <option value="pending" selected>Yapılacaklar</option>
+                                <option value="completed">Tamamlananlar</option>
+                            </select>
+                        </div>
+                        <div class="filter-group ml-auto">
+                            <button class="btn btn-primary" id="jobsPageAddBtn">➕ Yeni İş Ekle</button>
+                        </div>
+                    </div>
+
+                    <!-- Jobs List Container (Smart Cards) -->
+                    <div class="jobs-container" id="jobsList">
+                        <!-- Job cards will be injected here -->
+                        <div class="empty-state">
+                            <span>💼</span>
+                            <p>Henüz atanmış bir iş yok.</p>
+                        </div>
                     </div>
                 </div>
 
@@ -262,6 +413,7 @@
                                             <select id="chart1AnalysisType" class="filter-select">
                                                 <option value="quarter">Çeyrek Bazlı</option>
                                                 <option value="type">Yükümlülük Türü</option>
+                                                <option value="workload">Uzman İş Yükü (Aktif)</option>
                                                 <option value="company">Firma</option>
                                                 <option value="parentCompany">Ana Firma</option>
                                                 <option value="month">Aylık</option>
@@ -285,78 +437,73 @@
                                                 <option value="all">Tüm Yıllar</option>
                                             </select>
                                         </div>
-                                        <div class="filter-group">
-                                            <button class="btn btn-primary btn-small"
-                                                id="chart1Update">Güncelle</button>
-                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                            <div class="chart-body" id="chart1Container">
-                                <div class="chart-placeholder">
-                                    <span>📊</span>
-                                    <p>Parametreleri ayarlayıp "Güncelle" butonuna tıklayın</p>
                                 </div>
                             </div>
                         </div>
+                        <div class="chart-body" id="chart1Container">
+                            <div class="chart-placeholder">
+                                <span>📊</span>
+                                <p>Parametreleri ayarlayıp "Güncelle" butonuna tıklayın</p>
+                            </div>
+                        </div>
+                    </div>
 
-                        <!-- Chart 2 -->
-                        <div class="chart-container">
-                            <div class="chart-controls">
-                                <h3 class="chart-title">📉 Grafik 2</h3>
-                                <div class="chart-filters">
-                                    <div class="filter-row">
-                                        <div class="filter-group">
-                                            <label>Analiz Türü:</label>
-                                            <select id="chart2AnalysisType" class="filter-select">
-                                                <option value="quarter">Çeyrek Bazlı</option>
-                                                <option value="type" selected>Yükümlülük Türü</option>
-                                                <option value="company">Firma</option>
-                                                <option value="parentCompany">Ana Firma</option>
-                                                <option value="month">Aylık</option>
-                                            </select>
-                                        </div>
-                                        <div class="filter-group">
-                                            <label>Grafik Türü:</label>
-                                            <select id="chart2ChartType" class="filter-select">
-                                                <option value="bar">Bar Grafik</option>
-                                                <option value="pie" selected>Pasta Grafik</option>
-                                            </select>
-                                        </div>
+                    <!-- Chart 2 -->
+                    <div class="chart-container">
+                        <div class="chart-controls">
+                            <h3 class="chart-title">📉 Grafik 2</h3>
+                            <div class="chart-filters">
+                                <div class="filter-row">
+                                    <div class="filter-group">
+                                        <label>Analiz Türü:</label>
+                                        <select id="chart2AnalysisType" class="filter-select">
+                                            <option value="quarter">Çeyrek Bazlı</option>
+                                            <option value="type" selected>Yükümlülük Türü</option>
+                                            <option value="workload">Uzman İş Yükü (Aktif)</option>
+                                            <option value="company">Firma</option>
+                                            <option value="parentCompany">Ana Firma</option>
+                                            <option value="month">Aylık</option>
+                                        </select>
                                     </div>
-                                    <div class="filter-row">
-                                        <div class="filter-group">
-                                            <label>Yıl:</label>
-                                            <select id="chart2Year" class="filter-select">
-                                                <option value="2026">2026</option>
-                                                <option value="2025">2025</option>
-                                                <option value="2027">2027</option>
-                                                <option value="all">Tüm Yıllar</option>
-                                            </select>
-                                        </div>
-                                        <div class="filter-group">
-                                            <button class="btn btn-primary btn-small"
-                                                id="chart2Update">Güncelle</button>
-                                        </div>
+                                    <div class="filter-group">
+                                        <label>Grafik Türü:</label>
+                                        <select id="chart2ChartType" class="filter-select">
+                                            <option value="bar">Bar Grafik</option>
+                                            <option value="pie" selected>Pasta Grafik</option>
+                                        </select>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="chart-body" id="chart2Container">
-                                <div class="chart-placeholder">
-                                    <span>📊</span>
-                                    <p>Parametreleri ayarlayıp "Güncelle" butonuna tıklayın</p>
+                                <div class="filter-row">
+                                    <div class="filter-group">
+                                        <label>Yıl:</label>
+                                        <select id="chart2Year" class="filter-select">
+                                            <option value="2026">2026</option>
+                                            <option value="2025">2025</option>
+                                            <option value="2027">2027</option>
+                                            <option value="all">Tüm Yıllar</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                    <div class="chart-body" id="chart2Container">
+                        <div class="chart-placeholder">
+                            <span>📊</span>
+                            <p>Parametreleri ayarlayıp "Güncelle" butonuna tıklayın</p>
+                        </div>
+                    </div>
+                </div> <!-- closes analytics -->
 
                 <!-- Settings Page -->
                 <div class="page" id="settings">
                     <div class="settings-container">
+
+                        <!-- Card 2: Legacy Maintenance -->
                         <div class="card">
                             <div class="card-header">
-                                <h2>⚙️ Veri Yönetimi</h2>
+                                <h2>⚙️ Veri Yönetimi (Sistem)</h2>
                             </div>
                             <div class="card-body">
                                 <div class="settings-item">
@@ -373,6 +520,13 @@
                                     </div>
                                     <button class="btn btn-secondary" id="exportBtn">📥 İndir</button>
                                 </div>
+                                <div class="settings-item primary">
+                                    <div class="settings-info">
+                                        <h3>Master Sistem Yedeği (Hard Copy)</h3>
+                                        <p>Tüm verileri "DaVinci Arşivi" formatında bilgisayarınıza yedekleyin.</p>
+                                    </div>
+                                    <button class="btn btn-primary" id="masterBackupBtn">🛡️ Güvenli Yedek Al</button>
+                                </div>
                                 <div class="settings-item danger">
                                     <div class="settings-info">
                                         <h3>Tüm Verileri Sil</h3>
@@ -380,8 +534,60 @@
                                     </div>
                                     <button class="btn btn-danger" id="clearDataBtn">🗑️ Sil</button>
                                 </div>
+                                <div class="settings-item primary">
+                                    <div class="settings-info">
+                                        <h3>Toplu Veri Güncelleme</h3>
+                                        <p>Metin kutusuna kopyaladığınız verilerle sistemi topluca güncelleyin.</p>
+                                    </div>
+                                    <button class="btn btn-primary" id="bulkImportBtn">📥 Proje-Şirket-Ana Şirket-Uzman
+                                        Bilgilerini Güncelle</button>
+                                </div>
+
+                                <!-- Collapsible Project Table (Phase 3.5) -->
+                                <div class="collapsible-section" style="margin-top: 20px;">
+                                    <div class="collapsible-header" id="toggleProjectTable">
+                                        <h3>📋 Mevcut Proje, Firma ve Uzman Tanımları</h3>
+                                        <span class="collapsible-icon">▼</span>
+                                    </div>
+                                    <div class="collapsible-content" id="projectTableContent">
+                                        <div
+                                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; margin-top: 10px;">
+                                            <p style="color: rgba(255,255,255,0.6); font-size: 0.85em; margin: 0;">
+                                                Sistemde kayıtlı proje ve uzman listesi aşağıdadır.
+                                            </p>
+                                            <button class="btn btn-primary btn-sm" id="settingsAddProjectBtn">➕ Yeni
+                                                Proje Ekle</button>
+                                        </div>
+                                        <div class="table-container">
+                                            <table class="data-table" style="width: 100%;">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Ana Şirket</th>
+                                                        <th>Firma</th>
+                                                        <th>Proje Adı</th>
+                                                        <th>Lisans No</th>
+                                                        <th>Lisans Tarihi</th>
+                                                        <th>Uzman</th>
+                                                        <th>İletişim</th>
+                                                        <th style="width: 80px;">İşlemler</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="settingsProjectsTableBody">
+                                                    <!-- JS Injected -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div
+                                            style="margin-top: 20px; text-align: right; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
+                                            <button class="btn btn-danger btn-sm" id="resetProjectsBtn">🗑️ Tüm Proje
+                                                Tanımlarını Yazılardan Temizle</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
+
+                        <!-- Card 3: Stats -->
                         <div class="card">
                             <div class="card-header">
                                 <h2>📋 Veri Durumu</h2>
@@ -403,11 +609,162 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Card 4: Notifications -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h2>🔔 Bildirim ve E-Posta Ayarları</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="settings-item">
+                                    <div class="settings-info">
+                                        <h3>Bildirimleri Test Et</h3>
+                                        <p>Tarayıcı bildirimlerinin ve mail servisinin çalışıp çalışmadığını kontrol
+                                            edin.</p>
+                                    </div>
+                                    <button class="btn btn-secondary" id="testNotificationsBtn">🔔 Test Gönder</button>
+                                </div>
+
+                                <!-- Accordion Wrapper -->
+                                <div class="settings-accordion-wrapper">
+
+                                    <!-- 1. Daily Settings (Active by Default) -->
+                                    <div class="settings-accordion-item active" id="dailySettingsItem">
+                                        <div class="settings-accordion-header" id="dailySettingsHeader">
+                                            <div class="header-info">
+                                                <h3>📅 Günlük Hatırlatıcı Ayarları</h3>
+                                                <p>Günlük özet maillerinin zamanlaması</p>
+                                            </div>
+                                            <span class="accordion-icon">▼</span>
+                                        </div>
+                                        <div class="settings-accordion-content">
+                                            <div class="notification-schedule-form">
+                                                <div class="schedule-group">
+                                                    <label>Gönderim Günleri:</label>
+                                                    <div class="days-selector">
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="notifyDay" value="1"><span>Pzt</span></label>
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="notifyDay" value="2"><span>Sal</span></label>
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="notifyDay" value="3"><span>Çar</span></label>
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="notifyDay" value="4"><span>Per</span></label>
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="notifyDay" value="5"><span>Cum</span></label>
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="notifyDay" value="6"><span>Cmt</span></label>
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="notifyDay" value="0"><span>Paz</span></label>
+                                                    </div>
+                                                </div>
+                                                <div class="schedule-group" style="margin-top: 15px;">
+                                                    <label>Gönderim Saati:</label>
+                                                    <div class="time-selector">
+                                                        <select id="notifyHour" class="glass-input"
+                                                            style="width: 120px;">
+                                                            <option value="6">06:00</option>
+                                                            <option value="7">07:00</option>
+                                                            <option value="8" selected>08:00</option>
+                                                            <option value="9">09:00</option>
+                                                            <option value="10">10:00</option>
+                                                            <option value="11">11:00</option>
+                                                            <option value="12">12:00</option>
+                                                            <option value="13">13:00</option>
+                                                            <option value="14">14:00</option>
+                                                            <option value="15">15:00</option>
+                                                            <option value="16">16:00</option>
+                                                            <option value="17">17:00</option>
+                                                            <option value="18">18:00</option>
+                                                        </select>
+                                                        <span
+                                                            style="font-size: 0.8em; opacity: 0.7; margin-left: 10px;">(İstanbul
+                                                            Saati)</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- 2. Weekly Report Settings -->
+                                    <div class="settings-accordion-item" id="weeklySettingsItem">
+                                        <div class="settings-accordion-header" id="weeklySettingsHeader">
+                                            <div class="header-info">
+                                                <h3>📊 Haftalık Rapor Ayarları</h3>
+                                                <p>Detaylı hafta özetinin gönderileceği zaman</p>
+                                            </div>
+                                            <span class="accordion-icon">▼</span>
+                                        </div>
+                                        <div class="settings-accordion-content">
+                                            <div class="notification-schedule-form">
+                                                <div class="schedule-group">
+                                                    <label>Rapor Günleri:</label>
+                                                    <div class="days-selector">
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="weeklyReportDay"
+                                                                value="1"><span>Pzt</span></label>
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="weeklyReportDay"
+                                                                value="2"><span>Sal</span></label>
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="weeklyReportDay"
+                                                                value="3"><span>Çar</span></label>
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="weeklyReportDay"
+                                                                value="4"><span>Per</span></label>
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="weeklyReportDay"
+                                                                value="5"><span>Cum</span></label>
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="weeklyReportDay"
+                                                                value="6"><span>Cmt</span></label>
+                                                        <label class="day-checkbox"><input type="checkbox"
+                                                                name="weeklyReportDay"
+                                                                value="0"><span>Paz</span></label>
+                                                    </div>
+                                                </div>
+                                                <div class="schedule-group" style="margin-top: 15px;">
+                                                    <label>Gönderim Saati:</label>
+                                                    <div class="time-selector">
+                                                        <select id="weeklyReportHour" class="glass-input"
+                                                            style="width: 120px;">
+                                                            <option value="6">06:00</option>
+                                                            <option value="7">07:00</option>
+                                                            <option value="8" selected>08:00</option>
+                                                            <option value="9">09:00</option>
+                                                            <option value="10">10:00</option>
+                                                            <option value="11">11:00</option>
+                                                            <option value="12">12:00</option>
+                                                            <option value="13">13:00</option>
+                                                            <option value="14">14:00</option>
+                                                            <option value="15">15:00</option>
+                                                            <option value="16">16:00</option>
+                                                            <option value="17">17:00</option>
+                                                            <option value="18">18:00</option>
+                                                        </select>
+                                                        <span
+                                                            style="font-size: 0.8em; opacity: 0.7; margin-left: 10px;">(İstanbul
+                                                            Saati)</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                                <div style="margin-top: 20px; text-align: right;">
+                                    <button class="btn btn-primary" id="saveNotificationSettingsBtn">💾 Ayarları
+                                        Kaydet</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </main>
-    </div>
+            </div> <!-- closes settings -->
+    </div> <!-- closes pages-container -->
+    </main> <!-- closes main-content -->
+    </div> <!-- closes app-container -->
 
     <!-- Toast Notification -->
     <div class="toast" id="toast">
@@ -444,10 +801,10 @@
 
                 <!-- Section 1: Dashboard -->
                 <section class="tutorial-section">
-                    <h3><span class="step-badge">2</span> Dashboard Paneli</h3>
+                    <h3><span class="step-badge">2</span> Ana Sayfa Paneli</h3>
                     <div class="tutorial-content">
                         <div class="tutorial-text">
-                            <p>Uygulamaya giriş yaptığınızda sizi <strong>Dashboard</strong> karşılar. Burada:</p>
+                            <p>Uygulamaya giriş yaptığınızda sizi <strong>Ana Sayfa</strong> karşılar. Burada:</p>
                             <ul>
                                 <li><strong>Özet Kartları:</strong> Bu hafta, bu ay ve gelecekteki yükümlülük sayılarını
                                     anlık görün.</li>
@@ -515,7 +872,7 @@
                                 kullanabilirsiniz:</p>
                             <ul>
                                 <li>Gerekli alanları doldurun (Yıldızlı alanlar zorunludur).</li>
-                                <li>Kaydettiğiniz veriler anlık olarak listeye eklenir ve Dashboard güncellenir.</li>
+                                <li>Kaydettiğiniz veriler anlık olarak listeye eklenir ve Ana Sayfa güncellenir.</li>
                             </ul>
                         </div>
                         <div class="tutorial-media">
@@ -539,10 +896,13 @@
             </div>
             <div class="modal-body">
                 <form id="addObligationForm">
-                    <div class="form-group">
-                        <label for="projectName">Proje Adı <span class="required">*</span></label>
-                        <input type="text" id="projectName" class="form-input" placeholder="Örn: Ankara RES Projesi"
-                            required>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="projectName">🏭 Proje Adı</label>
+                            <select id="projectName" class="glass-input" required>
+                                <option value="">Proje Seçiniz...</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -592,7 +952,294 @@
         </div>
     </div>
 
-    <script type="module" src="app.js"></script>
+    <!-- Add Job Modal -->
+    <div class="modal-overlay" id="addJobModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3 id="jobModalTitle">Yeni İş Oluştur</h3>
+                <button class="modal-close" id="addJobModalClose">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="addJobForm" class="modern-form">
+                    <div class="form-group">
+                        <label for="jobTitle">İş Başlığı*</label>
+                        <input type="text" id="jobTitle" required placeholder="İşin kısa tanımını giriniz..."
+                            class="modern-input">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>İlgili Projeler*</label>
+                            <div id="jobProjectList" class="multi-select-container">
+                                <!-- Will be populated by JS -->
+                                <div class="loading-text">Yükleniyor...</div>
+                            </div>
+                            <small class="bulk-info-text">Birden fazla seçilebilir.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="jobObligation">Bağlı Yükümlülük</label>
+                            <select id="jobObligation" class="modern-select">
+                                <option value="">Yükümlülük Seçiniz...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Atanacak Kişiler*</label>
+                        <div id="jobAssigneeList" class="multi-select-container">
+                            <!-- Will be populated by JS -->
+                            <div class="loading-text">Yükleniyor...</div>
+                        </div>
+                        <small class="bulk-info-text">Birden fazla seçilebilir.</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="jobPriority">Öncelik</label>
+                            <select id="jobPriority" class="modern-select">
+                                <option value="low">Düşük</option>
+                                <option value="medium" selected>Orta</option>
+                                <option value="high">Yüksek</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="jobDueDate">Termin Tarihi</label>
+                            <input type="date" id="jobDueDate" class="modern-input">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="jobDescription">Açıklama</label>
+                        <textarea id="jobDescription" rows="4" placeholder="İş detaylarını buraya ekleyebilirsiniz..."
+                            class="modern-textarea"></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <span>🚀</span> İşi Oluştur
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div class="modal-overlay" id="profileModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>👤 Profil Ayarları</h3>
+                <button class="modal-close" id="profileModalClose">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="profileForm">
+                    <div class="profile-photo-section">
+                        <div class="profile-photo-preview" id="profilePhotoPreview">
+                            <span>📷</span>
+                        </div>
+                        <input type="file" id="profilePhotoInput" accept="image/*" style="display: none;">
+                        <button type="button" class="btn btn-secondary btn-sm"
+                            onclick="document.getElementById('profilePhotoInput').click()">Fotoğraf Yükle</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label>E-posta (Değiştirilemez)</label>
+                        <input type="email" id="profileEmail" disabled class="disabled-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="profileName">Ad Soyad*</label>
+                        <input type="text" id="profileName" required placeholder="Örn: Ahmet Yılmaz">
+                    </div>
+                    <div class="form-group">
+                        <label for="profileTitle">Ünvan / Pozisyon</label>
+                        <input type="text" id="profileTitle" placeholder="Örn: Proje Mühendisi">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Bilgileri Güncelle</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phase 3: Project Modal -->
+    <div class="modal-overlay" id="projectModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>Define New Project</h3>
+                <button class="modal-close">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="projectForm">
+                    <input type="hidden" id="projectId">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Ana Şirket</label>
+                            <input type="text" id="projectParentCompany" class="modern-input"
+                                placeholder="Örn: DaVinci Holding">
+                        </div>
+                        <div class="form-group">
+                            <label>Firma / Kurum</label>
+                            <input type="text" id="projectCompany" class="modern-input"
+                                placeholder="Örn: DaVinci Enerji A.Ş.">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Proje Adı *</label>
+                        <input type="text" id="projectName" class="modern-input" required
+                            placeholder="Örn: G25-Eskişehir-1 GES">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Lisans Numarası</label>
+                            <input type="text" id="projectLicenseNo" class="modern-input"
+                                placeholder="Örn: EÜ/1234-5/678">
+                        </div>
+                        <div class="form-group">
+                            <label>Lisans Tarihi</label>
+                            <input type="date" id="projectLicenseDate" class="modern-input">
+                        </div>
+                    </div>
+
+                    <div class="form-divider" style="margin: 20px 0; border-top: 1px solid rgba(255,255,255,0.1);">
+                    </div>
+                    <h4 style="margin-bottom: 15px; font-size: 0.95em; color: #a5b4fc;">EPDK Uzman Bilgileri</h4>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Uzman Adı Soyadı</label>
+                            <input type="text" id="expertName" class="modern-input" placeholder="Örn: Ahmet Yılmaz">
+                        </div>
+                        <div class="form-group">
+                            <label>Uzman Telefonu</label>
+                            <input type="tel" id="expertPhone" class="modern-input" placeholder="Örn: 0532 123 45 67">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Uzman Mail Adresi</label>
+                        <input type="email" id="expertEmail" class="modern-input"
+                            placeholder="Örn: ahmet.yilmaz@epdk.gov.tr">
+                    </div>
+
+                    <div class="form-actions" style="margin-top: 25px;">
+                        <button type="submit" class="btn btn-primary btn-block">💾 Kaydet</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="bulkImportModal">
+        <div class="modal-container" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3>📥 Toplu Veri Güncelleme</h3>
+                <button class="modal-close">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 15px; color: rgba(255,255,255,0.7); font-size: 0.9em;">
+                    Excel listenizden satırları kopyalayıp aşağıdaki alana yapıştırın. <br>
+                    <strong>Excel Kolon Sırası (8 adet):</strong> <br>
+                    <code
+                        style="background: rgba(255,255,255,0.1); padding: 5px; border-radius: 4px; display: block; margin-top: 5px; line-height: 1.5; font-size: 0.85em;">
+                        Ana Şirket | Şirket | Proje Adı | Lisans No | Lisans Tarihi | Uzman | Uzman Telefonu | Uzman Maili
+                    </code>
+                </p>
+                <textarea id="bulkImportInput" class="modern-textarea" rows="10"
+                    placeholder="Örn:&#10;DaVinci Holding | DaVinci Enerji | G25-Eskişehir-1 | EÜ/1234 | 01.01.2024 | Ahmet Yılmaz | 0532... | ahmet@epdk...&#10;..."
+                    style="font-family: monospace; white-space: pre; font-size: 0.85rem;"></textarea>
+
+                <div class="import-preview" id="importPreview" style="margin-top: 15px; display: none;">
+                    <!-- Preview Logic will be here -->
+                </div>
+
+                <div
+                    style="margin: 15px 0; display: flex; align-items: center; gap: 10px; background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 8px;">
+                    <input type="checkbox" id="clearAllProjectsCheck"
+                        style="width: 18px; height: 18px; cursor: pointer;">
+                    <label for="clearAllProjectsCheck"
+                        style="color: #ef4444; font-weight: 600; cursor: pointer; user-select: none;">
+                        ⚠️ Mevcut tüm projeleri sil ve sadece bu listedekileri yükle
+                    </label>
+                </div>
+
+                <div class="form-actions" style="margin-top: 20px; display: flex; justify-content: space-between;">
+                    <button type="button" class="btn btn-secondary"
+                        onclick="document.getElementById('bulkImportInput').value=''">Temizle</button>
+                    <button type="button" class="btn btn-primary" id="processImportBtn">💾 Verileri İşle ve
+                        Kaydet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js?v=2"></script>
+    <!-- Inline Drill-down Back Button (Dynamic) -->
+    <div id="drilldownControls" class="drilldown-controls hidden">
+        <button id="btnBackToSummary" class="btn-back">
+            ← Genel Özete Dön
+        </button>
+    </div>
+
+    <style>
+        .drilldown-controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            background: rgba(30, 41, 59, 0.9);
+            padding: 10px 20px;
+            border-radius: 50px;
+            border: 1px solid rgba(99, 102, 241, 0.5);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translate(-50%, 50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+
+        .btn-back {
+            background: none;
+            border: none;
+            color: #fff;
+            font-family: 'Outfit';
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        .btn-back:hover {
+            color: #6366f1;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+    <!-- PDF Generation Loading Overlay -->
+    <div id="reportLoadingOverlay" class="report-loading-overlay hidden">
+        <div class="report-loading-content">
+            <div class="report-spinner"></div>
+            <div class="report-text-container">
+                <h2 id="reportStatusTitle">Rapor Hazırlanıyor...</h2>
+                <p id="reportTimerText">Tahmini süre: 5s</p>
+            </div>
+        </div>
+    </div>
+
 </body>
 
 </html>

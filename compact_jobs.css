@@ -1,0 +1,49 @@
+/* ==========================================
+   Phase 2.11: Compact Completed Jobs
+   ========================================== */
+
+.job-card.completed {
+    opacity: 0.6;
+    background: rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.05);
+    padding: 12px 16px;
+    /* Reduced padding */
+    min-height: auto;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.job-card.completed:hover {
+    opacity: 0.9;
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateX(5px);
+    /* Slight peek effect */
+}
+
+/* Hide Details */
+.job-card.completed .job-body,
+.job-card.completed .job-footer {
+    display: none;
+}
+
+/* Adjust Header for Compact Mode */
+.job-card.completed .job-header {
+    margin-bottom: 0;
+    align-items: center;
+}
+
+.job-card.completed .job-title {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    text-decoration: line-through;
+    font-weight: 400;
+}
+
+.job-card.completed .job-checkbox {
+    transform: scale(0.9);
+}
+
+/* Add a visual indicator for completion status if needed */
+.job-card.completed::before {
+    display: none;
+    /* Clean look */
+}

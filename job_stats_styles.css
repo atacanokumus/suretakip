@@ -1,0 +1,36 @@
+/* ==========================================
+   Phase 2.8: Job Stats Grid & Quick Filters
+   ========================================== */
+
+.job-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
+/* Reuse .stat-card styles but add specific behaviors */
+.stat-card.active-filter {
+    border: 2px solid white;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+.stat-card.clickable-card {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.stat-card.clickable-card:hover {
+    transform: translateY(-4px);
+    filter: brightness(1.1);
+}
+
+/* Mobile Responsiveness for Job Stats */
+@media (max-width: 768px) {
+    .job-stats-grid {
+        grid-template-columns: 1fr;
+        /* Stack on mobile */
+        gap: 15px;
+    }
+}

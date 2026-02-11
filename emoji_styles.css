@@ -1,0 +1,92 @@
+/* ==========================================
+   Emoji Picker Styles
+   ========================================== */
+.emoji-input-wrapper {
+    position: relative;
+    display: block;
+    width: 100%;
+}
+
+.emoji-trigger-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: transparent;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 10;
+    padding: 0;
+    line-height: 1;
+}
+
+.emoji-trigger-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.emoji-popover {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    width: 300px;
+    height: 250px;
+    background: var(--surface-light);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    overflow-y: auto;
+    padding: 10px;
+    margin-bottom: 5px;
+    backdrop-filter: blur(10px);
+    display: none;
+    /* Toggled by JS */
+}
+
+/* Scrollbar for emoji picker */
+.emoji-popover::-webkit-scrollbar {
+    width: 6px;
+}
+
+.emoji-popover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.emoji-category-title {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 8px 0 4px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.emoji-category-title:first-child {
+    margin-top: 0;
+}
+
+.emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+}
+
+.emoji-item {
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.emoji-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.2);
+}

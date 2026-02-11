@@ -2,36 +2,55 @@
  * Authentication module for EPDK Süre Takip Platformu
  */
 
-const APP_PASSWORD = 'Davinci*2026';
-const AUTH_KEY = 'epdk_authenticated';
+import { auth } from './firebase-config.js';
+import {
+    signInWithEmailAndPassword,
+    onAuthStateChanged,
+    signOut,
+    setPersistence,
+    browserLocalPersistence,
+    browserSessionPersistence
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 /**
- * Checks if the user is authenticated in the current session
- * @returns {boolean}
+ * Checks if the user is authenticated via Firebase
+ * @param {Function} callback - Function to call with auth state
  */
-export function checkAuthentication() {
-    return sessionStorage.getItem(AUTH_KEY) === 'true';
+export function checkAuthentication(callback) {
+    onAuthStateChanged(auth, (user) => {
+        if (callback) callback(user);
+    });
 }
 
 /**
- * Authenticates the user with the provided password
- * @param {string} password 
- * @returns {boolean}
+ * Authenticates the user with Firebase Email/Password
+ * @param {string} email
+ * @param {string} password
+ * @param {boolean} remember - Whether to persist the session
+ * @returns {Promise<boolean>}
  */
-export function authenticate(password) {
-    if (password === APP_PASSWORD) {
-        sessionStorage.setItem(AUTH_KEY, 'true');
+export async function authenticate(email, password, remember = true) {
+    try {
+        const persistence = remember ? browserLocalPersistence : browserSessionPersistence;
+        await setPersistence(auth, persistence);
+        await signInWithEmailAndPassword(auth, email, password);
         return true;
+    } catch (error) {
+        console.error('Auth Error:', error.code, error.message);
+        return false;
     }
-    return false;
 }
 
 /**
- * Logs out the user and clears authentication state
+ * Logs out the user from Firebase
  */
-export function logout() {
-    sessionStorage.removeItem(AUTH_KEY);
-    window.location.reload();
+export async function logout() {
+    try {
+        await signOut(auth);
+        window.location.reload();
+    } catch (error) {
+        console.error('Logout Error:', error);
+    }
 }
 
 /**

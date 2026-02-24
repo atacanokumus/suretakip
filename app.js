@@ -72,6 +72,7 @@ function initApp() {
     }
 }
 
+
 /**
  * Initialize mobile hamburger menu toggle
  */
@@ -250,6 +251,8 @@ function setupLoginForm() {
 
         newForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+
+
             const email = document.getElementById('emailInput').value;
             const password = document.getElementById('passwordInput').value;
             const remember = document.getElementById('rememberMe')?.checked ?? true;
@@ -300,6 +303,7 @@ async function authorizedInit() {
         refreshAllViews();
         setupEventHandlers();
         initJobsEventHandlers(); // Initialize Job Event Handlers
+
 
         // Background/Async tasks
         try {
@@ -1040,3 +1044,4 @@ function triggerConfetti(x, y) {
         }, 1000);
     }
 }
+

@@ -67,3 +67,22 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# iOS / Xcode
+*.xcuserdata
+*.xcworkspace
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.hmap
+*.swp
+*.lock
+.build/
+Packages/
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+# Firebase config (contains API key — add locally)
+SureTakip-iOS/SureTakip/GoogleService-Info.plist

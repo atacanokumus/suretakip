@@ -10,14 +10,31 @@ struct SureTakipApp: App {
     @StateObject private var firestoreService: FirestoreService
     
     init() {
-        // Initialize Firebase here (before @StateObjects are initialized)
-        // This prevents "FirebaseApp.configure() not called" crashes
+        // Initialize Firebase
         FirebaseConfiguration.shared.setLoggerLevel(.min)
+        
         if FirebaseApp.app() == nil {
-            FirebaseApp.configure()
+            // Attempt to load from Plist first (standard way)
+            if let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
+               let _ = NSDictionary(contentsOfFile: path) {
+                FirebaseApp.configure()
+            } else {
+                // FALLBACK: Programmatic Configuration
+                // This allows the app to run WITHOUT the .plist file
+                let options = FirebaseOptions(
+                    googleAppID: "1:973425573379:ios:xxxxxxxxxxxx", // User will replace this
+                    gcmSenderID: "973425573379"
+                )
+                options.apiKey = "AIzaSyD2X_ccHXMwLw9gcnHHt9d1zNGyrHzhGKM"
+                options.projectID = "sure-takip"
+                options.bundleID = "com.davincienerji.suretakip"
+                
+                FirebaseApp.configure(options: options)
+                print("⚠️ Firebase configured programmatically (Plist missing)")
+            }
         }
         
-        // Manual initialization of StateObjects to ensure Firebase is ready
+        // Manual initialization of StateObjects
         _authService = StateObject(wrappedValue: AuthService())
         _firestoreService = StateObject(wrappedValue: FirestoreService())
     }

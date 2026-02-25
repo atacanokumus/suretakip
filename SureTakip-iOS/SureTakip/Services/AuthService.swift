@@ -10,6 +10,10 @@ class AuthService: ObservableObject {
     @Published var isLoading = true
     @Published var errorMessage: String?
     
+    var userEmail: String? {
+        currentUser?.email
+    }
+    
     private var authStateHandle: AuthStateDidChangeListenerHandle?
     
     init() {

@@ -1,5 +1,4 @@
 import SwiftUI
-import FirebaseAuth
 
 /// Settings view — mirrors web app's profile and settings
 struct SettingsView: View {
@@ -10,7 +9,7 @@ struct SettingsView: View {
     
     // Current user profile
     private var currentUserProfile: AppUser? {
-        guard let email = authService.currentUser?.email else { return nil }
+        guard let email = authService.userEmail else { return nil }
         return firestoreService.users.first { $0.email == email }
     }
     
@@ -72,7 +71,7 @@ struct SettingsView: View {
             }
             
             VStack(spacing: 4) {
-                Text(currentUserProfile?.displayName ?? authService.currentUser?.email ?? "Kullanıcı")
+                Text(currentUserProfile?.displayName ?? authService.userEmail ?? "Kullanıcı")
                     .font(.title3.bold())
                     .foregroundColor(.white)
                 
@@ -82,7 +81,7 @@ struct SettingsView: View {
                         .foregroundColor(.white.opacity(0.6))
                 }
                 
-                Text(authService.currentUser?.email ?? "")
+                Text(authService.userEmail ?? "")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.4))
             }

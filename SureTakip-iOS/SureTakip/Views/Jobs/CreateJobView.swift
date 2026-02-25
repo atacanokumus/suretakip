@@ -1,5 +1,4 @@
 import SwiftUI
-import FirebaseAuth
 
 /// Create new job view — mirrors web app's job creation modal
 struct CreateJobView: View {
@@ -223,7 +222,7 @@ struct CreateJobView: View {
             description: description.isEmpty ? nil : description,
             status: "active",
             priority: priority,
-            assignedTo: authService.currentUser?.email,
+            assignedTo: authService.userEmail,
             projectName: selectedProject,
             linkedObligationId: linkedObligationId,
             linkedObligationLabel: linkedLabel,
@@ -232,7 +231,7 @@ struct CreateJobView: View {
             comments: nil,
             history: [Job.JobHistoryEntry(
                 action: "created",
-                user: authService.currentUser?.email ?? "unknown",
+                user: authService.userEmail ?? "unknown",
                 date: Date()
             )],
             emoji: selectedEmoji,

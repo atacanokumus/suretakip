@@ -1,5 +1,4 @@
 import SwiftUI
-import FirebaseAuth
 
 /// Dashboard view — mirrors web app's main dashboard with stat cards
 struct DashboardView: View {
@@ -43,9 +42,15 @@ struct DashboardView: View {
                     .font(.title2.bold())
                     .foregroundColor(.white)
                 
-                Text(firestoreService.getUserName(email: authService.currentUser?.email))
+                Text(currentUserProfile?.displayName ?? authService.userEmail ?? "Kullanıcı")
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.6))
+                
+                if let title = currentUserProfile?.title {
+                    Text(title)
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.6))
+                }
             }
             Spacer()
             
@@ -257,6 +262,10 @@ struct DashboardView: View {
     }
     private var thisMonthObligations: [Obligation] {
         firestoreService.obligations.filter { $0.computedStatus == .thisMonth }
+    }
+    private var currentUserProfile: AppUser? {
+        guard let email = authService.userEmail else { return nil }
+        return firestoreService.users.first { $0.email == email }
     }
     private var urgentObligations: [Obligation] {
         firestoreService.obligations

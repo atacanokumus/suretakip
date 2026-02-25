@@ -1,6 +1,7 @@
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
+import FirebaseCore
 import Combine
 
 /// Handles all Firestore operations — mirrors web app's data.js
@@ -15,7 +16,13 @@ class FirestoreService: ObservableObject {
     @Published var isLoading = false
     @Published var lastUpdate: Date?
     
-    private let db = Firestore.firestore()
+    private lazy var db: Firestore = {
+        if FirebaseApp.app() == nil {
+            FirebaseApp.configure()
+        }
+        return Firestore.firestore()
+    }()
+    
     private var listener: ListenerRegistration?
     
     // MARK: - Same Firestore path as web app

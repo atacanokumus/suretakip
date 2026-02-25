@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseAuth
 
 /// Dashboard view — mirrors web app's main dashboard with stat cards
 struct DashboardView: View {

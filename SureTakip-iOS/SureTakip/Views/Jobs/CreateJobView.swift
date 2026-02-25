@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseAuth
 
 /// Create new job view — mirrors web app's job creation modal
 struct CreateJobView: View {

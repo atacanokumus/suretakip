@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseAuth
 
 /// Settings view — mirrors web app's profile and settings
 struct SettingsView: View {

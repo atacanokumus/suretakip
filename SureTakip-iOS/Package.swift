@@ -20,8 +20,20 @@ let package = Package(
                 .product(name: "FirebaseFirestore", package: "firebase-ios-sdk"),
             ],
             path: "SureTakip",
-            exclude: ["GoogleService-Info.plist"],
-            infoPlist: .file(path: "Info.plist")
+            exclude: ["GoogleService-Info.plist", "Info.plist"],
+            infoPlist: .dictionary([
+                "CFBundleIdentifier": "com.davincienerji.suretakip",
+                "CFBundleDisplayName": "Süre Takip",
+                "CFBundleName": "SureTakip",
+                "CFBundlePackageType": "APPL",
+                "CFBundleShortVersionString": "1.0",
+                "CFBundleVersion": "1",
+                "LSRequiresIPhoneOS": true,
+                "UIApplicationSceneManifest": [
+                    "UIApplicationSupportsMultipleScenes": false
+                ],
+                "UILaunchScreen": [:]
+            ])
         )
     ]
 )

@@ -1,0 +1,38 @@
+name: SureTakip
+options:
+  bundleIdPrefix: com.davincienerji
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+
+packages:
+  FirebaseAuth:
+    url: https://github.com/firebase/firebase-ios-sdk.git
+    from: "10.22.0"
+
+targets:
+  SureTakip:
+    type: application
+    platform: iOS
+    sources:
+      - path: SureTakip
+        excludes:
+          - GoogleService-Info.plist
+          - Info.plist
+    info:
+      path: SureTakip/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.davincienerji.suretakip
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: SureTakip/Info.plist
+        DEVELOPMENT_TEAM: ""
+    dependencies:
+      - package: FirebaseAuth
+        product: FirebaseAuth
+      - package: FirebaseAuth
+        product: FirebaseFirestore
+    resources:
+      - path: SureTakip/GoogleService-Info.plist

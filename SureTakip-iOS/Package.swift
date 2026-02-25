@@ -19,7 +19,10 @@ let package = Package(
                 .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseFirestore", package: "firebase-ios-sdk"),
             ],
-            path: "SureTakip"
+            path: "SureTakip",
+            resources: [
+                .process("GoogleService-Info.plist")
+            ]
         )
     ]
 )

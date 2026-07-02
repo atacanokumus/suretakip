@@ -52,7 +52,27 @@ export const Store = {
     updateJob(id, data) {
         const index = this.jobs.findIndex(j => j.id == id);
         if (index !== -1) {
-            this.jobs[index] = { ...this.jobs[index], ...data, updatedAt: new Date() };
+            let updatedJob = { ...this.jobs[index], ...data, updatedAt: new Date() };
+            
+            // Auto-update steps if status is updated externally (e.g. from project modal toggle)
+            if (data.status && !data.steps && updatedJob.steps) {
+                const steps = { ...updatedJob.steps };
+                if (data.status === 'completed') {
+                    for (let i = 1; i <= 9; i++) {
+                        steps[`step${i}`] = { ...steps[`step${i}`], completed: true };
+                    }
+                    updatedJob.currentStep = 9;
+                } else {
+                    // Reset steps 2-9 if changed back to pending
+                    for (let i = 2; i <= 9; i++) {
+                        steps[`step${i}`] = { ...steps[`step${i}`], completed: false };
+                    }
+                    updatedJob.currentStep = 2;
+                }
+                updatedJob.steps = steps;
+            }
+
+            this.jobs[index] = updatedJob;
             this.lastUpdate = new Date().toISOString();
             return true;
         }

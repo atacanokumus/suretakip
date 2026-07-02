@@ -269,8 +269,8 @@ export function getStatus(date, currentStatus = 'pending') {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
 
-    // Auto-complete: Anything in the past is completed
-    if (d < now || currentStatus === 'completed') return 'completed';
+    if (currentStatus === 'completed') return 'completed';
+    if (d < now) return 'overdue';
     if (isInThisCalendarWeek(date)) return 'this-week';
     if (isInThisCalendarMonth(date)) return 'this-month';
 
@@ -286,6 +286,10 @@ export function getStatus(date, currentStatus = 'pending') {
 export function getStatusText(date, currentStatus = 'pending') {
     const status = getStatus(date, currentStatus);
     if (status === 'completed') return 'Tamamlandı ✅';
+    if (status === 'overdue') {
+        const days = Math.abs(getDaysUntil(date));
+        return `Gecikmiş ⚠️ (${days} gün)`;
+    }
 
     const days = getDaysUntil(date);
     if (days === 0) return 'Bugün!';

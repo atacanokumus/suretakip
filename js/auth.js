@@ -27,17 +27,17 @@ export function checkAuthentication(callback) {
  * @param {string} email
  * @param {string} password
  * @param {boolean} remember - Whether to persist the session
- * @returns {Promise<boolean>}
+ * @returns {Promise<{success: boolean, error?: Error}>}
  */
 export async function authenticate(email, password, remember = true) {
     try {
         const persistence = remember ? browserLocalPersistence : browserSessionPersistence;
         await setPersistence(auth, persistence);
         await signInWithEmailAndPassword(auth, email, password);
-        return true;
+        return { success: true };
     } catch (error) {
         console.error('Auth Error:', error.code, error.message);
-        return false;
+        return { success: false, error: error };
     }
 }
 

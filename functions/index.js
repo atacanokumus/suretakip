@@ -331,9 +331,17 @@ exports.checkDeadlines = onSchedule({
         const todayAndOverdue = [];
         const upcomingNext7Days = [];
 
+        console.log(`📊 Total obligations in Firestore: ${obligations.length}`);
+        const completedCount = obligations.filter(o => o.status === 'completed').length;
+        console.log(`✅ Completed obligations (will skip): ${completedCount}`);
+
         obligations.forEach(o => {
-            if (o.status === 'completed') return;
+            if (o.status === 'completed') {
+                console.log(`⏭️ Skipping completed: ${o.projectName} - ${o.obligationType}`);
+                return;
+            }
             const days = getDaysUntil(o.deadline);
+            console.log(`📋 Checking: ${o.projectName} | Status: "${o.status}" | Days: ${days}`);
 
             if (days <= 0) {
                 todayAndOverdue.push({ ...o, days });

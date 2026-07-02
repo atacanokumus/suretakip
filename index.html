@@ -3,10 +3,21 @@
 
 <head>
     <meta charset="UTF-8">
+    <script>
+        window.addEventListener('error', function(e) {
+            console.error("Global JS Error caught:", e);
+            alert("Sistem Hatası:\n" + e.message + "\nDosya: " + e.filename + "\nSatır: " + e.lineno);
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error("Global Promise Rejection caught:", e);
+            alert("Süreç Hatası (Promise Rejection):\n" + (e.reason ? (e.reason.message || e.reason) : e));
+        });
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DaVinci Lisans Süre Takip Platformu</title>
     <link rel="icon" type="image/png" href="assets/logo.png">
     <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="stylesheet" href="jobs.css">
     <link rel="stylesheet" href="modern_job_modal.css">
     <link rel="stylesheet" href="profile_styles.css">
     <link rel="stylesheet" href="button_polish.css?v=2">
@@ -86,7 +97,7 @@
                 </a>
                 <a href="#" class="nav-item" data-page="jobs">
                     <span class="nav-icon">💼</span>
-                    <span>İş Takibi</span>
+                    <span>Tadiller & Süreç Takibi</span>
                 </a>
                 <a href="#" class="nav-item" data-page="obligations">
                     <span class="nav-icon">📋</span>
@@ -143,7 +154,7 @@
                     <button class="add-job-btn btn-primary" id="addJobBtn"
                         style="background: var(--surface-glass); border-color: var(--border-glass);">
                         <span class="btn-icon">💼</span>
-                        <span>Yeni İş Ekle</span>
+                        <span>Yeni Tadil Başvurusu</span>
                     </button>
                     <button class="add-obligation-btn" id="addObligationBtn">
                         <span class="btn-icon">➕</span>
@@ -325,21 +336,21 @@
                             <div class="stat-icon">👤</div>
                             <div class="stat-content">
                                 <span class="stat-value" id="jobStatMyPending">0</span>
-                                <span class="stat-label">Bana Atanan (Bekleyen)</span>
+                                <span class="stat-label">Bana Atanan (Aktif)</span>
                             </div>
                         </div>
                         <div class="stat-card info clickable-card" data-job-filter="all-pending">
                             <div class="stat-icon">⏳</div>
                             <div class="stat-content">
                                 <span class="stat-value" id="jobStatAllPending">0</span>
-                                <span class="stat-label">Toplam Bekleyen</span>
+                                <span class="stat-label">Toplam Aktif Tadil</span>
                             </div>
                         </div>
                         <div class="stat-card success clickable-card" data-job-filter="completed">
                             <div class="stat-icon">✅</div>
                             <div class="stat-content">
                                 <span class="stat-value" id="jobStatCompleted">0</span>
-                                <span class="stat-label">Tamamlanan İşler</span>
+                                <span class="stat-label">Tamamlanan Tadiller</span>
                             </div>
                         </div>
                     </div>
@@ -362,12 +373,12 @@
                             <label>Durum:</label>
                             <select id="jobStatusFilter">
                                 <option value="all">Tümü</option>
-                                <option value="pending" selected>Yapılacaklar</option>
+                                <option value="pending" selected>Aktif Süreçler</option>
                                 <option value="completed">Tamamlananlar</option>
                             </select>
                         </div>
                         <div class="filter-group ml-auto">
-                            <button class="btn btn-primary" id="jobsPageAddBtn">➕ Yeni İş Ekle</button>
+                            <button class="btn btn-primary" id="jobsPageAddBtn">➕ Yeni Tadil Başvurusu</button>
                         </div>
                     </div>
 
@@ -943,12 +954,55 @@
 
     <!-- Modal -->
     <div class="modal-overlay" id="modalOverlay">
-        <div class="modal-content" id="modal">
-            <div class="modal-header">
-                <h3 id="modalTitle"></h3>
-                <button class="modal-close" id="modalClose">&times;</button>
+        <div class="modal-container-split">
+            <!-- Left Panel (Tadil Workflow) -->
+            <div class="modal-content" id="modal">
+                <div class="modal-header">
+                    <h3 id="modalTitle"></h3>
+                    <button class="modal-close" id="modalClose">&times;</button>
+                </div>
+                <div class="modal-body" id="modalBody"></div>
             </div>
-            <div class="modal-body" id="modalBody"></div>
+
+            <!-- Right Panel (Tadil Obligation Form) -->
+            <div class="modal-content" id="tadilObligationPanel">
+                <div class="modal-header">
+                    <h3>➕ Yeni Yükümlülük Ekle</h3>
+                    <button class="split-close" id="tadilObligationClose">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="tadilObligationForm">
+                        <div class="form-group">
+                            <label>🏭 Proje Adı</label>
+                            <input type="text" id="tadilProjectName" class="form-input" readonly style="background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.05); color: var(--text-muted); pointer-events: none;">
+                        </div>
+                        <div class="form-group" style="margin-top: 10px;">
+                            <label>Proje Linki (M-Files)</label>
+                            <input type="url" id="tadilProjectLink" class="form-input" placeholder="https://...">
+                        </div>
+                        <div class="form-group" style="margin-top: 10px;">
+                            <label>Yükümlülük Türü <span class="required">*</span></label>
+                            <input type="text" id="tadilObligationType" class="form-input" placeholder="Örn: İnşaat Ruhsatı" required>
+                        </div>
+                        <div class="form-group" style="margin-top: 10px;">
+                            <label>Yükümlülük Açıklaması <span class="required">*</span></label>
+                            <textarea id="tadilObligationDescription" class="form-textarea" rows="3" placeholder="Detaylı açıklama..." required></textarea>
+                        </div>
+                        <div class="form-group" style="margin-top: 10px;">
+                            <label>Son Tarih <span class="required">*</span></label>
+                            <input type="date" id="tadilDeadline" class="form-input" required>
+                        </div>
+                        <div class="form-group" style="margin-top: 10px;">
+                            <label>Notlar</label>
+                            <textarea id="tadilNotes" class="form-textarea" rows="2" placeholder="Ek notlar..."></textarea>
+                        </div>
+                        <div class="form-actions" style="margin-top: 15px; display: flex; gap: 10px; justify-content: flex-end;">
+                            <button type="button" class="btn btn-secondary" id="tadilObligationCancel">İptal</button>
+                            <button type="submit" class="btn btn-primary">💾 Kaydet</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -956,67 +1010,51 @@
     <div class="modal-overlay" id="addJobModal">
         <div class="modal-container">
             <div class="modal-header">
-                <h3 id="jobModalTitle">Yeni İş Oluştur</h3>
+                <h3 id="jobModalTitle">Yeni Tadil Başvurusu Başlat</h3>
                 <button class="modal-close" id="addJobModalClose">×</button>
             </div>
             <div class="modal-body">
                 <form id="addJobForm" class="modern-form">
                     <div class="form-group">
-                        <label for="jobTitle">İş Başlığı*</label>
-                        <input type="text" id="jobTitle" required placeholder="İşin kısa tanımını giriniz..."
-                            class="modern-input">
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>İlgili Projeler*</label>
-                            <div id="jobProjectList" class="multi-select-container">
-                                <!-- Will be populated by JS -->
-                                <div class="loading-text">Yükleniyor...</div>
-                            </div>
-                            <small class="bulk-info-text">Birden fazla seçilebilir.</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="jobObligation">Bağlı Yükümlülük</label>
-                            <select id="jobObligation" class="modern-select">
-                                <option value="">Yükümlülük Seçiniz...</option>
-                            </select>
-                        </div>
+                        <label for="jobProjectSelect">İlgili Proje*</label>
+                        <select id="jobProjectSelect" class="modern-select" required>
+                            <option value="">Proje Seçiniz...</option>
+                        </select>
                     </div>
 
                     <div class="form-group">
-                        <label>Atanacak Kişiler*</label>
-                        <div id="jobAssigneeList" class="multi-select-container">
-                            <!-- Will be populated by JS -->
-                            <div class="loading-text">Yükleniyor...</div>
-                        </div>
-                        <small class="bulk-info-text">Birden fazla seçilebilir.</small>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="jobPriority">Öncelik</label>
-                            <select id="jobPriority" class="modern-select">
-                                <option value="low">Düşük</option>
-                                <option value="medium" selected>Orta</option>
-                                <option value="high">Yüksek</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="jobDueDate">Termin Tarihi</label>
-                            <input type="date" id="jobDueDate" class="modern-input">
-                        </div>
+                        <label for="jobTitle">Tadil Türü*</label>
+                        <select id="jobTitle" required class="modern-select">
+                            <option value="">Seçiniz...</option>
+                            <option value="Bağlantı Noktası Tadili">Bağlantı Noktası Tadili</option>
+                            <option value="Depolama Ünitesi Tadili">Depolama Ünitesi Tadili</option>
+                            <option value="Hibrit Başvurusu">Hibrit Başvurusu</option>
+                            <option value="İnvertör Tadili">İnvertör Tadili</option>
+                            <option value="Kurulu Güç / Ünite Tadili">Kurulu Güç / Ünite Tadili</option>
+                            <option value="Muhatap Yetkilisi Tanımlama">Muhatap Yetkilisi Tanımlama</option>
+                            <option value="Ortaklık / Yönetici Değişikliği">Ortaklık / Yönetici Değişikliği</option>
+                            <option value="Önlisans Başvurusu">Önlisans Başvurusu</option>
+                            <option value="Önlisans Süre Uzatımı">Önlisans Süre Uzatımı</option>
+                            <option value="Saha Koordinat Tadili">Saha Koordinat Tadili</option>
+                            <option value="Tedarik Lisansı Başvurusu">Tedarik Lisansı Başvurusu</option>
+                            <option value="Tedarik Lisansı Tadili">Tedarik Lisansı Tadili</option>
+                            <option value="Tesis Tamamlama Süre Uzatımı">Tesis Tamamlama Süre Uzatımı</option>
+                            <option value="Ünite Koordinat Tadili">Ünite Koordinat Tadili</option>
+                            <option value="Üretim Lisansı Başvurusu">Üretim Lisansı Başvurusu</option>
+                            <option value="YEKDEM Başvurusu">YEKDEM Başvurusu</option>
+                            <option value="Yıllık Elektrik Enerjisi Üretimi Miktarı Tadili">Yıllık Elektrik Enerjisi Üretimi Miktarı Tadili</option>
+                        </select>
                     </div>
 
                     <div class="form-group">
-                        <label for="jobDescription">Açıklama</label>
-                        <textarea id="jobDescription" rows="4" placeholder="İş detaylarını buraya ekleyebilirsiniz..."
+                        <label for="jobDescription">Açıklama / Notlar (Opsiyonel)</label>
+                        <textarea id="jobDescription" rows="3" placeholder="Tadil hakkında ek açıklama ekleyebilirsiniz..."
                             class="modern-textarea"></textarea>
                     </div>
 
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary btn-block">
-                            <span>🚀</span> İşi Oluştur
+                            <span>🚀</span> Tadil Başvurusunu Kaydet
                         </button>
                     </div>
                 </form>

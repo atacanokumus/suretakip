@@ -21,6 +21,7 @@ import {
 
 const STORAGE_KEY = 'epdk_obligations';
 const MAX_STORAGE_SIZE_MB = 5;
+let unsubscribeFirestore = null;
 
 // ==========================================
 // Safe Storage Operations
@@ -78,19 +79,23 @@ export function logError(context, error, additionalData = {}) {
 /**
  * Saves current store data to Firestore
  */
-export async function syncToFirestore() {
+export async function syncToFirestore(customTimestamp) {
     if (!auth.currentUser) return;
 
     try {
         const dataRef = doc(db, "daVinciData", "master");
+        const ts = customTimestamp || new Date().toISOString();
         await setDoc(dataRef, {
             obligations: Store.obligations,
             jobs: Store.jobs || [],
             projects: Store.projects || [],
             // Users are stored in a separate collection
-            lastUpdate: new Date().toISOString(),
+            lastUpdate: ts,
             updatedBy: auth.currentUser.email
         });
+        if (!customTimestamp) {
+            localStorage.setItem('epdk_lastUpdate', ts);
+        }
         return true;
     } catch (error) {
         logError('Firestore yazma hatası', error);
@@ -104,8 +109,13 @@ export async function syncToFirestore() {
 export function initFirestoreSync() {
     if (!auth.currentUser) return;
 
+    if (unsubscribeFirestore) {
+        unsubscribeFirestore();
+        unsubscribeFirestore = null;
+    }
+
     const dataRef = doc(db, "daVinciData", "master");
-    onSnapshot(dataRef, (doc) => {
+    unsubscribeFirestore = onSnapshot(dataRef, (doc) => {
         if (doc.exists()) {
             const data = doc.data();
 
@@ -284,13 +294,14 @@ export function saveData(syncWithCloud = true) {
     if (success) {
         safeSetStorage('epdk_jobs', Store.jobs); // Also save jobs
         safeSetStorage('epdk_projects', Store.projects); // And projects
-        localStorage.setItem('epdk_lastUpdate', new Date().toISOString());
+        const timestamp = new Date().toISOString();
+        localStorage.setItem('epdk_lastUpdate', timestamp);
 
         // Trigger global UI refresh (Phase 4)
         window.dispatchEvent(new CustomEvent('data-refreshed'));
 
         if (syncWithCloud && auth.currentUser) {
-            syncToFirestore();
+            syncToFirestore(timestamp);
             // Backup reminder (Hard Copy Support)
             const lastBackup = localStorage.getItem('epdk_lastBackup');
             const now = new Date();
@@ -299,7 +310,6 @@ export function saveData(syncWithCloud = true) {
             }
         }
     }
-    return success;
     return success;
 }
 
@@ -355,20 +365,43 @@ export function handleExcelImport(file, callback) {
                     const obligationDescription = validateString(row[2], 500);
                     const dateResult = validateDate(row[3]);
                     const notes = validateString(row[4], 1000);
-                    const excelStatus = row[5] ? String(row[5]).trim().toLowerCase() : null;
 
                     if (projectName && dateResult.valid) {
                         // Smart Logic: Check if this item already exists and is 'completed'
-                        const existing = Store.obligations.find(ex =>
+                        // Try strict match first (name + type + date)
+                        let existing = Store.obligations.find(ex =>
                             ex.projectName === projectName &&
                             ex.obligationType === obligationType &&
                             formatDate(ex.deadline) === formatDate(dateResult.date)
                         );
+                        // Fallback: match by name + type only (date format may differ)
+                        if (!existing) {
+                            existing = Store.obligations.find(ex =>
+                                ex.projectName === projectName &&
+                                ex.obligationType === obligationType &&
+                                ex.status === 'completed'
+                            );
+                        }
+                        // Fallback 2: case-insensitive project name match
+                        if (!existing) {
+                            existing = Store.obligations.find(ex =>
+                                ex.projectName.trim().toLowerCase() === projectName.trim().toLowerCase() &&
+                                ex.obligationType === obligationType &&
+                                ex.status === 'completed'
+                            );
+                        }
+
+                        // Check if ANY column contains exactly the completion keywords
+                        const hasCompletedKeyword = row.some(cell => {
+                            if (!cell) return false;
+                            const s = String(cell).trim().toLowerCase();
+                            return s === 'tamamlandı' || s === 'tamamlandi' || s === 'completed' || s === 'tamam';
+                        });
 
                         let finalStatus = 'pending';
                         if (existing && existing.status === 'completed') {
                             finalStatus = 'completed';
-                        } else if (excelStatus === 'completed' || excelStatus === 'tamamlandı' || excelStatus === 'tamam') {
+                        } else if (hasCompletedKeyword) {
                             finalStatus = 'completed';
                         }
 

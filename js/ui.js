@@ -105,6 +105,11 @@ export function initModals() {
     // Close on background click
     window.addEventListener('click', (event) => {
         if (event.target.classList.contains('modal-overlay')) {
+            if (event.target.id === 'modalOverlay' && event.target.classList.contains('split-active')) {
+                event.target.classList.remove('split-active');
+                window.activeTadilJobIdForObligation = null;
+                return;
+            }
             event.target.classList.remove('show');
         }
     });

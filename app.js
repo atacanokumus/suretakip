@@ -1,4 +1,4 @@
-﻿import { auth } from './js/firebase-config.js';
+import { auth } from './js/firebase-config.js';
 import { Store } from './js/store.js';
 import {
     initAuthStyles, checkAuthentication, authenticate, logout
@@ -24,7 +24,7 @@ import {
     updateAnalytics, initAnalytics
 } from './js/analytics.js';
 import {
-    updateJobsView, initJobsEventHandlers, refreshJobFilters
+    updateJobsView, initJobsEventHandlers, refreshJobFilters, getWorkflowSteps, getInitialStepData
 } from './js/jobs.js';
 import {
     initNotifications, checkAndNotify, testNotifications
@@ -257,10 +257,22 @@ function setupLoginForm() {
             const password = document.getElementById('passwordInput').value;
             const remember = document.getElementById('rememberMe')?.checked ?? true;
 
-            const success = await authenticate(email, password, remember);
-            if (!success) {
+            const result = await authenticate(email, password, remember);
+            if (!result.success) {
                 const errEl = document.getElementById('loginError');
-                if (errEl) errEl.textContent = 'âŒ GiriÅŸ baÅŸarÄ±sÄ±z! LÃ¼tfen kontrol edin.';
+                if (errEl) {
+                    let errMsg = '❌ Giriş başarısız! Lütfen kontrol edin.';
+                    if (result.error) {
+                        if (result.error.code === 'auth/invalid-credential') {
+                            errMsg = '❌ Hatalı e-posta veya şifre!';
+                        } else if (result.error.code === 'auth/network-request-failed') {
+                            errMsg = '❌ Ağ bağlantısı hatası! İnternetinizi kontrol edin.';
+                        } else {
+                            errMsg = `❌ Giriş hatası: ${result.error.message || result.error.code}`;
+                        }
+                    }
+                    errEl.textContent = errMsg;
+                }
                 const container = document.querySelector('.login-container');
                 container.style.animation = 'shake 0.5s';
                 setTimeout(() => container.style.animation = '', 500);
@@ -475,6 +487,25 @@ function setupEventHandlers() {
         });
     }
 
+    // Reset Tadil mode if modal is closed without submitting
+    const cancelAddBtn = document.getElementById('cancelAddObligation');
+    if (cancelAddBtn) {
+        cancelAddBtn.addEventListener('click', () => {
+            window.activeTadilJobIdForObligation = null;
+        });
+    }
+    const closeAddBtn = document.getElementById('addObligationModalClose');
+    if (closeAddBtn) {
+        closeAddBtn.addEventListener('click', () => {
+            window.activeTadilJobIdForObligation = null;
+        });
+    }
+    window.addEventListener('click', (e) => {
+        if (e.target === addModal) {
+            window.activeTadilJobIdForObligation = null;
+        }
+    });
+
     if (addForm) {
         addForm.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -492,12 +523,186 @@ function setupEventHandlers() {
                 updatedAt: new Date()
             };
 
+            // Link to Tadil Job if in Tadil Mode
+            const linkedJobId = window.activeTadilJobIdForObligation;
+            if (linkedJobId) {
+                const job = Store.jobs.find(j => j.id == linkedJobId);
+                if (job) {
+                    const stepsConf = getWorkflowSteps(job);
+                    const tanimlamaIdx = stepsConf.findIndex(s => s.type === 'YUKUMLULUK_TANIMLAMA');
+                    if (tanimlamaIdx !== -1) {
+                        const stepNum = tanimlamaIdx + 1;
+                        const stepKey = `step${stepNum}`;
+                        if (!job.steps[stepKey]) {
+                            job.steps[stepKey] = { completed: false, obligationIds: [], noObligation: false };
+                        }
+                        if (!job.steps[stepKey].obligationIds) {
+                            job.steps[stepKey].obligationIds = [];
+                        }
+                        
+                        if (!job.steps[stepKey].obligationIds.includes(newObligation.id)) {
+                            job.steps[stepKey].obligationIds.push(newObligation.id);
+                        }
+                        job.steps[stepKey].completed = false;
+                        job.steps[stepKey].noObligation = false;
+                        
+                        if (job.currentStep > stepNum) {
+                            job.currentStep = stepNum;
+                            const totalSteps = stepsConf.length;
+                            for (let k = stepNum + 1; k <= totalSteps; k++) {
+                                const nextStepKey = `step${k}`;
+                                if (job.steps[nextStepKey]) {
+                                    const nextStepConf = stepsConf[k - 1];
+                                    if (nextStepConf) {
+                                        job.steps[nextStepKey] = getInitialStepData(nextStepConf.type, false);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    Store.updateJob(job.id, {
+                        steps: job.steps,
+                        currentStep: job.currentStep
+                    });
+                }
+                window.activeTadilJobIdForObligation = null;
+            }
+
             Store.obligations.push(newObligation);
             if (saveData()) {
                 addModal.classList.remove('show');
                 addForm.reset();
                 refreshAllViews();
-                showToast('YÃ¼kÃ¼mlÃ¼lÃ¼k baÅŸarÄ±yla eklendi', 'success');
+                showToast('Yükümlülük başarıyla eklendi', 'success');
+
+                // Reopen the Job Tracking modal to show the newly added obligation
+                if (linkedJobId) {
+                    const updatedJob = Store.jobs.find(j => j.id == linkedJobId);
+                    if (updatedJob && typeof window.showJobDetailModal === 'function') {
+                        setTimeout(() => {
+                            window.showJobDetailModal(updatedJob);
+                        }, 100);
+                    }
+                }
+            }
+        });
+    }
+
+    // Tadil Obligation split screen submission
+    const tadilForm = document.getElementById('tadilObligationForm');
+    if (tadilForm) {
+        tadilForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const linkedJobId = window.activeTadilJobIdForObligation;
+            if (!linkedJobId) return;
+
+            const newObligation = {
+                id: generateId(),
+                projectName: validateString(document.getElementById('tadilProjectName').value),
+                projectLink: document.getElementById('tadilProjectLink').value,
+                obligationType: validateString(document.getElementById('tadilObligationType').value),
+                obligationDescription: validateString(document.getElementById('tadilObligationDescription').value),
+                deadline: new Date(document.getElementById('tadilDeadline').value),
+                notes: validateString(document.getElementById('tadilNotes').value),
+                status: 'pending',
+                comments: [],
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+
+            const job = Store.jobs.find(j => j.id == linkedJobId);
+            if (job) {
+                const stepsConf = getWorkflowSteps(job);
+                const tanimlamaIdx = stepsConf.findIndex(s => s.type === 'YUKUMLULUK_TANIMLAMA');
+                if (tanimlamaIdx !== -1) {
+                    const stepNum = tanimlamaIdx + 1;
+                    const stepKey = `step${stepNum}`;
+                    if (!job.steps[stepKey]) {
+                        job.steps[stepKey] = { completed: false, obligationIds: [], noObligation: false };
+                    }
+                    if (!job.steps[stepKey].obligationIds) {
+                        job.steps[stepKey].obligationIds = [];
+                    }
+                    
+                    if (!job.steps[stepKey].obligationIds.includes(newObligation.id)) {
+                        job.steps[stepKey].obligationIds.push(newObligation.id);
+                    }
+                    job.steps[stepKey].completed = false;
+                    job.steps[stepKey].noObligation = false;
+                    
+                    if (job.currentStep > stepNum) {
+                        job.currentStep = stepNum;
+                        const totalSteps = stepsConf.length;
+                        for (let k = stepNum + 1; k <= totalSteps; k++) {
+                            const nextStepKey = `step${k}`;
+                            if (job.steps[nextStepKey]) {
+                                const nextStepConf = stepsConf[k - 1];
+                                if (nextStepConf) {
+                                    job.steps[nextStepKey] = getInitialStepData(nextStepConf.type, false);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Store.updateJob(job.id, {
+                    steps: job.steps,
+                    currentStep: job.currentStep
+                });
+            }
+
+            Store.obligations.push(newObligation);
+            if (saveData()) {
+                tadilForm.reset();
+                
+                // Hide split screen with animation
+                const overlay = document.getElementById('modalOverlay');
+                if (overlay) {
+                    overlay.classList.remove('split-active');
+                }
+                window.activeTadilJobIdForObligation = null;
+
+                refreshAllViews();
+                showToast('Yükümlülük başarıyla eklendi', 'success');
+
+                // Refresh/reopen the same detail modal inline
+                if (job) {
+                    setTimeout(() => {
+                        window.showJobDetailModal(job);
+                    }, 400); // Wait for the transition to finish
+                }
+            }
+        });
+    }
+
+    // Cancel/Close Tadil Obligation split screen
+    const cancelTadilObBtn = document.getElementById('tadilObligationCancel');
+    const closeTadilObBtn = document.getElementById('tadilObligationClose');
+    const resetSplit = () => {
+        const overlay = document.getElementById('modalOverlay');
+        if (overlay) {
+            overlay.classList.remove('split-active');
+        }
+        window.activeTadilJobIdForObligation = null;
+    };
+    if (cancelTadilObBtn) cancelTadilObBtn.onclick = resetSplit;
+    if (closeTadilObBtn) closeTadilObBtn.onclick = resetSplit;
+
+    // Reset split-active when main modal overlay closes
+    const mainOverlay = document.getElementById('modalOverlay');
+    if (mainOverlay) {
+        const mainClose = document.getElementById('modalClose');
+        if (mainClose) {
+            mainClose.addEventListener('click', () => {
+                mainOverlay.classList.remove('split-active');
+                window.activeTadilJobIdForObligation = null;
+            });
+        }
+        window.addEventListener('click', (e) => {
+            if (e.target === mainOverlay) {
+                mainOverlay.classList.remove('split-active');
+                window.activeTadilJobIdForObligation = null;
             }
         });
     }
@@ -1044,4 +1249,9 @@ function triggerConfetti(x, y) {
         }, 1000);
     }
 }
+
+// Global refresh-views listener for job callbacks
+window.addEventListener('refresh-views', () => {
+    refreshAllViews();
+});
 

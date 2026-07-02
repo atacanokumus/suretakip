@@ -2,195 +2,816 @@
    Phase 2: Job Tracking Styles
    ========================================== */
 
-/* Jobs Container Grid */
+/* Jobs Container Grid -> Flex Container */
 .jobs-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 20px;
-    padding-bottom: 20px;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+    padding-bottom: 24px !important;
 }
 
-/* Job Card Design */
+/* Job Card Design - Horizontal Glassmorphism Layout */
 .job-card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 16px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    cursor: pointer;
-    transition: all 0.3s var(--transition-subtle);
-    position: relative;
-    overflow: hidden;
+    background: rgba(30, 41, 59, 0.45) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border-radius: 18px !important;
+    padding: 16px 24px !important;
+    display: grid !important;
+    grid-template-columns: 260px 1fr 240px !important;
+    align-items: center !important;
+    gap: 24px !important;
+    cursor: pointer !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    flex-direction: unset !important;
 }
 
 .job-card:hover {
-    background: rgba(255, 255, 255, 0.06);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-    border-color: rgba(255, 165, 0, 0.3);
-    /* Amber accent */
+    background: rgba(30, 41, 59, 0.6) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3), 0 0 12px rgba(251, 191, 36, 0.15) !important;
+    border-color: rgba(251, 191, 36, 0.3) !important; /* Amber glow */
 }
 
-/* Card Header */
-.job-header {
+/* Column 1: Info Column */
+.job-info-col {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+    text-align: left;
 }
 
 .job-title {
     color: var(--text-primary);
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1.4;
-    margin-right: 10px;
-}
-
-.job-priority-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    margin-top: 6px;
-}
-
-.priority-high {
-    background-color: #ff4d4d;
-    box-shadow: 0 0 8px rgba(255, 77, 77, 0.4);
-}
-
-.priority-medium {
-    background-color: #ffaa00;
-}
-
-.priority-low {
-    background-color: #00cc66;
-}
-
-/* Subtitle / Project */
-.job-project {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--text-muted);
-    font-size: 13px;
-}
-
-/* Card Body / Description */
-.job-description {
-    color: var(--text-secondary);
-    font-size: 13px;
-    line-height: 1.5;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.3;
+    margin: 0;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Card Footer */
-.job-footer {
+.tadil-badge {
+    align-self: flex-start;
+    font-size: 11px;
+    font-weight: 600;
+    color: #e2e8f0;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 3px 8px;
+    border-radius: 6px;
+    margin-top: 4px;
+}
+
+/* Column 2: Stepper Column */
+.job-stepper-col {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     align-items: center;
-    margin-top: auto;
-    padding-top: 15px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
 }
 
-.job-assignee {
+/* Metro Line / Subway Map Stepper Styles */
+.metro-line-wrapper {
+    position: relative;
+    width: 94%;
+    height: 75px; /* Comfortable height for alternating top/bottom labels */
+    margin: 18px auto 8px auto;
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: var(--text-secondary);
 }
 
-.assignee-avatar {
-    width: 24px;
-    height: 24px;
+.metro-rail-bg {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    z-index: 1;
+}
+
+.metro-rail-progress {
+    position: absolute;
+    left: 0;
+    height: 6px;
+    background: linear-gradient(90deg, #10b981, #34d399);
+    border-radius: 3px;
+    z-index: 2;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+.metro-stations-container {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 100%;
+    z-index: 3;
+}
+
+.metro-station {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.metro-station-dot {
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #FFB74D, #FF9800);
-    color: #fff;
-    font-weight: bold;
-    font-size: 10px;
+    background: #1e293b;
+    border: 3px solid rgba(255, 255, 255, 0.35);
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-.job-date {
-    font-size: 12px;
+.metro-station.completed .metro-station-dot {
+    background: #10b981;
+    border-color: #34d399;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+}
+
+.metro-station.active .metro-station-dot {
+    background: #fbbf24;
+    border-color: #f59e0b;
+    animation: pulseAmberDot 1.6s infinite ease-in-out;
+    transform: scale(1.3);
+}
+
+@keyframes pulseAmberDot {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(251, 191, 36, 0.7);
+        transform: scale(1.25);
+    }
+    50% {
+        box-shadow: 0 0 25px rgba(251, 191, 36, 1), 0 0 10px rgba(245, 158, 11, 0.5);
+        transform: scale(1.4);
+    }
+}
+
+/* Animated active segment between previous completed station and current station */
+.metro-rail-active-segment {
+    position: absolute;
+    height: 6px;
+    z-index: 25;
+    border-radius: 3px;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.metro-rail-pulse-line {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #10b981, #67e8f9); /* Completed green -> active bright cyan */
+    box-shadow: 0 0 8px rgba(103, 232, 249, 0.8);
+    border-radius: 3px;
+    animation: pulseSegmentFlow 1.8s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes pulseSegmentFlow {
+    0% {
+        width: 0%;
+        opacity: 0.3;
+    }
+    70% {
+        width: 100%;
+        opacity: 1;
+    }
+    90% {
+        width: 100%;
+        opacity: 0;
+    }
+    100% {
+        width: 0%;
+        opacity: 0;
+    }
+}
+
+.metro-station-number {
+    font-size: 8px;
+    font-weight: 800;
+    color: transparent;
+    position: absolute;
+}
+
+.metro-station:hover .metro-station-dot {
+    transform: scale(1.4);
+    border-color: #fbbf24;
+}
+
+/* Active Train Icon & Animation */
+.metro-train-icon {
+    position: absolute;
+    font-size: 16px;
+    bottom: 18px; /* Lifted above the dot */
+    left: 50%;
+    transform: translateX(-50%);
+    animation: trainBob 1.2s infinite ease-in-out;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+    pointer-events: none;
+    z-index: 10;
+}
+
+@keyframes trainBob {
+    0%, 100% {
+        transform: translate(-50%, 0);
+    }
+    50% {
+        transform: translate(-50%, -5px);
+    }
+}
+
+/* Station Labels (Alternating) */
+.metro-station-label {
+    position: absolute;
+    font-size: 9px;
+    font-weight: 600;
     color: var(--text-muted);
-    background: rgba(255, 255, 255, 0.05);
-    padding: 4px 8px;
-    border-radius: 6px;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+    pointer-events: none;
 }
 
-.date-overdue {
-    color: #fe6e6e;
-    background: rgba(254, 110, 110, 0.1);
+.metro-station-label.label-top {
+    bottom: 22px;
 }
 
-.date-today {
+.metro-station.active .metro-station-label.label-top {
+    bottom: 38px; /* Shift up to prevent overlapping the train icon */
+}
+
+.metro-station-label.label-bottom {
+    top: 22px;
+}
+
+.metro-station.completed .metro-station-label {
+    color: #e2e8f0;
+}
+
+.metro-station.active .metro-station-label {
     color: #ffd166;
-    background: rgba(255, 209, 102, 0.1);
+    font-weight: 700;
+    font-size: 10px;
+}
+
+/* Next Station textual layout styling */
+.next-station-desc {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-top: 4px;
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.job-card:hover .next-station-desc {
+    color: var(--text-secondary);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Mobile Responsive for Metro Stepper */
+@media (max-width: 768px) {
+    .metro-line-wrapper {
+        width: 90%;
+    }
+    .metro-station-label {
+        display: none;
+    }
+    .metro-station.active .metro-station-label {
+        display: block;
+        font-size: 8px;
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid rgba(251, 191, 36, 0.4);
+        padding: 3px 8px;
+        border-radius: 6px;
+        z-index: 15;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .metro-station.active .metro-station-label.label-top {
+        bottom: 30px;
+    }
+    .metro-station.active .metro-station-label.label-bottom {
+        top: 20px;
+    }
+}
+
+.live-status-container {
+    text-align: center;
+    width: 100%;
+}
+
+.live-status-desc {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffd166;
+    background: rgba(255, 209, 102, 0.08);
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 209, 102, 0.15);
+    display: inline-block;
+}
+
+.live-status-desc.pulse {
+    animation: pulseGlow 2s infinite ease-in-out;
+}
+
+@keyframes pulseGlow {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 209, 102, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 8px rgba(255, 209, 102, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 209, 102, 0);
+    }
+}
+
+/* Column 3: Meta & Assignee Column */
+.job-meta-col {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 20px;
+}
+
+.progress-box-mini {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 60px;
+}
+
+.progress-val-circle {
+    font-size: 15px;
+    font-weight: 700;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.08);
+    border: 2.5px solid #10b981;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.progress-label-mini {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.assignee-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 6px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.assignee-avatar {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #fbbf24, #d97706);
+    color: #fff;
+    font-weight: bold;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+}
+
+.assignee-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.assignee-details {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.assignee-role {
+    font-size: 9px;
+    color: var(--text-muted);
+}
+
+.assignee-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.last-update {
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
 }
 
 /* Completed State */
 .job-card.completed {
-    opacity: 0.7;
-    border-color: rgba(0, 255, 127, 0.2);
+    opacity: 0.8 !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
+    background: rgba(16, 185, 129, 0.02) !important;
+    padding: 16px 24px !important;
+    display: grid !important;
+    grid-template-columns: 260px 1fr 240px !important;
+    align-items: center !important;
+    min-height: unset !important;
+    height: auto !important;
+    flex-direction: unset !important;
 }
 
 .job-card.completed .job-title {
-    text-decoration: line-through;
-    color: var(--text-muted);
+    text-decoration: line-through !important;
+    color: var(--text-muted) !important;
 }
 
-.job-card.completed::before {
-    content: "✓";
+.job-card.completed .progress-val-circle {
+    color: #10b981;
+    border-color: #10b981;
+}
+
+/* Mobile & Laptop Responsive Stacking */
+@media (max-width: 1450px) {
+    .job-card {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+        padding: 18px !important;
+    }
+
+    .job-info-col {
+        align-items: flex-start !important;
+    }
+
+    .job-stepper-col {
+        padding: 8px 0 !important;
+    }
+
+    .job-meta-col {
+        width: 100% !important;
+        justify-content: space-between !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+        padding-top: 12px !important;
+    }
+}
+
+/* ==========================================
+   Tadil Workflow Special Styles
+   ========================================== */
+
+/* Company & Title Styling */
+.company-tag {
+    font-size: 0.75rem;
+    color: var(--accent-light);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+    display: block;
+}
+
+.tadil-type-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    font-weight: 500;
+}
+
+.stage-badge {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.stage-badge.stage-1 { border-color: rgba(99, 102, 241, 0.3); color: #818cf8; }
+.stage-badge.stage-2 { border-color: rgba(245, 158, 11, 0.3); color: #fbbf24; }
+.stage-badge.stage-3 { border-color: rgba(245, 158, 11, 0.3); color: #fbbf24; }
+.stage-badge.stage-4 { border-color: rgba(245, 158, 11, 0.3); color: #fbbf24; }
+.stage-badge.stage-5 { border-color: rgba(239, 68, 68, 0.3); color: #f87171; }
+.stage-badge.stage-6 { border-color: rgba(239, 68, 68, 0.3); color: #f87171; }
+.stage-badge.stage-7 { border-color: rgba(16, 185, 129, 0.3); color: #34d399; }
+.stage-badge.stage-8 { border-color: rgba(16, 185, 129, 0.3); color: #34d399; }
+.stage-badge.stage-9 { border-color: rgba(16, 185, 129, 0.3); color: #34d399; }
+
+/* Metro interval days badge between stations */
+.metro-interval-badge {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-15deg);
-    font-size: 80px;
-    color: rgba(0, 255, 127, 0.1);
-    font-weight: 900;
+    top: calc(50% + 5px);
+    transform: translateX(-50%);
+    font-size: 9.5px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.4);
+    background: transparent !important;
+    padding: 0;
+    white-space: nowrap;
     pointer-events: none;
+    border: none !important;
+    letter-spacing: 0.2px;
+    font-style: italic;
 }
 
-/* Checkbox Action */
-.job-checkbox {
-    width: 20px;
-    height: 20px;
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
+/* Card Dates & Elapsed Days Metadata */
+.job-date-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.job-date-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.days-badge {
+    color: #fbbf24;
+    font-weight: 600;
+    font-size: 10px;
+    background: rgba(251, 191, 36, 0.12);
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+/* Live Status text styling */
+.live-status-desc {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #ffd166;
+    letter-spacing: 0.3px;
+    margin: 2px 0;
+}
+
+.job-card:hover .live-status-desc {
+    color: #fff;
+    text-shadow: 0 0 8px rgba(255, 209, 102, 0.3);
+}
+
+/* Accordion Stepper styling for Detail Modal */
+.tadil-accordion-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.step-accordion-item {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.step-accordion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    background: rgba(255, 255, 255, 0.03);
     cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.step-accordion-header:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.step-accordion-header .header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.step-number-badge {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
 }
 
-.job-checkbox:hover {
-    border-color: #FFB74D;
+.step-name-text {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
 }
 
-.job-checkbox.checked {
-    background-color: #00cc66;
-    border-color: #00cc66;
+.step-status-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.05);
+    color: var(--text-muted);
 }
 
-/* Mobile Responsive */
+/* Expansion Logic styling */
+.step-accordion-item .step-accordion-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.step-accordion-item.expanded .step-accordion-content {
+    max-height: 800px; /* Large enough to fit step 2 & 5 forms */
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.step-form-wrapper {
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+/* Step State Modifiers */
+/* Completed State */
+.step-accordion-item.completed {
+    border-color: rgba(16, 185, 129, 0.2);
+}
+.step-accordion-item.completed .step-number-badge {
+    background: #10b981;
+    color: #fff;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+}
+.step-accordion-item.completed .step-status-badge {
+    background: rgba(16, 185, 129, 0.1);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+/* Active State */
+.step-accordion-item.active {
+    border-color: rgba(251, 191, 36, 0.3);
+    background: rgba(251, 191, 36, 0.02);
+}
+.step-accordion-item.active .step-number-badge {
+    background: #fbbf24;
+    color: #000;
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+}
+.step-accordion-item.active .step-status-badge {
+    background: rgba(251, 191, 36, 0.1);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+/* Locked State */
+.step-accordion-item.locked {
+    opacity: 0.5;
+}
+.step-accordion-item.locked .step-accordion-header {
+    cursor: not-allowed;
+}
+.step-accordion-item.locked .step-accordion-header:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* Form Styles inside details */
+.gorus-box {
+    transition: all 0.3s ease;
+}
+
+.gorus-box:hover {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    background: rgba(0, 0, 0, 0.25) !important;
+}
+
+.checkbox-group input[type="checkbox"]:focus {
+    outline: none;
+}
+
+/* ==========================================================================
+   Tadil Workflow Split Screen & Transition Animation Styles (Phase 10)
+   ========================================================================== */
+
+.modal-container-split {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+    max-width: 95vw;
+}
+
+#modalOverlay #modal {
+    width: 680px;
+    max-width: 90vw;
+    transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+#modalOverlay #tadilObligationPanel.modal-content {
+    width: 0;
+    max-width: 0;
+    opacity: 0;
+    visibility: hidden;
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
+    border: none !important;
+    transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+    transform: translateX(50px);
+}
+
+/* Active split state */
+#modalOverlay.split-active .modal-container-split {
+    gap: 20px;
+}
+
+#modalOverlay.split-active #modal {
+    transform: translateX(0);
+}
+
+#modalOverlay.split-active #tadilObligationPanel.modal-content {
+    width: 480px;
+    max-width: 90vw;
+    opacity: 1;
+    visibility: visible;
+    padding: 24px;
+    margin: 0;
+    border: 1px solid var(--border-glass) !important;
+    transform: translateX(0);
+}
+
+/* Mobile responsive styles */
 @media (max-width: 768px) {
-    .jobs-container {
-        grid-template-columns: 1fr;
-        /* Full width cards */
+    .modal-container-split {
+        flex-direction: column;
+        max-height: 90vh;
+        overflow-y: auto;
     }
-
-    .job-card {
-        padding: 15px;
+    
+    #modalOverlay.split-active #modal {
+        display: none;
+    }
+    
+    #modalOverlay.split-active #tadilObligationPanel.modal-content {
+        width: 100%;
+        margin-left: 0;
+        transform: translateY(20px);
     }
 }
+
+/* Split Modal Close Button Styles */
+.split-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 24px;
+    cursor: pointer;
+    transition: color 0.3s;
+}
+
+.split-close:hover {
+    color: var(--text-primary);
+}

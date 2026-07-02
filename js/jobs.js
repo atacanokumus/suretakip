@@ -105,7 +105,7 @@ const WORKFLOWS = {
     "Ünite Koordinat Tadili": [
         { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
         { type: "BASVURU", short: "Başvuru", long: "2. Tadil Başvurusunun Yapılması" },
-        { type: "KURUM_GORUS_EIGM", short: "EİGM Görüşü", long: "3. EİGM Kurum Görüşü" },
+        { type: "KURUM_GORUS_TEIAS_EIGM", short: "TEİAŞ/EİGM Görüşü", long: "3. TEİAŞ ve EİGM Kurum Görüşleri" },
         { type: "OLUR_MUZEKKERE_YAZIMI", short: "Olur Hazırlama", long: "4. Daire Başkanlığı Oluru Hazırlanması" },
         { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Olur İmzalanması", long: "5. Olur İmzalanması" },
         { type: "DERC_EDILME", short: "Tadil Derç", long: "6. Tadilin Önlisans/Lisansa Derç Edilmesi" },
@@ -250,6 +250,33 @@ function ensureTadilSteps(job) {
         job.currentStep = job.status === 'completed' ? 10 : (job.currentStep || 1) + 1;
         Store.updateJob(job.id, { steps: job.steps, currentStep: job.currentStep });
         return job;
+    }
+
+    if (job.title === 'Ünite Koordinat Tadili' && job.steps && job.steps.step3 && job.steps.step3.teiasDondu === undefined) {
+        job.steps.step3 = {
+            ...job.steps.step3,
+            completed: false,
+            teiasCikildi: false,
+            teiasDondu: false,
+            teiasCikisSayi: '',
+            teiasCikisTarih: '',
+            teiasSayi: '',
+            teiasTarih: '',
+            teiasBaglantiDurumu: 'kabul',
+            teiasItirazEpdkTarih: '',
+            teiasItirazEpdkSayi: '',
+            teiasItirazTeiasTarih: '',
+            teiasItirazTeiasSayi: '',
+            teiasItirazCevapTarih: '',
+            teiasItirazCevapSayi: '',
+            teiasItirazCevapGeriDondu: false,
+            teiasObjections: [],
+            teiasKabulTaahhutTanimla: false,
+            teiasKabulDeadline: '',
+            teiasKabulDesc: '',
+            teiasKabulObgId: ''
+        };
+        Store.updateJob(job.id, { steps: job.steps });
     }
 
     const stepsConf = getWorkflowSteps(job);

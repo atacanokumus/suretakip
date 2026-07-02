@@ -37,7 +37,7 @@ const WORKFLOWS = {
     "Depolama Ünitesi Tadili": [
         { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
         { type: "BASVURU", short: "Başvuru", long: "2. Tadil Başvurusunun Yapılması" },
-        { type: "KURUM_GORUS_TEIAS_EIGM", short: "TEİAŞ/EİGM Görüşü", long: "3. TEİAŞ / EİGM Kurum Görüşleri" },
+        { type: "KURUM_GORUS_KDB", short: "KDB Görüşü", long: "3. KDB Kurum Görüşü" },
         { type: "OLUR_MUZEKKERE_YAZIMI", short: "Olur Hazırlama", long: "4. Daire Başkanlığı Oluru Hazırlanması" },
         { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Olur İmzalanması", long: "5. Olur İmzalanması" },
         { type: "DERC_EDILME", short: "Tadil Derç", long: "6. Tadilin Önlisans/Lisansa Derç Edilmesi" },
@@ -275,6 +275,22 @@ function ensureTadilSteps(job) {
             teiasKabulDeadline: '',
             teiasKabulDesc: '',
             teiasKabulObgId: ''
+        };
+        Store.updateJob(job.id, { steps: job.steps });
+    }
+
+    if (job.title === 'Depolama Ünitesi Tadili' && job.steps && job.steps.step3 && job.steps.step3.kdbDondu === undefined) {
+        const oldStep3 = job.steps.step3;
+        if (oldStep3.teiasKabulObgId && typeof Store !== 'undefined' && Store.obligations) {
+            Store.obligations = Store.obligations.filter(o => o.id !== oldStep3.teiasKabulObgId);
+        }
+        job.steps.step3 = {
+            completed: false,
+            kdbDondu: false,
+            kdbCikisSayi: '',
+            kdbCikisTarih: '',
+            kdbSayi: '',
+            kdbTarih: ''
         };
         Store.updateJob(job.id, { steps: job.steps });
     }

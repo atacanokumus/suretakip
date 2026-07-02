@@ -164,7 +164,20 @@ const FALLBACK_STEPS = [
 export function getWorkflowSteps(job) {
     if (!job || !job.title) return FALLBACK_STEPS;
     const title = job.title.trim();
-    return WORKFLOWS[title] || FALLBACK_STEPS;
+    const steps = WORKFLOWS[title] || FALLBACK_STEPS;
+    if (job.revisionCount && job.revisionCount > 0) {
+        return steps.map(step => {
+            if (step.type === 'BASVURU') {
+                return {
+                    ...step,
+                    short: 'Revizyon',
+                    long: `${job.revisionCount}. Revizyon Yapılması`
+                };
+            }
+            return step;
+        });
+    }
+    return steps;
 }
 
 export function getInitialStepData(type, isCompleted) {
@@ -521,6 +534,19 @@ function generateProcessSummaryHtml(job) {
     const stepsConf = getWorkflowSteps(job);
     const summaryLines = [];
 
+    // Prepend revision history
+    if (job.revisions && job.revisions.length > 0) {
+        job.revisions.forEach(rev => {
+            const revDate = new Date(rev.date).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            summaryLines.push(`
+                <div class="summary-line-item revision-summary-item" style="margin-bottom:8px; display:flex; align-items:flex-start; gap:6px; color:#fbbf24; border-bottom:1px dashed rgba(251,191,36,0.15); padding-bottom:6px;">
+                    <span style="color:#fbbf24;">🔄</span>
+                    <div><strong>${rev.revisionNum}. Revizyon Başlatıldı:</strong> ${revDate} tarihinde süreç revize edilerek yeniden başvuru aşamasına çekildi.</div>
+                </div>
+            `);
+        });
+    }
+
     stepsConf.forEach((stepConf, idx) => {
         const stepNum = idx + 1;
         const sData = job.steps[`step${stepNum}`];
@@ -556,7 +582,40 @@ function generateProcessSummaryHtml(job) {
                     if (sData.eigmDondu) {
                         parts.push(`EİGM görüşü ${sData.eigmTarih ? formatDate(sData.eigmTarih) + ' tarihinde' : ''} cevaplandı (${escapeHtml(sData.eigmSayi || 'Muaf')})`);
                     }
-                    if (parts.length > 0) lineText = parts.join(', ') + '.';
+                    if (parts.length > 0) {
+                        lineText = parts.join(', ') + '.';
+                        
+                        // Current connection status details
+                        const baglantiDurumu = sData.teiasBaglantiDurumu || 'kabul';
+                        if (baglantiDurumu === 'kabul') {
+                            if (sData.teiasKabulTaahhutTanimla || sData.teiasKabulObgId) {
+                                lineText += `<div style="margin-left:15px; color:#10b981; font-size:11px; margin-top:2px;">↳ 📋 Bağlantı kabul taahhüt yükümlülüğü tanımlandı (Son Gün: ${sData.teiasKabulDeadline ? formatDate(sData.teiasKabulDeadline) : '-'}).</div>`;
+                            } else if (sData.teiasDondu) {
+                                lineText += `<div style="margin-left:15px; color:#10b981; font-size:11px; margin-top:2px;">↳ ✅ Bağlantı noktası değişmedi / kabul edildi.</div>`;
+                            }
+                        } else if (baglantiDurumu === 'itiraz') {
+                            let activeObjText = `<div style="margin-left:15px; color:#f87171; font-size:11px; margin-top:2px;">↳ ⚠️ Bağlantı görüşüne itiraz edildi (Süreç Takipte).`;
+                            if (sData.teiasItirazEpdkTarih || sData.teiasItirazEpdkSayi) {
+                                activeObjText += `<br>  • EPDK Sunum: ${sData.teiasItirazEpdkSayi || '-'} (${sData.teiasItirazEpdkTarih ? formatDate(sData.teiasItirazEpdkTarih) : '-'})`;
+                            }
+                            if (sData.teiasItirazTeiasTarih || sData.teiasItirazTeiasSayi) {
+                                activeObjText += `<br>  • TEİAŞ Görüş: ${sData.teiasItirazTeiasSayi || '-'} (${sData.teiasItirazTeiasTarih ? formatDate(sData.teiasItirazTeiasTarih) : '-'})`;
+                            }
+                            if (sData.teiasItirazCevapTarih || sData.teiasItirazCevapSayi) {
+                                activeObjText += `<br>  • TEİAŞ İtiraz Cevap: ${sData.teiasItirazCevapSayi || '-'} (${sData.teiasItirazCevapTarih ? formatDate(sData.teiasItirazCevapTarih) : '-'})`;
+                            }
+                            activeObjText += `</div>`;
+                            lineText += activeObjText;
+                        }
+
+                        // Archive loops details
+                        if (sData.teiasObjections && sData.teiasObjections.length > 0) {
+                            const objLines = sData.teiasObjections.map((obj, oIdx) => {
+                                return `<div style="margin-left:15px; color:#f87171; font-size:11px; margin-top:4px;">↳ <strong>[${oIdx+1}. Arşivlenen İtiraz]:</strong> TEİAŞ görüşüne itiraz edildi. EPDK Yazısı: ${obj.teiasItirazEpdkSayi || '-'} (${obj.teiasItirazEpdkTarih ? formatDate(obj.teiasItirazEpdkTarih) : '-'}), TEİAŞ Yazısı: ${obj.teiasItirazTeiasSayi || '-'} (${obj.teiasItirazTeiasTarih ? formatDate(obj.teiasItirazTeiasTarih) : '-'}), TEİAŞ Cevabı: ${obj.teiasItirazCevapSayi || '-'} (${obj.teiasItirazCevapTarih ? formatDate(obj.teiasItirazCevapTarih) : '-'})</div>`;
+                            }).join('');
+                            lineText += objLines;
+                        }
+                    }
                 }
                 break;
             case 'KURUM_GORUS_TEIAS':
@@ -568,7 +627,40 @@ function generateProcessSummaryHtml(job) {
                     if (sData.teiasDondu) {
                         parts.push(`TEİAŞ görüşü ${sData.teiasTarih ? formatDate(sData.teiasTarih) + ' tarihinde' : ''} cevaplandı (${escapeHtml(sData.teiasSayi || 'Muaf')})`);
                     }
-                    if (parts.length > 0) lineText = parts.join(', ') + '.';
+                    if (parts.length > 0) {
+                        lineText = parts.join(', ') + '.';
+
+                        // Current connection status details
+                        const baglantiDurumu = sData.teiasBaglantiDurumu || 'kabul';
+                        if (baglantiDurumu === 'kabul') {
+                            if (sData.teiasKabulTaahhutTanimla || sData.teiasKabulObgId) {
+                                lineText += `<div style="margin-left:15px; color:#10b981; font-size:11px; margin-top:2px;">↳ 📋 Bağlantı kabul taahhüt yükümlülüğü tanımlandı (Son Gün: ${sData.teiasKabulDeadline ? formatDate(sData.teiasKabulDeadline) : '-'}).</div>`;
+                            } else if (sData.teiasDondu) {
+                                lineText += `<div style="margin-left:15px; color:#10b981; font-size:11px; margin-top:2px;">↳ ✅ Bağlantı noktası değişmedi / kabul edildi.</div>`;
+                            }
+                        } else if (baglantiDurumu === 'itiraz') {
+                            let activeObjText = `<div style="margin-left:15px; color:#f87171; font-size:11px; margin-top:2px;">↳ ⚠️ Bağlantı görüşüne itiraz edildi (Süreç Takipte).`;
+                            if (sData.teiasItirazEpdkTarih || sData.teiasItirazEpdkSayi) {
+                                activeObjText += `<br>  • EPDK Sunum: ${sData.teiasItirazEpdkSayi || '-'} (${sData.teiasItirazEpdkTarih ? formatDate(sData.teiasItirazEpdkTarih) : '-'})`;
+                            }
+                            if (sData.teiasItirazTeiasTarih || sData.teiasItirazTeiasSayi) {
+                                activeObjText += `<br>  • TEİAŞ Görüş: ${sData.teiasItirazTeiasSayi || '-'} (${sData.teiasItirazTeiasTarih ? formatDate(sData.teiasItirazTeiasTarih) : '-'})`;
+                            }
+                            if (sData.teiasItirazCevapTarih || sData.teiasItirazCevapSayi) {
+                                activeObjText += `<br>  • TEİAŞ İtiraz Cevap: ${sData.teiasItirazCevapSayi || '-'} (${sData.teiasItirazCevapTarih ? formatDate(sData.teiasItirazCevapTarih) : '-'})`;
+                            }
+                            activeObjText += `</div>`;
+                            lineText += activeObjText;
+                        }
+
+                        // Archive loops details
+                        if (sData.teiasObjections && sData.teiasObjections.length > 0) {
+                            const objLines = sData.teiasObjections.map((obj, oIdx) => {
+                                return `<div style="margin-left:15px; color:#f87171; font-size:11px; margin-top:4px;">↳ <strong>[${oIdx+1}. Arşivlenen İtiraz]:</strong> TEİAŞ görüşüne itiraz edildi. EPDK Yazısı: ${obj.teiasItirazEpdkSayi || '-'} (${obj.teiasItirazEpdkTarih ? formatDate(obj.teiasItirazEpdkTarih) : '-'}), TEİAŞ Yazısı: ${obj.teiasItirazTeiasSayi || '-'} (${obj.teiasItirazTeiasTarih ? formatDate(obj.teiasItirazTeiasTarih) : '-'}), TEİAŞ Cevabı: ${obj.teiasItirazCevapSayi || '-'} (${obj.teiasItirazCevapTarih ? formatDate(obj.teiasItirazCevapTarih) : '-'})</div>`;
+                            }).join('');
+                            lineText += objLines;
+                        }
+                    }
                 }
                 break;
             case 'KURUM_GORUS_EIGM':
@@ -992,12 +1084,17 @@ function showJobDetailModal(jobData) {
     const stepCount = stepsConf.length;
     const stepsArray = Array.from({ length: stepCount }, (_, i) => i + 1);
 
+    const basvuruIdx = stepsConf.findIndex(s => s.type === 'BASVURU') + 1; // 1-based index
+    const showRevisionBtn = (basvuruIdx > 0) && (job.currentStep >= basvuruIdx) && (job.status !== 'completed');
+
     body.innerHTML = `
         <div class="job-detail-panel">
             <header class="detail-header" style="border-bottom:none; padding-bottom:5px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span class="stage-badge stage-${job.currentStep}" style="font-size:12px; font-weight:bold;">Aşama ${job.currentStep}/${stepCount}</span>
-                    <button class="btn btn-sm btn-danger" id="deleteTadilBtn" style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.2); color:#ef4444;">🗑️ Sil</button>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-sm btn-danger" id="deleteTadilBtn" style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.2); color:#ef4444;">🗑️ Sil</button>
+                    </div>
                 </div>
                 <h2 style="font-family:'Outfit'; font-size:22px; margin-top:8px;">${escapeHtml(job.project)}</h2>
                 <p style="color:var(--text-muted); font-size:14px; margin-top:4px;">📋 ${escapeHtml(job.title)}</p>
@@ -1007,9 +1104,16 @@ function showJobDetailModal(jobData) {
 
             <!-- İş Akışı Geçmişi Özeti Panel -->
             <div class="tadil-summary-card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; margin-top: 12px; margin-bottom: 15px;">
-                <h4 style="margin:0 0 10px 0; font-size:13.5px; font-weight:700; color:var(--accent-light); display:flex; align-items:center; gap:6px;">
-                    📜 İş Akışı Geçmişi Özeti
-                </h4>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h4 style="margin:0; font-size:13.5px; font-weight:700; color:var(--accent-light); display:flex; align-items:center; gap:6px;">
+                        📜 İş Akışı Geçmişi Özeti
+                    </h4>
+                    ${showRevisionBtn ? `
+                        <button type="button" class="btn btn-xs btn-secondary" id="revisionTadilBtn" style="background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.2); color:#fbbf24; font-weight:bold; font-size:11px; padding:4px 10px; border-radius:6px; cursor:pointer; display:flex; align-items:center; gap:4px; border:none;">
+                            🔄 Revizyon Yap
+                        </button>
+                    ` : ''}
+                </div>
                 <div class="tadil-summary-timeline" style="font-size:12px; line-height:1.6; color:var(--text-primary);">
                     ${generateProcessSummaryHtml(job)}
                 </div>
@@ -1079,6 +1183,66 @@ function showJobDetailModal(jobData) {
         };
     });
 
+    // Bind Revision Button
+    const revisionBtn = document.getElementById('revisionTadilBtn');
+    if (revisionBtn) {
+        revisionBtn.onclick = () => {
+            if (confirm('Bu tadil süreci için yeni bir revizyon başlatmak istediğinize emin misiniz? Süreç Başvuru/Revizyon aşamasına geri dönecek, mevcut bilgileriniz arşivlenecektir.')) {
+                const revisionNum = (job.revisionCount || 0) + 1;
+                
+                job.revisions = job.revisions || [];
+                job.revisions.push({
+                    revisionNum: revisionNum,
+                    date: new Date().toISOString(),
+                    steps: JSON.parse(JSON.stringify(job.steps)),
+                    currentStep: job.currentStep
+                });
+
+                job.revisionCount = revisionNum;
+                job.currentStep = basvuruIdx;
+
+                // Reset step status
+                for (let i = basvuruIdx; i <= stepCount; i++) {
+                    if (job.steps[`step${i}`]) {
+                        job.steps[`step${i}`].completed = false;
+                        if (job.steps[`step${i}`].teiasDondu) job.steps[`step${i}`].teiasDondu = false;
+                        if (job.steps[`step${i}`].eigmDondu) job.steps[`step${i}`].eigmDondu = false;
+                        if (job.steps[`step${i}`].kdbDondu) job.steps[`step${i}`].kdbDondu = false;
+                        if (job.steps[`step${i}`].yazildi) job.steps[`step${i}`].yazildi = false;
+                        if (job.steps[`step${i}`].imzaDurumu) job.steps[`step${i}`].imzaDurumu = 'imzada';
+                        if (job.steps[`step${i}`].sunuldu) job.steps[`step${i}`].sunuldu = false;
+                        if (job.steps[`step${i}`].dercEdildi) job.steps[`step${i}`].dercEdildi = false;
+                        if (job.steps[`step${i}`].teslimAlindi) job.steps[`step${i}`].teslimAlindi = false;
+                        if (job.steps[`step${i}`].dagitildi) job.steps[`step${i}`].dagitildi = false;
+                    }
+                }
+
+                job.comments = job.comments || [];
+                job.comments.push({
+                    user: auth.currentUser?.email || 'Herkes',
+                    timestamp: new Date().toISOString(),
+                    text: `🔄 ${revisionNum}. Revizyon başlatıldı. Süreç başvuru/revizyon aşamasına geri alındı.`
+                });
+
+                Store.updateJob(job.id, {
+                    revisionCount: job.revisionCount,
+                    revisions: job.revisions,
+                    currentStep: job.currentStep,
+                    steps: job.steps,
+                    comments: job.comments,
+                    updatedAt: new Date()
+                });
+
+                if (saveData()) {
+                    window.dispatchEvent(new CustomEvent('refresh-views'));
+                    showToast(`${revisionNum}. Revizyon başarıyla başlatıldı.`, 'success');
+                    const updated = Store.jobs.find(j => j.id == job.id);
+                    if (updated) showJobDetailModal(updated);
+                }
+            }
+        };
+    }
+
     // Bind Delete Button
     document.getElementById('deleteTadilBtn').onclick = () => {
         if (confirm('Bu tadil sürecini tamamen silmek istediğinize emin misiniz?')) {
@@ -1098,6 +1262,9 @@ function showJobDetailModal(jobData) {
         const btn = document.getElementById(`saveStepBtn-${i}`);
         if (btn) {
             btn.onclick = () => saveStepData(job.id, i);
+        }
+        if (typeof window.updateTeiasSaveButtonText === 'function') {
+            window.updateTeiasSaveButtonText(i);
         }
     }
 
@@ -1142,6 +1309,96 @@ function renderAccordionStep(job, stepNum) {
                             🔄 Bu Aşamaya Geri Dön
                         </button>
                     ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderTeiasObjectionHtml(sData, stepNum) {
+    const baglantiDurumu = sData.teiasBaglantiDurumu || 'kabul';
+    const hasKabulObg = !!sData.teiasKabulObgId;
+    
+    let obgDeadline = sData.teiasKabulDeadline || '';
+    let obgDesc = sData.teiasKabulDesc || 'TEİAŞ Bağlantı Kabul Taahhüdü Yükümlülüğü';
+    
+    if (hasKabulObg && typeof Store !== 'undefined' && Store.obligations) {
+        const ob = Store.obligations.find(o => o.id === sData.teiasKabulObgId);
+        if (ob) {
+            obgDeadline = ob.deadline ? new Date(ob.deadline).toISOString().split('T')[0] : '';
+            obgDesc = ob.obligationDescription || '';
+        }
+    }
+
+    return `
+        <div class="teias-objection-section" style="margin-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 12px;">
+            <div class="form-group" style="margin-bottom: 8px;">
+                <label style="font-weight: bold; color: var(--accent-light); font-size: 11px; display: block; margin-bottom: 6px;">🔗 Bağlantı Görüşü Kabul Taahhüt / İtiraz Durumu</label>
+                <select id="teiasBaglantiDurumu-${stepNum}" class="modern-select" onchange="toggleTeiasObjectionFields(${stepNum}); updateTeiasSaveButtonText(${stepNum});" style="font-size: 11px; padding: 4px 8px; height: auto;">
+                    <option value="kabul" ${baglantiDurumu === 'kabul' ? 'selected' : ''}>✅ Kabul Edildi / Bağlantı Noktası Değişmedi</option>
+                    <option value="itiraz" ${baglantiDurumu === 'itiraz' ? 'selected' : ''}>⚠️ İtiraz Edildi</option>
+                </select>
+            </div>
+            
+            <div id="teiasKabulFields-${stepNum}" style="display: ${baglantiDurumu === 'kabul' ? 'block' : 'none'}; margin-top: 10px; padding: 10px; background: rgba(16, 185, 129, 0.05); border-left: 3px solid #10b981; border-radius: 6px;">
+                <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:6px; margin-bottom:0;">
+                    <input type="checkbox" id="teiasKabulTaahhutTanimla-${stepNum}" ${sData.teiasKabulTaahhutTanimla || hasKabulObg ? 'checked' : ''} onchange="toggleTeiasKabulSubFields(${stepNum});" style="width:14px; height:14px; cursor:pointer;">
+                    <label for="teiasKabulTaahhutTanimla-${stepNum}" style="font-weight:bold; color:#10b981; margin-bottom:0; cursor:pointer; font-size:11px;">📋 Bağlantı Kabul Taahhüt Yükümlülüğü Tanımla</label>
+                </div>
+                
+                <div id="teiasKabulSubFields-${stepNum}" style="display: ${sData.teiasKabulTaahhutTanimla || hasKabulObg ? 'block' : 'none'}; margin-top: 8px;">
+                    <div class="form-row" style="display: flex; gap: 8px;">
+                        <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                            <label style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px;">Taahhüt Son Günü</label>
+                            <input type="date" id="teiasKabulDeadline-${stepNum}" value="${obgDeadline}" class="modern-input" style="font-size: 11px; padding: 4px 8px;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0; flex: 2;">
+                            <label style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px;">Taahhüt Açıklaması</label>
+                            <input type="text" id="teiasKabulDesc-${stepNum}" value="${escapeHtml(obgDesc)}" class="modern-input" placeholder="Açıklama" style="font-size: 11px; padding: 4px 8px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="teiasObjectionFields-${stepNum}" style="display: ${baglantiDurumu === 'itiraz' ? 'block' : 'none'}; margin-top: 10px; padding: 10px; background: rgba(239, 68, 68, 0.05); border-left: 3px solid #ef4444; border-radius: 6px;">
+                <h6 style="color:#f87171; margin:0 0 8px 0; font-size:10px; font-weight:bold; text-transform:uppercase; letter-spacing:0.5px;">TEİAŞ İtiraz Süreci Takibi</h6>
+                
+                <div class="form-row" style="margin-bottom: 8px; display: flex; gap: 8px;">
+                    <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                        <label style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px;">EPDK'ya Sunulan İtiraz Tarihi</label>
+                        <input type="date" id="teiasItirazEpdkTarih-${stepNum}" value="${sData.teiasItirazEpdkTarih || ''}" class="modern-input" style="font-size: 11px; padding: 4px 8px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                        <label style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px;">EPDK'ya Sunulan İtiraz Sayısı</label>
+                        <input type="text" id="teiasItirazEpdkSayi-${stepNum}" value="${escapeHtml(sData.teiasItirazEpdkSayi || '')}" class="modern-input" placeholder="Yazı Sayısı" style="font-size: 11px; padding: 4px 8px;">
+                    </div>
+                </div>
+
+                <div class="form-row" style="margin-bottom: 8px; display: flex; gap: 8px;">
+                    <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                        <label style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px;">TEİAŞ'a Gönderilen Görüş Tarihi</label>
+                        <input type="date" id="teiasItirazTeiasTarih-${stepNum}" value="${sData.teiasItirazTeiasTarih || ''}" class="modern-input" style="font-size: 11px; padding: 4px 8px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                        <label style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px;">TEİAŞ'a Gönderilen Görüş Sayısı</label>
+                        <input type="text" id="teiasItirazTeiasSayi-${stepNum}" value="${escapeHtml(sData.teiasItirazTeiasSayi || '')}" class="modern-input" placeholder="Görüş Sayısı" style="font-size: 11px; padding: 4px 8px;">
+                    </div>
+                </div>
+
+                <div class="form-row" style="margin-bottom: 8px; display: flex; gap: 8px;">
+                    <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                        <label style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px;">TEİAŞ İtiraz Cevap Tarihi</label>
+                        <input type="date" id="teiasItirazCevapTarih-${stepNum}" value="${sData.teiasItirazCevapTarih || ''}" class="modern-input" style="font-size: 11px; padding: 4px 8px;">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0; flex: 1;">
+                        <label style="font-size: 10px; color: var(--text-muted); display: block; margin-bottom: 2px;">TEİAŞ İtiraz Cevap Sayısı</label>
+                        <input type="text" id="teiasItirazCevapSayi-${stepNum}" value="${escapeHtml(sData.teiasItirazCevapSayi || '')}" class="modern-input" placeholder="Cevap Sayısı" style="font-size: 11px; padding: 4px 8px;">
+                    </div>
+                </div>
+
+                <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:6px; margin-top:8px; margin-bottom:0;">
+                    <input type="checkbox" id="teiasItirazCevapGeriDondu-${stepNum}" ${sData.teiasItirazCevapGeriDondu ? 'checked' : ''} onchange="updateTeiasSaveButtonText(${stepNum});" style="width:14px; height:14px; cursor:pointer;">
+                    <label for="teiasItirazCevapGeriDondu-${stepNum}" style="font-weight:bold; color:#f87171; margin-bottom:0; cursor:pointer; font-size:11px;">🔄 İtiraz Cevabı Geldi (Süreci Başına Döndür)</label>
                 </div>
             </div>
         </div>
@@ -1257,6 +1514,7 @@ function renderStepFields(job, stepNum) {
                         <label for="eigmDondu-${stepNum}" style="font-weight:bold; color:#10b981; margin-bottom:0; cursor:pointer; font-size:12px;">EİGM Görüşü Cevaplandı / Tamamlandı</label>
                     </div>
                 </div>
+                ${renderTeiasObjectionHtml(sData, stepNum)}
             `;
         case 'KURUM_GORUS_TEIAS':
             return `
@@ -1294,6 +1552,7 @@ function renderStepFields(job, stepNum) {
                         <label for="teiasDondu-${stepNum}" style="font-weight:bold; color:#10b981; margin-bottom:0; cursor:pointer; font-size:12px;">TEİAŞ Görüşü Cevaplandı / Tamamlandı</label>
                     </div>
                 </div>
+                ${renderTeiasObjectionHtml(sData, stepNum)}
             `;
         case 'KURUM_GORUS_EIGM':
             return `
@@ -1686,6 +1945,51 @@ window.calculateTadilObligationDate = function (daysVal) {
     targetInput.value = targetDate.toISOString().split('T')[0];
 };
 
+window.toggleTeiasObjectionFields = function(stepNum) {
+    const selectEl = document.getElementById(`teiasBaglantiDurumu-${stepNum}`);
+    const fieldsEl = document.getElementById(`teiasObjectionFields-${stepNum}`);
+    const kabulEl = document.getElementById(`teiasKabulFields-${stepNum}`);
+    if (selectEl) {
+        if (fieldsEl) fieldsEl.style.display = selectEl.value === 'itiraz' ? 'block' : 'none';
+        if (kabulEl) kabulEl.style.display = selectEl.value === 'kabul' ? 'block' : 'none';
+    }
+};
+
+window.updateTeiasSaveButtonText = function(stepNum) {
+    const selectEl = document.getElementById(`teiasBaglantiDurumu-${stepNum}`);
+    const geriDonChk = document.getElementById(`teiasItirazCevapGeriDondu-${stepNum}`);
+    const saveBtn = document.getElementById(`saveStepBtn-${stepNum}`);
+    
+    if (!saveBtn) return;
+    
+    if (!selectEl) {
+        saveBtn.textContent = 'Aşamayı Kaydet & İlerlet';
+        saveBtn.style.background = '';
+        return;
+    }
+    
+    if (selectEl.value === 'itiraz') {
+        if (geriDonChk && geriDonChk.checked) {
+            saveBtn.textContent = '🔄 İtirazı Arşivle ve Süreci Yeniden Başlat';
+            saveBtn.style.background = '#10b981'; // Green accent
+        } else {
+            saveBtn.textContent = '💾 İtiraz Sürecini Kaydet (Aşama İlerletilemez)';
+            saveBtn.style.background = '#d97706'; // Amber warning color
+        }
+    } else {
+        saveBtn.textContent = 'Aşamayı Kaydet & İlerlet';
+        saveBtn.style.background = '';
+    }
+};
+
+window.toggleTeiasKabulSubFields = function(stepNum) {
+    const chk = document.getElementById(`teiasKabulTaahhutTanimla-${stepNum}`);
+    const subFields = document.getElementById(`teiasKabulSubFields-${stepNum}`);
+    if (chk && subFields) {
+        subFields.style.display = chk.checked ? 'block' : 'none';
+    }
+};
+
 window.quickCompleteGorus = function(jobId, type, stepNum) {
     const job = Store.jobs.find(j => j.id == jobId);
     if (!job) return;
@@ -1741,6 +2045,7 @@ function saveStepData(jobId, stepNum) {
 
         case 'KURUM_GORUS_TEIAS_EIGM':
             {
+                const sData = steps[`step${stepNum}`] || {};
                 const teiasCikildi = document.getElementById(`teiasCikildi-${stepNum}`)?.checked || false;
                 let teias = document.getElementById(`teiasDondu-${stepNum}`).checked;
                 const teiasCikisSayi = document.getElementById(`teiasCikisSayi-${stepNum}`).value.trim();
@@ -1758,26 +2063,142 @@ function saveStepData(jobId, stepNum) {
                 if (teiasCikisTarih && teiasTarih) teias = true;
                 if (eigmCikisTarih && eigmTarih) eigm = true;
 
-                const isCompletedVal = teias && eigm;
+                const teiasBaglantiDurumu = document.getElementById(`teiasBaglantiDurumu-${stepNum}`)?.value || 'kabul';
+                const teiasItirazEpdkTarih = document.getElementById(`teiasItirazEpdkTarih-${stepNum}`)?.value || '';
+                const teiasItirazEpdkSayi = document.getElementById(`teiasItirazEpdkSayi-${stepNum}`)?.value.trim() || '';
+                const teiasItirazTeiasTarih = document.getElementById(`teiasItirazTeiasTarih-${stepNum}`)?.value || '';
+                const teiasItirazTeiasSayi = document.getElementById(`teiasItirazTeiasSayi-${stepNum}`)?.value.trim() || '';
+                const teiasItirazCevapTarih = document.getElementById(`teiasItirazCevapTarih-${stepNum}`)?.value || '';
+                const teiasItirazCevapSayi = document.getElementById(`teiasItirazCevapSayi-${stepNum}`)?.value.trim() || '';
+                const teiasItirazCevapGeriDondu = document.getElementById(`teiasItirazCevapGeriDondu-${stepNum}`)?.checked || false;
 
-                steps[`step${stepNum}`] = {
-                    completed: isCompletedVal,
-                    teiasCikildi: teiasCikildi || teias || !!teiasCikisTarih || !!teiasCikisSayi,
-                    teiasDondu: teias, teiasCikisSayi, teiasCikisTarih, teiasSayi, teiasTarih,
-                    eigmCikildi: eigmCikildi || eigm || !!eigmCikisTarih || !!eigmCikisSayi,
-                    eigmDondu: eigm, eigmCikisSayi, eigmCikisTarih, eigmSayi, eigmTarih
-                };
+                const teiasKabulTaahhutTanimla = document.getElementById(`teiasKabulTaahhutTanimla-${stepNum}`)?.checked || false;
+                const teiasKabulDeadline = document.getElementById(`teiasKabulDeadline-${stepNum}`)?.value || '';
+                const teiasKabulDesc = document.getElementById(`teiasKabulDesc-${stepNum}`)?.value.trim() || 'TEİAŞ Bağlantı Kabul Taahhüdü Yükümlülüğü';
 
-                if (isCompletedVal) {
-                    if (currentStep === stepNum) currentStep = stepNum + 1;
-                } else {
+                if (teiasBaglantiDurumu === 'kabul' && teiasKabulTaahhutTanimla && !teiasKabulDeadline) {
+                    showToast('Bağlantı kabul taahhüdü için son gün tarihi zorunludur.', 'warning');
+                    return;
+                }
+
+                let teiasKabulObgId = sData.teiasKabulObgId || '';
+
+                if (teiasBaglantiDurumu === 'kabul' && teiasKabulTaahhutTanimla) {
+                    if (teiasKabulObgId) {
+                        const ob = Store.obligations.find(o => o.id === teiasKabulObgId);
+                        if (ob) {
+                            ob.deadline = new Date(teiasKabulDeadline);
+                            ob.obligationDescription = teiasKabulDesc;
+                            ob.updatedAt = new Date();
+                        }
+                    } else {
+                        teiasKabulObgId = generateId();
+                        const newObg = {
+                            id: teiasKabulObgId,
+                            projectName: job.project,
+                            projectLink: '',
+                            obligationType: 'Bağlantı Anlaşması Kabul Taahhüdü',
+                            obligationDescription: teiasKabulDesc,
+                            deadline: new Date(teiasKabulDeadline),
+                            notes: 'TEİAŞ görüşü üzerine otomatik oluşturuldu.',
+                            status: 'pending',
+                            comments: [],
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        };
+                        Store.obligations.push(newObg);
+                        
+                        const tanimlamaIdx = stepsConf.findIndex(s => s.type === 'YUKUMLULUK_TANIMLAMA');
+                        if (tanimlamaIdx !== -1) {
+                            const tStepNum = tanimlamaIdx + 1;
+                            const tStepKey = `step${tStepNum}`;
+                            if (!steps[tStepKey]) {
+                                steps[tStepKey] = { completed: false, obligationIds: [], noObligation: false };
+                            }
+                            if (!steps[tStepKey].obligationIds) {
+                                steps[tStepKey].obligationIds = [];
+                            }
+                            if (!steps[tStepKey].obligationIds.includes(teiasKabulObgId)) {
+                                steps[tStepKey].obligationIds.push(teiasKabulObgId);
+                            }
+                            steps[tStepKey].completed = false;
+                            steps[tStepKey].noObligation = false;
+                        }
+                        showToast('Bağlantı Kabul Taahhüt Yükümlülüğü oluşturuldu.', 'success');
+                    }
+                } else if (teiasKabulObgId) {
+                    Store.obligations = Store.obligations.filter(o => o.id !== teiasKabulObgId);
+                    const tanimlamaIdx = stepsConf.findIndex(s => s.type === 'YUKUMLULUK_TANIMLAMA');
+                    if (tanimlamaIdx !== -1) {
+                        const tStepNum = tanimlamaIdx + 1;
+                        const tStepKey = `step${tStepNum}`;
+                        if (steps[tStepKey] && steps[tStepKey].obligationIds) {
+                            steps[tStepKey].obligationIds = steps[tStepKey].obligationIds.filter(id => id !== teiasKabulObgId);
+                        }
+                    }
+                    teiasKabulObgId = '';
+                    showToast('Bağlantı Kabul Taahhüt Yükümlülüğü kaldırıldı.', 'info');
+                }
+
+                let teiasObjections = sData.teiasObjections || [];
+
+                if (teiasBaglantiDurumu === 'itiraz' && teiasItirazCevapGeriDondu) {
+                    teiasObjections.push({
+                        date: new Date().toISOString(),
+                        teiasCikisTarih, teiasCikisSayi, teiasTarih, teiasSayi,
+                        teiasItirazEpdkTarih, teiasItirazEpdkSayi,
+                        teiasItirazTeiasTarih, teiasItirazTeiasSayi,
+                        teiasItirazCevapTarih, teiasItirazCevapSayi
+                    });
+
+                    steps[`step${stepNum}`] = {
+                        completed: false,
+                        teiasCikildi: false,
+                        teiasDondu: false,
+                        teiasCikisSayi: '', teiasCikisTarih: '', teiasSayi: '', teiasTarih: '',
+                        teiasBaglantiDurumu: 'kabul',
+                        teiasItirazEpdkTarih: '', teiasItirazEpdkSayi: '',
+                        teiasItirazTeiasTarih: '', teiasItirazTeiasSayi: '',
+                        teiasItirazCevapTarih: '', teiasItirazCevapSayi: '',
+                        teiasItirazCevapGeriDondu: false,
+                        teiasObjections,
+                        teiasKabulTaahhutTanimla: false, teiasKabulDeadline: '', teiasKabulDesc: '', teiasKabulObgId: '',
+                        eigmCikildi: eigmCikildi || eigm || !!eigmCikisTarih || !!eigmCikisSayi,
+                        eigmDondu: eigm, eigmCikisSayi, eigmCikisTarih, eigmSayi, eigmTarih
+                    };
+
                     if (currentStep > stepNum) currentStep = stepNum;
+                    showToast('TEİAŞ itiraz cevabı arşivlendi ve süreç yeni kurum görüşü girişi için başa döndürüldü.', 'info');
+                } else {
+                    const teiasCompleted = (teiasBaglantiDurumu === 'kabul') && teias;
+                    const isCompletedVal = teiasCompleted && eigm;
+
+                    steps[`step${stepNum}`] = {
+                        completed: isCompletedVal,
+                        teiasCikildi: teiasCikildi || teias || !!teiasCikisTarih || !!teiasCikisSayi,
+                        teiasDondu: teias, teiasCikisSayi, teiasCikisTarih, teiasSayi, teiasTarih,
+                        teiasBaglantiDurumu, teiasItirazEpdkTarih, teiasItirazEpdkSayi,
+                        teiasItirazTeiasTarih, teiasItirazTeiasSayi,
+                        teiasItirazCevapTarih, teiasItirazCevapSayi,
+                        teiasItirazCevapGeriDondu,
+                        teiasObjections,
+                        teiasKabulTaahhutTanimla, teiasKabulDeadline, teiasKabulDesc, teiasKabulObgId,
+                        eigmCikildi: eigmCikildi || eigm || !!eigmCikisTarih || !!eigmCikisSayi,
+                        eigmDondu: eigm, eigmCikisSayi, eigmCikisTarih, eigmSayi, eigmTarih
+                    };
+
+                    if (isCompletedVal) {
+                        if (currentStep === stepNum) currentStep = stepNum + 1;
+                    } else {
+                        if (currentStep > stepNum) currentStep = stepNum;
+                    }
                 }
             }
             break;
 
         case 'KURUM_GORUS_TEIAS':
             {
+                const sData = steps[`step${stepNum}`] || {};
                 const teiasCikildi = document.getElementById(`teiasCikildi-${stepNum}`)?.checked || false;
                 let teias = document.getElementById(`teiasDondu-${stepNum}`).checked;
                 const teiasCikisSayi = document.getElementById(`teiasCikisSayi-${stepNum}`).value.trim();
@@ -1787,16 +2208,130 @@ function saveStepData(jobId, stepNum) {
 
                 if (teiasCikisTarih && teiasTarih) teias = true;
 
-                steps[`step${stepNum}`] = {
-                    completed: teias,
-                    teiasCikildi: teiasCikildi || teias || !!teiasCikisTarih || !!teiasCikisSayi,
-                    teiasDondu: teias, teiasCikisSayi, teiasCikisTarih, teiasSayi, teiasTarih
-                };
+                const teiasBaglantiDurumu = document.getElementById(`teiasBaglantiDurumu-${stepNum}`)?.value || 'kabul';
+                const teiasItirazEpdkTarih = document.getElementById(`teiasItirazEpdkTarih-${stepNum}`)?.value || '';
+                const teiasItirazEpdkSayi = document.getElementById(`teiasItirazEpdkSayi-${stepNum}`)?.value.trim() || '';
+                const teiasItirazTeiasTarih = document.getElementById(`teiasItirazTeiasTarih-${stepNum}`)?.value || '';
+                const teiasItirazTeiasSayi = document.getElementById(`teiasItirazTeiasSayi-${stepNum}`)?.value.trim() || '';
+                const teiasItirazCevapTarih = document.getElementById(`teiasItirazCevapTarih-${stepNum}`)?.value || '';
+                const teiasItirazCevapSayi = document.getElementById(`teiasItirazCevapSayi-${stepNum}`)?.value.trim() || '';
+                const teiasItirazCevapGeriDondu = document.getElementById(`teiasItirazCevapGeriDondu-${stepNum}`)?.checked || false;
 
-                if (teias) {
-                    if (currentStep === stepNum) currentStep = stepNum + 1;
-                } else {
+                const teiasKabulTaahhutTanimla = document.getElementById(`teiasKabulTaahhutTanimla-${stepNum}`)?.checked || false;
+                const teiasKabulDeadline = document.getElementById(`teiasKabulDeadline-${stepNum}`)?.value || '';
+                const teiasKabulDesc = document.getElementById(`teiasKabulDesc-${stepNum}`)?.value.trim() || 'TEİAŞ Bağlantı Kabul Taahhüdü Yükümlülüğü';
+
+                if (teiasBaglantiDurumu === 'kabul' && teiasKabulTaahhutTanimla && !teiasKabulDeadline) {
+                    showToast('Bağlantı kabul taahhüdü için son gün tarihi zorunludur.', 'warning');
+                    return;
+                }
+
+                let teiasKabulObgId = sData.teiasKabulObgId || '';
+
+                if (teiasBaglantiDurumu === 'kabul' && teiasKabulTaahhutTanimla) {
+                    if (teiasKabulObgId) {
+                        const ob = Store.obligations.find(o => o.id === teiasKabulObgId);
+                        if (ob) {
+                            ob.deadline = new Date(teiasKabulDeadline);
+                            ob.obligationDescription = teiasKabulDesc;
+                            ob.updatedAt = new Date();
+                        }
+                    } else {
+                        teiasKabulObgId = generateId();
+                        const newObg = {
+                            id: teiasKabulObgId,
+                            projectName: job.project,
+                            projectLink: '',
+                            obligationType: 'Bağlantı Anlaşması Kabul Taahhüdü',
+                            obligationDescription: teiasKabulDesc,
+                            deadline: new Date(teiasKabulDeadline),
+                            notes: 'TEİAŞ görüşü üzerine otomatik oluşturuldu.',
+                            status: 'pending',
+                            comments: [],
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        };
+                        Store.obligations.push(newObg);
+                        
+                        const tanimlamaIdx = stepsConf.findIndex(s => s.type === 'YUKUMLULUK_TANIMLAMA');
+                        if (tanimlamaIdx !== -1) {
+                            const tStepNum = tanimlamaIdx + 1;
+                            const tStepKey = `step${tStepNum}`;
+                            if (!steps[tStepKey]) {
+                                steps[tStepKey] = { completed: false, obligationIds: [], noObligation: false };
+                            }
+                            if (!steps[tStepKey].obligationIds) {
+                                steps[tStepKey].obligationIds = [];
+                            }
+                            if (!steps[tStepKey].obligationIds.includes(teiasKabulObgId)) {
+                                steps[tStepKey].obligationIds.push(teiasKabulObgId);
+                            }
+                            steps[tStepKey].completed = false;
+                            steps[tStepKey].noObligation = false;
+                        }
+                        showToast('Bağlantı Kabul Taahhüt Yükümlülüğü oluşturuldu.', 'success');
+                    }
+                } else if (teiasKabulObgId) {
+                    Store.obligations = Store.obligations.filter(o => o.id !== teiasKabulObgId);
+                    const tanimlamaIdx = stepsConf.findIndex(s => s.type === 'YUKUMLULUK_TANIMLAMA');
+                    if (tanimlamaIdx !== -1) {
+                        const tStepNum = tanimlamaIdx + 1;
+                        const tStepKey = `step${tStepNum}`;
+                        if (steps[tStepKey] && steps[tStepKey].obligationIds) {
+                            steps[tStepKey].obligationIds = steps[tStepKey].obligationIds.filter(id => id !== teiasKabulObgId);
+                        }
+                    }
+                    teiasKabulObgId = '';
+                    showToast('Bağlantı Kabul Taahhüt Yükümlülüğü kaldırıldı.', 'info');
+                }
+
+                let teiasObjections = sData.teiasObjections || [];
+
+                if (teiasBaglantiDurumu === 'itiraz' && teiasItirazCevapGeriDondu) {
+                    teiasObjections.push({
+                        date: new Date().toISOString(),
+                        teiasCikisTarih, teiasCikisSayi, teiasTarih, teiasSayi,
+                        teiasItirazEpdkTarih, teiasItirazEpdkSayi,
+                        teiasItirazTeiasTarih, teiasItirazTeiasSayi,
+                        teiasItirazCevapTarih, teiasItirazCevapSayi
+                    });
+
+                    steps[`step${stepNum}`] = {
+                        completed: false,
+                        teiasCikildi: false,
+                        teiasDondu: false,
+                        teiasCikisSayi: '', teiasCikisTarih: '', teiasSayi: '', teiasTarih: '',
+                        teiasBaglantiDurumu: 'kabul',
+                        teiasItirazEpdkTarih: '', teiasItirazEpdkSayi: '',
+                        teiasItirazTeiasTarih: '', teiasItirazTeiasSayi: '',
+                        teiasItirazCevapTarih: '', teiasItirazCevapSayi: '',
+                        teiasItirazCevapGeriDondu: false,
+                        teiasObjections,
+                        teiasKabulTaahhutTanimla: false, teiasKabulDeadline: '', teiasKabulDesc: '', teiasKabulObgId: ''
+                    };
+
                     if (currentStep > stepNum) currentStep = stepNum;
+                    showToast('TEİAŞ itiraz cevabı arşivlendi ve süreç yeni kurum görüşü girişi için başa döndürüldü.', 'info');
+                } else {
+                    const teiasCompleted = (teiasBaglantiDurumu === 'kabul') && teias;
+
+                    steps[`step${stepNum}`] = {
+                        completed: teiasCompleted,
+                        teiasCikildi: teiasCikildi || teias || !!teiasCikisTarih || !!teiasCikisSayi,
+                        teiasDondu: teias, teiasCikisSayi, teiasCikisTarih, teiasSayi, teiasTarih,
+                        teiasBaglantiDurumu, teiasItirazEpdkTarih, teiasItirazEpdkSayi,
+                        teiasItirazTeiasTarih, teiasItirazTeiasSayi,
+                        teiasItirazCevapTarih, teiasItirazCevapSayi,
+                        teiasItirazCevapGeriDondu,
+                        teiasObjections,
+                        teiasKabulTaahhutTanimla, teiasKabulDeadline, teiasKabulDesc, teiasKabulObgId
+                    };
+
+                    if (teiasCompleted) {
+                        if (currentStep === stepNum) currentStep = stepNum + 1;
+                    } else {
+                        if (currentStep > stepNum) currentStep = stepNum;
+                    }
                 }
             }
             break;

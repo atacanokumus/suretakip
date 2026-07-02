@@ -665,7 +665,7 @@
 }
 
 .step-accordion-item.expanded .step-accordion-content {
-    max-height: 800px; /* Large enough to fit step 2 & 5 forms */
+    max-height: 2000px; /* Safe size to prevent forms from cutting off */
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 

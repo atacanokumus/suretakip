@@ -49,6 +49,22 @@ export function updateDashboard() {
         if (el) el.textContent = value;
     }
 
+    // Populate active pending jobs list inside the merged wide card
+    const activeJobs = jobs.filter(j => j.status !== 'completed');
+    const activeListEl = document.getElementById('activePendingJobsListContent');
+    if (activeListEl) {
+        if (activeJobs.length === 0) {
+            activeListEl.innerHTML = '<div style="color: var(--text-muted); font-style: italic; text-align: center; margin-top: 20px;">Aktif bekleyen tadil bulunmuyor.</div>';
+        } else {
+            activeListEl.innerHTML = activeJobs.map(j => `
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 5px 0; font-size: 11px;">
+                    <span style="font-weight: 700; color: #fff; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 12px;" title="${escapeHtml(j.project)}">${escapeHtml(j.project)}</span>
+                    <span style="color: var(--accent-light); font-size: 10px; flex-shrink: 0;" title="${escapeHtml(j.title)}">${escapeHtml(j.title)}</span>
+                </div>
+            `).join('');
+        }
+    }
+
     updateUpcomingList();
     updateMonthlyChart();
     updateQuarterlyChart();

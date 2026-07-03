@@ -173,22 +173,22 @@
                 <div class="page active" id="dashboard">
                     <!-- Stats Cards Grouped -->
                     <div class="dashboard-stats-container">
-                        <!-- Group: Jobs -->
+                        <!-- Group: Summary -->
                         <div class="stat-group">
-                            <h3 class="stat-group-header">İŞLERİM</h3>
+                            <h3 class="stat-group-header">TADİLLER & YÜKÜMLÜLÜKLER</h3>
                             <div class="stats-grid-mini">
-                                <div class="stat-card info clickable-card" data-filter="my-pending-jobs">
-                                    <div class="stat-icon">👤</div>
+                                <div class="stat-card success clickable-card" data-filter="this-month-obs">
+                                    <div class="stat-icon">🗓️</div>
                                     <div class="stat-content">
-                                        <span class="stat-value" id="myPendingJobsCount">0</span>
-                                        <span class="stat-label">İşlerim</span>
+                                        <span class="stat-value" id="thisMonthObsCount">0</span>
+                                        <span class="stat-label">Bu Ayki Yükümlülükler</span>
                                     </div>
                                 </div>
                                 <div class="stat-card upcoming clickable-card" data-filter="all-pending-jobs">
                                     <div class="stat-icon">💼</div>
                                     <div class="stat-content">
                                         <span class="stat-value" id="allPendingJobsCount">0</span>
-                                        <span class="stat-label">Tüm Bekleyenler</span>
+                                        <span class="stat-label">Bekleyen Tadiller</span>
                                     </div>
                                 </div>
                             </div>
@@ -197,23 +197,12 @@
                         <!-- Divider -->
                         <div class="stat-v-divider"></div>
 
-                        <!-- Group: Obligations -->
+                        <!-- Group: Active Pending Jobs -->
                         <div class="stat-group">
-                            <h3 class="stat-group-header">YÜKÜMLÜLÜKLER</h3>
-                            <div class="stats-grid-mini">
-                                <div class="stat-card warning clickable-card" data-filter="this-week-obs">
-                                    <div class="stat-icon">📅</div>
-                                    <div class="stat-content">
-                                        <span class="stat-value" id="thisWeekObsCount">0</span>
-                                        <span class="stat-label">Bu Hafta</span>
-                                    </div>
-                                </div>
-                                <div class="stat-card success clickable-card" data-filter="this-month-obs">
-                                    <div class="stat-icon">🗓️</div>
-                                    <div class="stat-content">
-                                        <span class="stat-value" id="thisMonthObsCount">0</span>
-                                        <span class="stat-label">Bu Ay</span>
-                                    </div>
+                            <h3 class="stat-group-header">AKTİF BEKLEYEN TADİLLER</h3>
+                            <div id="activePendingJobsListCard" class="stat-card info" style="height: 123px; display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; padding: 12px 16px; overflow: hidden; cursor: default; box-sizing: border-box;">
+                                <div id="activePendingJobsListContent" style="overflow-y: auto; flex: 1; font-size: 11px; line-height: 1.4; color: var(--text-primary); padding-right: 4px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent;">
+                                    <!-- List of active pending jobs will be injected dynamically -->
                                 </div>
                             </div>
                         </div>

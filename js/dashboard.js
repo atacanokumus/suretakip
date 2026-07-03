@@ -158,7 +158,7 @@ export function updateUpcomingList() {
 }
 
 /**
- * Updates the monthly intensity chart (Rolling 6 Months)
+ * Updates the monthly intensity chart (Rolling 12 Months)
  */
 export function updateMonthlyChart() {
     const container = document.getElementById('monthlyChart');
@@ -168,8 +168,8 @@ export function updateMonthlyChart() {
     const rollingMonths = [];
     const monthNames = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 
-    // Generate rolling 6 months
-    for (let i = 0; i < 6; i++) {
+    // Generate rolling 12 months
+    for (let i = 0; i < 12; i++) {
         const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
         rollingMonths.push({
             month: d.getMonth(),
@@ -192,13 +192,11 @@ export function updateMonthlyChart() {
     const max = Math.max(...rollingMonths.map(m => m.count), 1);
 
     container.innerHTML = rollingMonths.map((m, i) => {
-        const height = (m.count / max) * 100;
         const isPeak = m.count === max && max > 0;
-
         return `
             <div class="month-bar">
                 <span class="month-bar-label">${m.label}</span>
-                <div class="month-bar-fill ${isPeak ? 'peak' : ''}" style="height: ${height}%" id="m${i + 1}Bar"></div>
+                <div class="month-bar-fill ${isPeak ? 'peak' : ''}" style="height: 0%;" id="m${i + 1}Bar"></div>
                 <span class="month-bar-value">${m.count}</span>
             </div>
         `;
@@ -208,74 +206,98 @@ export function updateMonthlyChart() {
     rollingMonths.forEach((m, i) => {
         const height = (m.count / max) * 100;
         setTimeout(() => {
-            const styleId = `m${i + 1}BarStyle`;
-            let styleEl = document.getElementById(styleId);
-            if (!styleEl) {
-                styleEl = document.createElement('style');
-                styleEl.id = styleId;
-                document.head.appendChild(styleEl);
+            const bar = document.getElementById(`m${i + 1}Bar`);
+            if (bar) {
+                bar.style.transitionDelay = `${i * 0.05}s`;
+                bar.style.height = `${height}%`;
             }
-            styleEl.textContent = `
-                #m${i + 1}Bar::after { 
-                    height: ${height}% !important; 
-                    transition-delay: ${i * 0.1}s !important; 
-                }
-            `;
-        }, 300);
+        }, 100);
     });
 }
 
 /**
- * Updates the quarterly intensity chart
+ * Updates the quarterly intensity chart (Rolling Current + Next 3 Quarters)
  */
 export function updateQuarterlyChart() {
-    const currentYear = new Date().getFullYear();
-    const quarters = [0, 0, 0, 0];
+    const container = document.getElementById('quarterlyChart');
+    if (!container) return;
 
-    Store.obligations.forEach(o => {
-        const year = new Date(o.deadline).getFullYear();
-        if (year === currentYear) {
-            const q = getQuarter(o.deadline) - 1;
-            quarters[q]++;
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const currentQIndex = Math.floor(currentMonth / 3);
+
+    const rollingQuarters = [];
+    
+    // Generate current quarter + next 3 quarters
+    for (let i = 0; i < 4; i++) {
+        let qVal = currentQIndex + 1 + i;
+        let yVal = currentYear;
+        if (qVal > 4) {
+            qVal -= 4;
+            yVal += 1;
         }
+        rollingQuarters.push({
+            quarter: qVal,
+            year: yVal,
+            label: `${yVal} Q${qVal}`,
+            count: 0
+        });
+    }
+
+    // Count obligations for these quarters
+    Store.obligations.forEach(o => {
+        const date = new Date(o.deadline);
+        if (isNaN(date.getTime())) return;
+        
+        const y = date.getFullYear();
+        const m = date.getMonth();
+        const q = Math.floor(m / 3) + 1;
+
+        rollingQuarters.forEach(rq => {
+            if (rq.quarter === q && rq.year === y) {
+                rq.count++;
+            }
+        });
     });
 
-    const max = Math.max(...quarters, 1);
+    const max = Math.max(...rollingQuarters.map(rq => rq.count), 1);
 
-    for (let i = 0; i < 4; i++) {
-        const bar = document.getElementById(`q${i + 1}Bar`);
-        const value = document.getElementById(`q${i + 1}Value`);
-        const label = document.querySelector(`#quarterlyChart .quarter-bar:nth-child(${i + 1}) .bar-label`);
+    // Inject dynamic HTML
+    container.innerHTML = rollingQuarters.map((rq, idx) => {
+        return `
+            <div class="quarter-bar" data-quarter="Q${rq.quarter}">
+                <span class="bar-label" style="width: 65px; font-size: 11px; font-weight: 700; color: var(--text-muted);">${rq.label}</span>
+                <div class="bar-fill" id="q${idx + 1}Bar" style="flex: 1; height: 36px; background: rgba(255, 255, 255, 0.03); border-radius: 10px; position: relative; overflow: hidden; border: 1px solid var(--border-glass);"></div>
+                <span class="bar-value" id="q${idx + 1}Value" style="min-width: 20px; text-align: right; font-weight: 600; font-size: 13px;">${rq.count}</span>
+            </div>
+        `;
+    }).join('');
 
-        if (label) label.textContent = `${currentYear} Q${i + 1}`;
-        if (value) value.textContent = quarters[i];
-
+    // Trigger Fill Animation
+    rollingQuarters.forEach((rq, idx) => {
+        const width = (rq.count / max) * 100;
+        const isPeak = rq.count === max && max > 0;
+        const bar = document.getElementById(`q${idx + 1}Bar`);
+        
         if (bar) {
-            const width = (quarters[i] / max) * 100;
-            const isPeak = quarters[i] === max && max > 0;
-
             if (isPeak) bar.classList.add('peak');
-            else bar.classList.remove('peak');
-
-            bar.style.setProperty('--width', `${width}%`);
-
-            // Enhanced Animation: Staggered Fill
+            
             setTimeout(() => {
-                const styleId = `q${i + 1}BarStyle`;
+                const styleId = `q${idx + 1}BarStyle`;
                 let styleEl = document.getElementById(styleId);
                 if (!styleEl) {
                     styleEl = document.createElement('style');
                     styleEl.id = styleId;
                     document.head.appendChild(styleEl);
                 }
-                // Use a staggered delay based on the index (i)
                 styleEl.textContent = `
-                    #q${i + 1}Bar::after { 
+                    #q${idx + 1}Bar::after { 
                         width: ${width}% !important; 
-                        transition-delay: ${i * 0.15}s !important; 
+                        transition-delay: ${idx * 0.15}s !important; 
                     }
                 `;
-            }, 300); // Wait for page transition to finish
+            }, 300);
         }
-    }
+    });
 }

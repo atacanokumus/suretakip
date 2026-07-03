@@ -4,6 +4,24 @@ import {
     getDaysUntil, getStatus, getStatusText, formatDate, getQuarter, escapeHtml, isInThisCalendarMonth
 } from './utils.js';
 
+function getGradientColor(index, total) {
+    if (total <= 1) return 'hsl(35, 95%, 65%)';
+    const pct = index / (total - 1);
+    let h, s, l;
+    if (pct < 0.5) {
+        const t = pct * 2;
+        h = 35 + (260 - 35) * t;
+        s = 95 - 5 * t;
+        l = 68 + (75 - 68) * t;
+    } else {
+        const t = (pct - 0.5) * 2;
+        h = 260 + (165 - 260) * t;
+        s = 90;
+        l = 75 - 10 * t;
+    }
+    return `hsl(${Math.round(h)}, ${Math.round(s)}%, ${Math.round(l)}%)`;
+}
+
 /**
  * Updates all dashboard elements
  */
@@ -58,12 +76,16 @@ export function updateDashboard() {
         if (activeJobs.length === 0) {
             activeListEl.innerHTML = '<div style="color: var(--text-muted); font-style: italic; text-align: center; margin-top: 20px; grid-column: span 2;">Aktif devam eden tadil bulunmuyor.</div>';
         } else {
-            activeListEl.innerHTML = activeJobs.map(j => `
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 5px 0; font-size: 11px;">
-                    <span style="font-weight: 700; color: #fff; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 12px;" title="${escapeHtml(j.project)}">${escapeHtml(j.project)}</span>
-                    <span style="color: var(--accent-light); font-size: 10px; flex-shrink: 0;" title="${escapeHtml(j.title)}">${escapeHtml(j.title)}</span>
-                </div>
-            `).join('');
+            const total = activeJobs.length;
+            activeListEl.innerHTML = activeJobs.map((j, idx) => {
+                const color = getGradientColor(idx, total);
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 5px 0; font-size: 11px;">
+                        <span style="font-weight: 700; color: ${color}; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 12px;" title="${escapeHtml(j.project)}">${escapeHtml(j.project)}</span>
+                        <span style="color: ${color}; opacity: 0.8; font-size: 10px; flex-shrink: 0; font-weight: 600;" title="${escapeHtml(j.title)}">${escapeHtml(j.title)}</span>
+                    </div>
+                `;
+            }).join('');
         }
     }
 

@@ -50,7 +50,9 @@ export function updateDashboard() {
     }
 
     // Populate active pending jobs list inside the merged wide card
-    const activeJobs = jobs.filter(j => j.status !== 'completed');
+    const activeJobs = jobs
+        .filter(j => j.status !== 'completed')
+        .sort((a, b) => new Date(a.updatedAt || 0) - new Date(b.updatedAt || 0));
     const activeListEl = document.getElementById('activePendingJobsListContent');
     if (activeListEl) {
         if (activeJobs.length === 0) {

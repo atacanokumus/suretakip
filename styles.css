@@ -1,4 +1,4 @@
-﻿/* ==========================================
+/* ==========================================
    EPDK SÃ¼re Takip Platformu - Styles
    ========================================== */
 
@@ -5125,4 +5125,22 @@ tr.row-completed {
 .emoji-item:hover {
     background: rgba(255, 255, 255, 0.1);
     transform: scale(1.2);
+}
+
+/* Custom Scrollbar for Active Continuing Tadils */
+#activePendingJobsListContent::-webkit-scrollbar {
+    width: 4px;
+}
+
+#activePendingJobsListContent::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#activePendingJobsListContent::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+#activePendingJobsListContent::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.35);
 }

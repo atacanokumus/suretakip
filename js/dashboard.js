@@ -54,7 +54,7 @@ export function updateDashboard() {
     const activeListEl = document.getElementById('activePendingJobsListContent');
     if (activeListEl) {
         if (activeJobs.length === 0) {
-            activeListEl.innerHTML = '<div style="color: var(--text-muted); font-style: italic; text-align: center; margin-top: 20px;">Aktif bekleyen tadil bulunmuyor.</div>';
+            activeListEl.innerHTML = '<div style="color: var(--text-muted); font-style: italic; text-align: center; margin-top: 20px; grid-column: span 2;">Aktif devam eden tadil bulunmuyor.</div>';
         } else {
             activeListEl.innerHTML = activeJobs.map(j => `
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 5px 0; font-size: 11px;">

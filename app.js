@@ -419,19 +419,17 @@ function setupEventHandlers() {
     document.querySelectorAll('.clickable-card').forEach(card => {
         card.addEventListener('click', () => {
             const filter = card.getAttribute('data-filter');
+            if (!filter) return;
 
             if (filter.includes('-jobs')) {
                 // JOBS Logic
                 const jobsNav = document.querySelector('.nav-item[data-page="jobs"]');
-                const assigneeFilter = document.getElementById('jobAssigneeFilter');
+                const expertFilter = document.getElementById('jobExpertFilter');
                 const statusFilter = document.getElementById('jobStatusFilter');
 
-                if (jobsNav && assigneeFilter && statusFilter) {
-                    if (filter === 'my-pending-jobs') {
-                        assigneeFilter.value = 'me';
-                        statusFilter.value = 'pending';
-                    } else if (filter === 'all-pending-jobs') {
-                        assigneeFilter.value = 'all';
+                if (jobsNav && expertFilter && statusFilter) {
+                    if (filter === 'all-pending-jobs') {
+                        expertFilter.value = 'all';
                         statusFilter.value = 'pending';
                     }
                     jobsNav.click();

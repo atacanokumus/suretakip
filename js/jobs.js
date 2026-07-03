@@ -321,26 +321,35 @@ export function updateJobsView() {
     const listContainer = document.getElementById('jobsList');
     if (!listContainer) return;
 
-    const assigneeFilter = document.getElementById('jobAssigneeFilter')?.value || 'all';
-    const statusFilter = document.getElementById('jobStatusFilter')?.value || 'all';
+    const companyFilter = document.getElementById('jobCompanyFilter')?.value || 'all';
     const projectFilter = document.getElementById('jobProjectFilter')?.value || 'all';
+    const expertFilter = document.getElementById('jobExpertFilter')?.value || 'all';
+    const statusFilter = document.getElementById('jobStatusFilter')?.value || 'all';
 
     let filteredJobs = Store.jobs || [];
 
     // Ensure all jobs have the new step structure
     filteredJobs.forEach(j => ensureTadilSteps(j));
 
-    // Apply filters
-    if (assigneeFilter === 'me' && auth.currentUser) {
-        filteredJobs = filteredJobs.filter(j => j.assignee === auth.currentUser.email);
-    } else if (assigneeFilter !== 'all' && assigneeFilter !== 'me') {
-        filteredJobs = filteredJobs.filter(j => j.assignee === assigneeFilter);
+    // Apply Company Filter
+    if (companyFilter !== 'all') {
+        filteredJobs = filteredJobs.filter(j => {
+            const projectObj = Store.projects.find(p => p.name === j.project);
+            return projectObj && projectObj.company === companyFilter;
+        });
     }
 
+    // Apply Project Filter
     if (projectFilter !== 'all') {
         filteredJobs = filteredJobs.filter(j => j.project === projectFilter);
     }
 
+    // Apply Expert Filter
+    if (expertFilter !== 'all') {
+        filteredJobs = filteredJobs.filter(j => j.assignee === expertFilter);
+    }
+
+    // Apply Status Filter
     if (statusFilter === 'pending') {
         filteredJobs = filteredJobs.filter(j => j.status !== 'completed');
     } else if (statusFilter === 'completed') {
@@ -380,18 +389,15 @@ function updateJobStats() {
     // Ensure steps are initialized for stats check
     Store.jobs.forEach(j => ensureTadilSteps(j));
 
-    const myPending = Store.jobs.filter(j =>
-        auth.currentUser && j.assignee === auth.currentUser.email && j.status !== 'completed'
-    ).length;
-
+    const total = Store.jobs.length;
     const allPending = Store.jobs.filter(j => j.status !== 'completed').length;
     const completed = Store.jobs.filter(j => j.status === 'completed').length;
 
-    const elMy = document.getElementById('jobStatMyPending');
+    const elTotal = document.getElementById('jobStatTotal');
     const elAll = document.getElementById('jobStatAllPending');
     const elComp = document.getElementById('jobStatCompleted');
 
-    if (elMy) elMy.textContent = myPending;
+    if (elTotal) elTotal.textContent = total;
     if (elAll) elAll.textContent = allPending;
     if (elComp) elComp.textContent = completed;
 }
@@ -1064,10 +1070,32 @@ export function initJobsEventHandlers() {
         };
     }
 
-    // Standard Filters
-    ['jobAssigneeFilter', 'jobStatusFilter', 'jobProjectFilter'].forEach(id => {
+    // Standard Filters & Dependent Dropdowns
+    const companyFilter = document.getElementById('jobCompanyFilter');
+    if (companyFilter) {
+        companyFilter.addEventListener('change', () => {
+            const projectFilter = document.getElementById('jobProjectFilter');
+            if (projectFilter) projectFilter.value = 'all'; // Reset project
+            refreshJobFilters();
+            updateJobsView();
+        });
+    }
+
+    ['jobProjectFilter', 'jobExpertFilter', 'jobStatusFilter'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', updateJobsView);
+    });
+
+    // Click handlers for stats cards on the jobs page
+    document.querySelectorAll('.job-stats-grid .stat-card').forEach(card => {
+        card.onclick = () => {
+            const filterVal = card.getAttribute('data-job-filter');
+            const statusFilter = document.getElementById('jobStatusFilter');
+            if (statusFilter && filterVal) {
+                statusFilter.value = filterVal;
+                updateJobsView();
+            }
+        };
     });
 
     // Event listener for opening details from external clicks
@@ -1081,27 +1109,47 @@ export function initJobsEventHandlers() {
 }
 
 export function refreshJobFilters() {
+    const companyFilter = document.getElementById('jobCompanyFilter');
     const projectFilter = document.getElementById('jobProjectFilter');
-    if (projectFilter) {
-        const currentVal = projectFilter.value;
-        const allProjects = (Store.projects || []).map(p => p.name).sort();
-        projectFilter.innerHTML = '<option value="all">Tüm Projeler</option>' +
-            allProjects.map(p => `<option value="${escapeHtml(p)}" ${p === currentVal ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
+    const expertFilter = document.getElementById('jobExpertFilter');
+
+    // 1. Populate Company Filter
+    if (companyFilter) {
+        const currentCompany = companyFilter.value || 'all';
+        const allCompanies = [...new Set((Store.projects || []).map(p => p.company).filter(Boolean))].sort();
+        companyFilter.innerHTML = '<option value="all">Tüm Şirketler</option>' +
+            allCompanies.map(c => `<option value="${escapeHtml(c)}" ${c === currentCompany ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
     }
 
-    const assigneeFilterList = document.getElementById('jobAssigneeFilter');
-    if (assigneeFilterList) {
-        const currentVal = assigneeFilterList.value;
-        let html = `
-            <option value="all" ${currentVal === 'all' ? 'selected' : ''}>Tümü</option>
-            <option value="me" ${currentVal === 'me' ? 'selected' : ''}>Bana Atananlar</option>
-        `;
-        Store.users.forEach(u => {
-            if (u.email !== auth.currentUser?.email) {
-                html += `<option value="${u.email}" ${u.email === currentVal ? 'selected' : ''}>${escapeHtml(u.displayName || u.email)}</option>`;
-            }
+    // 2. Populate Project Filter (Dependent on Selected Company)
+    if (projectFilter) {
+        const selectedCompany = companyFilter ? companyFilter.value : 'all';
+        const currentProject = projectFilter.value || 'all';
+        
+        let filteredProjects = Store.projects || [];
+        if (selectedCompany !== 'all') {
+            filteredProjects = filteredProjects.filter(p => p.company === selectedCompany);
+        }
+        
+        const projectNames = filteredProjects.map(p => p.name).sort();
+        projectFilter.innerHTML = '<option value="all">Tüm Projeler</option>' +
+            projectNames.map(p => `<option value="${escapeHtml(p)}" ${p === currentProject ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
+    }
+
+    // 3. Populate Expert Filter (Assignees/Users)
+    if (expertFilter) {
+        const currentExpert = expertFilter.value || 'all';
+        let html = `<option value="all" ${currentExpert === 'all' ? 'selected' : ''}>Tüm Uzmanlar</option>`;
+        if (auth.currentUser) {
+            html += `<option value="${auth.currentUser.email}" ${currentExpert === auth.currentUser.email ? 'selected' : ''}>Bana Atananlar</option>`;
+        }
+        
+        // Add other users
+        const otherUsers = (Store.users || []).filter(u => u.email !== auth.currentUser?.email);
+        otherUsers.forEach(u => {
+            html += `<option value="${u.email}" ${currentExpert === u.email ? 'selected' : ''}>${escapeHtml(u.displayName || u.email)}</option>`;
         });
-        assigneeFilterList.innerHTML = html;
+        expertFilter.innerHTML = html;
     }
 }
 

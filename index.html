@@ -321,30 +321,36 @@
 
                     <!-- Job Stats Grid -->
                     <div class="job-stats-grid">
-                        <div class="stat-card warning clickable-card" data-job-filter="my-pending">
-                            <div class="stat-icon">👤</div>
+                        <div class="stat-card info clickable-card" data-job-filter="all">
+                            <div class="stat-icon">💼</div>
                             <div class="stat-content">
-                                <span class="stat-value" id="jobStatMyPending">0</span>
-                                <span class="stat-label">Bana Atanan (Aktif)</span>
+                                <span class="stat-value" id="jobStatTotal">0</span>
+                                <span class="stat-label">Toplam Başvuru</span>
                             </div>
                         </div>
-                        <div class="stat-card info clickable-card" data-job-filter="all-pending">
-                            <div class="stat-icon">⏳</div>
+                        <div class="stat-card warning clickable-card" data-job-filter="pending">
+                            <div class="stat-icon">⚡</div>
                             <div class="stat-content">
                                 <span class="stat-value" id="jobStatAllPending">0</span>
-                                <span class="stat-label">Toplam Aktif Tadil</span>
+                                <span class="stat-label">Aktif Süreçler</span>
                             </div>
                         </div>
                         <div class="stat-card success clickable-card" data-job-filter="completed">
                             <div class="stat-icon">✅</div>
                             <div class="stat-content">
                                 <span class="stat-value" id="jobStatCompleted">0</span>
-                                <span class="stat-label">Tamamlanan Tadiller</span>
+                                <span class="stat-label">Tamamlananlar</span>
                             </div>
                         </div>
                     </div>
 
                     <div class="filters-bar">
+                        <div class="filter-group">
+                            <label>Şirket:</label>
+                            <select id="jobCompanyFilter">
+                                <option value="all">Tüm Şirketler</option>
+                            </select>
+                        </div>
                         <div class="filter-group">
                             <label>Proje:</label>
                             <select id="jobProjectFilter">
@@ -352,10 +358,9 @@
                             </select>
                         </div>
                         <div class="filter-group">
-                            <label>Atanan:</label>
-                            <select id="jobAssigneeFilter">
-                                <option value="all">Tümü</option>
-                                <option value="me">Bana Atananlar</option>
+                            <label>Uzman:</label>
+                            <select id="jobExpertFilter">
+                                <option value="all">Tüm Uzmanlar</option>
                             </select>
                         </div>
                         <div class="filter-group">

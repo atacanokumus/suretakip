@@ -1,6 +1,6 @@
 import { Store } from './store.js';
 import { saveData } from './data.js';
-import { generateId, formatDate, escapeHtml, getStatus, convertToDate, validateString } from './utils.js';
+import { generateId, formatDate, escapeHtml, getStatus, convertToDate, validateString, getJobActualLastUpdateDate } from './utils.js';
 import {
     showToast, getExpertInfoHtml
 } from './ui.js';
@@ -368,7 +368,9 @@ export function updateJobsView() {
         const bCompleted = b.status === 'completed';
         if (aCompleted && !bCompleted) return 1;
         if (!aCompleted && bCompleted) return -1;
-        return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+        const dateA = new Date(getJobActualLastUpdateDate(a) || 0);
+        const dateB = new Date(getJobActualLastUpdateDate(b) || 0);
+        return dateB - dateA;
     });
 
     listContainer.innerHTML = '';
@@ -927,7 +929,7 @@ function createJobCard(job) {
         appDateHtml = `<div class="job-date-row" style="color:var(--text-muted);" title="Başvuru henüz yapılmadı">📝 <strong>Başvuru:</strong> Yapılmadı</div>`;
     }
 
-    const lastUpdateDateStr = job.updatedAt || job.createdAt;
+    const lastUpdateDateStr = getJobActualLastUpdateDate(job);
     const lastUpdateDaysAgoText = getDaysPassedText(lastUpdateDateStr);
     const lastUpdateDateFormatted = lastUpdateDateStr ? new Date(lastUpdateDateStr).toLocaleDateString('tr-TR') : '-';
 

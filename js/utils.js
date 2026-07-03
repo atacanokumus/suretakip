@@ -333,3 +333,43 @@ export function getQuarter(date) {
 export function getCurrentQuarter() {
     return getQuarter(new Date());
 }
+
+/**
+ * Recursively parses the steps object to find the latest custom date input.
+ * Falls back to updatedAt or createdAt.
+ * @param {Object} job 
+ * @returns {string|Date}
+ */
+export function getJobActualLastUpdateDate(job) {
+    let latestDate = null;
+    
+    function traverse(obj) {
+        if (!obj) return;
+        if (typeof obj === 'string') {
+            if (/^\d{4}-\d{2}-\d{2}$/.test(obj)) {
+                const d = new Date(obj);
+                if (!isNaN(d.getTime())) {
+                    if (!latestDate || d > latestDate) {
+                        latestDate = d;
+                    }
+                }
+            }
+        } else if (typeof obj === 'object') {
+            for (const key in obj) {
+                if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                    traverse(obj[key]);
+                }
+            }
+        }
+    }
+    
+    if (job.steps) {
+        traverse(job.steps);
+    }
+    
+    if (latestDate) {
+        return latestDate.toISOString().split('T')[0];
+    }
+    
+    return job.updatedAt || job.createdAt;
+}

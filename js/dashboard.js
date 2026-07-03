@@ -1,7 +1,7 @@
 import { auth } from './firebase-config.js';
 import { Store } from './store.js';
 import {
-    getDaysUntil, getStatus, getStatusText, formatDate, getQuarter, escapeHtml, isInThisCalendarMonth
+    getDaysUntil, getStatus, getStatusText, formatDate, getQuarter, escapeHtml, isInThisCalendarMonth, getJobActualLastUpdateDate
 } from './utils.js';
 
 function getGradientColor(index, total) {
@@ -70,7 +70,7 @@ export function updateDashboard() {
     // Populate active pending jobs list inside the merged wide card
     const activeJobs = jobs
         .filter(j => j.status !== 'completed')
-        .sort((a, b) => new Date(a.updatedAt || 0) - new Date(b.updatedAt || 0));
+        .sort((a, b) => new Date(getJobActualLastUpdateDate(a) || 0) - new Date(getJobActualLastUpdateDate(b) || 0));
     const activeListEl = document.getElementById('activePendingJobsListContent');
     if (activeListEl) {
         if (activeJobs.length === 0) {

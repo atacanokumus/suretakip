@@ -321,6 +321,9 @@ export function updateJobsView() {
     const listContainer = document.getElementById('jobsList');
     if (!listContainer) return;
 
+    // Refresh option lists before reading selected values to sync with job data
+    refreshJobFilters();
+
     const companyFilter = document.getElementById('jobCompanyFilter')?.value || 'all';
     const projectFilter = document.getElementById('jobProjectFilter')?.value || 'all';
     const expertFilter = document.getElementById('jobExpertFilter')?.value || 'all';
@@ -344,9 +347,12 @@ export function updateJobsView() {
         filteredJobs = filteredJobs.filter(j => j.project === projectFilter);
     }
 
-    // Apply Expert Filter
+    // Apply EPDK Expert Filter
     if (expertFilter !== 'all') {
-        filteredJobs = filteredJobs.filter(j => j.assignee === expertFilter);
+        filteredJobs = filteredJobs.filter(j => {
+            const projectObj = Store.projects.find(p => p.name === j.project);
+            return projectObj && projectObj.expert && projectObj.expert.name === expertFilter;
+        });
     }
 
     // Apply Status Filter
@@ -1113,43 +1119,67 @@ export function refreshJobFilters() {
     const projectFilter = document.getElementById('jobProjectFilter');
     const expertFilter = document.getElementById('jobExpertFilter');
 
+    const jobs = Store.jobs || [];
+
+    // Find all project names that have at least one job
+    const jobsProjects = [...new Set(jobs.map(j => j.project))];
+
+    // Find all companies of these projects
+    const jobsCompanies = [...new Set(jobsProjects.map(pName => {
+        const p = (Store.projects || []).find(proj => proj.name === pName);
+        return p ? p.company : null;
+    }).filter(Boolean))].sort();
+
     // 1. Populate Company Filter
     if (companyFilter) {
         const currentCompany = companyFilter.value || 'all';
-        const allCompanies = [...new Set((Store.projects || []).map(p => p.company).filter(Boolean))].sort();
         companyFilter.innerHTML = '<option value="all">Tüm Şirketler</option>' +
-            allCompanies.map(c => `<option value="${escapeHtml(c)}" ${c === currentCompany ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+            jobsCompanies.map(c => `<option value="${escapeHtml(c)}" ${c === currentCompany ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
     }
 
-    // 2. Populate Project Filter (Dependent on Selected Company)
-    if (projectFilter) {
-        const selectedCompany = companyFilter ? companyFilter.value : 'all';
-        const currentProject = projectFilter.value || 'all';
-        
-        let filteredProjects = Store.projects || [];
+    // Get selected company
+    const selectedCompany = companyFilter ? companyFilter.value : 'all';
+
+    // Filter projects that have jobs AND belong to selected company
+    let filteredProjectNames = jobsProjects.filter(pName => {
+        const p = (Store.projects || []).find(proj => proj.name === pName);
+        if (!p) return false;
         if (selectedCompany !== 'all') {
-            filteredProjects = filteredProjects.filter(p => p.company === selectedCompany);
+            return p.company === selectedCompany;
         }
-        
-        const projectNames = filteredProjects.map(p => p.name).sort();
+        return true;
+    }).sort();
+
+    // 2. Populate Project Filter
+    if (projectFilter) {
+        const currentProject = projectFilter.value || 'all';
         projectFilter.innerHTML = '<option value="all">Tüm Projeler</option>' +
-            projectNames.map(p => `<option value="${escapeHtml(p)}" ${p === currentProject ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
+            filteredProjectNames.map(p => `<option value="${escapeHtml(p)}" ${p === currentProject ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
     }
 
-    // 3. Populate Expert Filter (Assignees/Users)
+    // Filter EPDK experts that have jobs AND belong to selected company/project
+    const selectedProject = projectFilter ? projectFilter.value : 'all';
+    
+    let filteredExperts = [];
+    jobsProjects.forEach(pName => {
+        const p = (Store.projects || []).find(proj => proj.name === pName);
+        if (!p || !p.expert || !p.expert.name) return;
+        
+        // Match company filter
+        if (selectedCompany !== 'all' && p.company !== selectedCompany) return;
+        
+        // Match project filter
+        if (selectedProject !== 'all' && p.name !== selectedProject) return;
+
+        filteredExperts.push(p.expert.name);
+    });
+    filteredExperts = [...new Set(filteredExperts)].sort();
+
+    // 3. Populate Expert Filter (EPDK Uzmanı)
     if (expertFilter) {
         const currentExpert = expertFilter.value || 'all';
-        let html = `<option value="all" ${currentExpert === 'all' ? 'selected' : ''}>Tüm Uzmanlar</option>`;
-        if (auth.currentUser) {
-            html += `<option value="${auth.currentUser.email}" ${currentExpert === auth.currentUser.email ? 'selected' : ''}>Bana Atananlar</option>`;
-        }
-        
-        // Add other users
-        const otherUsers = (Store.users || []).filter(u => u.email !== auth.currentUser?.email);
-        otherUsers.forEach(u => {
-            html += `<option value="${u.email}" ${currentExpert === u.email ? 'selected' : ''}>${escapeHtml(u.displayName || u.email)}</option>`;
-        });
-        expertFilter.innerHTML = html;
+        expertFilter.innerHTML = '<option value="all">Tüm EPDK Uzmanları</option>' +
+            filteredExperts.map(e => `<option value="${escapeHtml(e)}" ${e === currentExpert ? 'selected' : ''}>${escapeHtml(e)}</option>`).join('');
     }
 }
 

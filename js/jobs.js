@@ -3408,12 +3408,159 @@ window.rollbackJobToStep = function(jobId, stepNum) {
 };
 
 // ==========================================
-// Önlisans Süre Uzatımları Matrix View
+// Önlisans Süre Uzatımları Matrix View & Seeding
 // ==========================================
+
+export const PRELICENCE_EXCEL_SEED = [
+    { row: 1, project: "TURGUTTEPE RES", title: "T13-T14 TESİS TAMAMLAMA", s1Date: "2026-08-10", s2Date: "2026-08-17", aoDate: "2026-08-18", gdDate: "2026-08-21", epdkDate: "2026-08-26", expiryDate: "2026-08-26" },
+    { row: 2, project: "HARPUT EDT 2 GES", title: "ÖNLİSANS SÜRESİ", s1Date: "2026-09-21", s2Date: "2026-09-28", aoDate: "2026-09-25", gdDate: "2026-09-30", epdkDate: "2026-10-05", expiryDate: "2026-10-12" },
+    { row: 3, project: "ÇATAL RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2026-09-28", s2Date: "2026-10-06", aoDate: "2026-10-07", gdDate: "2026-10-12", epdkDate: "2026-10-15", expiryDate: "2026-10-18" },
+    { row: 4, project: "ALAPINAR RES", title: "T2 TESİS TAMAMLAMA (T1'LE BİRLİKTE YAPALIM)", s1Date: "2026-09-28", s2Date: "2026-10-12", aoDate: "2026-10-14", gdDate: "2026-10-19", epdkDate: "2026-10-22", expiryDate: "2026-10-25" },
+    { row: 5, project: "SUGA BES", title: "TESİS TAMAMLAMA", s1Date: "2026-09-28", s2Date: "2026-10-12", aoDate: "2026-10-15", gdDate: "2026-10-20", epdkDate: "2026-10-23", expiryDate: "2026-10-24" },
+    { row: 6, project: "NECAT EDT GES", title: "ÖNLİSANS SÜRESİ", s1Date: "2026-09-28", s2Date: "2026-10-12", aoDate: "2026-10-19", gdDate: "2026-10-22", epdkDate: "2026-10-27", expiryDate: "2026-11-02" },
+    { row: 7, project: "SEYİRCEK RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2026-10-28", s2Date: "2026-11-04", aoDate: "2026-11-03", gdDate: "2026-11-06", epdkDate: "2026-11-11", expiryDate: "2026-11-16" },
+    { row: 8, project: "ŞAH RES", title: "T36 TESİS TAMAMLAMA", s1Date: "2026-11-16", s2Date: "2026-11-24", aoDate: "2026-11-23", gdDate: "2026-11-26", epdkDate: "2026-12-01", expiryDate: "2026-12-02" },
+    { row: 9, project: "BAKACAK RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2026-11-03", s2Date: "2026-11-17", aoDate: "2026-11-30", gdDate: "2026-12-03", epdkDate: "2026-12-08", expiryDate: "2026-12-31" },
+    { row: 10, project: "KORUKÖY RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2026-11-03", s2Date: "2026-11-17", aoDate: "2026-12-02", gdDate: "2026-12-07", epdkDate: "2026-12-10", expiryDate: "2026-12-31" },
+    { row: 11, project: "DAĞAHMETÇE RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2026-11-03", s2Date: "2026-11-17", aoDate: "2026-12-07", gdDate: "2026-12-10", epdkDate: "2026-12-15", expiryDate: "2026-12-31" },
+    { row: 12, project: "CAMİLİYAYLA RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2026-11-03", s2Date: "2026-11-17", aoDate: "2026-12-09", gdDate: "2026-12-14", epdkDate: "2026-12-17", expiryDate: "2026-12-31" },
+    { row: 13, project: "SÜRMELİ RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2026-11-03", s2Date: "2026-11-17", aoDate: "2026-12-14", gdDate: "2026-12-17", epdkDate: "2026-12-22", expiryDate: "2026-12-31" },
+    { row: 14, project: "ALAPINAR RES", title: "T1 TESİS TAMAMLAMA (T2 İLE BİRLİKTE YAPALIM)", s1Date: "", s2Date: "", aoDate: "", gdDate: "", epdkDate: "", expiryDate: "2026-12-31", isYellow: true },
+    { row: 15, project: "ADARES", title: "T9-T10 TESİS TAMAMLAMA", s1Date: "2026-11-24", s2Date: "2026-12-08", aoDate: "2026-12-21", gdDate: "2026-12-24", epdkDate: "2026-12-29", expiryDate: "2026-12-31" },
+    { row: 16, project: "TURGUTTEPE RES", title: "T15 TESİS TAMAMLAMA", s1Date: "2026-11-24", s2Date: "2026-12-08", aoDate: "2026-12-21", gdDate: "2026-12-24", epdkDate: "2026-12-29", expiryDate: "2027-01-02" },
+    { row: 17, project: "İLERLEME RAPORLARI", title: "İLERLEME RAPORLARI", s1Date: "", s2Date: "", aoDate: "", gdDate: "", epdkDate: "", expiryDate: "2027-01-29", isYellow: true },
+    { row: 18, project: "UMURLAR RES", title: "YARDIMCI KAYNAK TESİS TAMAMLAMA", s1Date: "2027-01-25", s2Date: "2027-02-02", aoDate: "2027-02-03", gdDate: "2027-02-08", epdkDate: "2027-02-11", expiryDate: "2027-02-13" },
+    { row: 19, project: "BAŞPINAR GES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-01-15", s2Date: "2027-01-29", aoDate: "2027-02-08", gdDate: "2027-02-11", epdkDate: "2027-02-16", expiryDate: "2027-02-28" },
+    { row: 20, project: "UĞRAK RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-01-15", s2Date: "2027-01-29", aoDate: "2027-02-10", gdDate: "2027-02-15", epdkDate: "2027-02-18", expiryDate: "2027-02-28" },
+    { row: 21, project: "KARATAY RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-01-15", s2Date: "2027-01-29", aoDate: "2027-02-15", gdDate: "2027-02-18", epdkDate: "2027-02-23", expiryDate: "2027-02-28" },
+    { row: 22, project: "KURTULUŞ RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-01-29", s2Date: "2027-02-15", aoDate: "2027-03-01", gdDate: "2027-03-04", epdkDate: "2027-03-09", expiryDate: "2027-03-31" },
+    { row: 23, project: "ÇAMLICA RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-01-29", s2Date: "2027-02-15", aoDate: "2027-03-03", gdDate: "2027-03-08", epdkDate: "2027-03-11", expiryDate: "2027-03-31" },
+    { row: 24, project: "AKBELEN RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-01-29", s2Date: "2027-02-15", aoDate: "2027-03-08", gdDate: "2027-03-11", epdkDate: "2027-03-16", expiryDate: "2027-03-31" },
+    { row: 25, project: "FULACIK RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-01-29", s2Date: "2027-02-15", aoDate: "2027-03-10", gdDate: "2027-03-15", epdkDate: "2027-03-18", expiryDate: "2027-03-31" },
+    { row: 26, project: "SERMAYECİK RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-01-29", s2Date: "2027-03-01", aoDate: "2027-03-15", gdDate: "2027-03-18", epdkDate: "2027-03-23", expiryDate: "2027-03-31" },
+    { row: 27, project: "AKSALUR RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-01-29", s2Date: "2027-03-01", aoDate: "2027-03-17", gdDate: "2027-03-22", epdkDate: "2027-03-25", expiryDate: "2027-03-31" },
+    { row: 28, project: "POZANTI RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-01-29", s2Date: "2027-03-01", aoDate: "2027-03-19", gdDate: "2027-03-24", epdkDate: "2027-03-29", expiryDate: "2027-03-31" },
+    { row: 29, project: "KAYNAK GES", title: "ÖNLİSANS SÜRESİ", s1Date: "", s2Date: "", aoDate: "", gdDate: "", epdkDate: "", expiryDate: "2027-03-31", isYellow: true },
+    { row: 30, project: "BOĞLAN GES", title: "ÖNLİSANS SÜRESİ", s1Date: "", s2Date: "", aoDate: "", gdDate: "", epdkDate: "", expiryDate: "2027-03-31", isYellow: true },
+    { row: 31, project: "YAZIR RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-04-08", s2Date: "2027-04-15", aoDate: "2027-04-14", gdDate: "2027-04-19", epdkDate: "2027-04-22", expiryDate: "2027-04-30" },
+    { row: 32, project: "ÇUBUK RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-04-19", s2Date: "2027-04-29", aoDate: "2027-04-28", gdDate: "2027-05-03", epdkDate: "2027-05-06", expiryDate: "2027-05-31" },
+    { row: 33, project: "İNDERESİ RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-04-19", s2Date: "2027-04-29", aoDate: "2027-05-05", gdDate: "2027-05-10", epdkDate: "2027-05-13", expiryDate: "2027-05-31" },
+    { row: 34, project: "SEYDAN RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-04-19", s2Date: "2027-04-29", aoDate: "2027-05-12", gdDate: "2027-05-17", epdkDate: "2027-05-20", expiryDate: "2027-05-31" }
+];
+
+export function seedPrelicenceExcelData() {
+    if (!Store.jobs || !Store.projects) return;
+
+    let hasChanges = false;
+
+    PRELICENCE_EXCEL_SEED.forEach(seed => {
+        let proj = Store.projects.find(p => p.name.toUpperCase() === seed.project.toUpperCase());
+        if (!proj && seed.project !== 'İLERLEME RAPORLARI') {
+            proj = {
+                id: generateId(),
+                name: seed.project,
+                company: "NESMA",
+                type: seed.project.includes('GES') ? 'GES' : (seed.project.includes('BES') ? 'BES' : 'RES'),
+                licenceExpiry: seed.expiryDate ? new Date(seed.expiryDate) : null,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+            Store.projects.push(proj);
+            hasChanges = true;
+        } else if (proj && seed.expiryDate && !proj.licenceExpiry) {
+            proj.licenceExpiry = new Date(seed.expiryDate);
+            hasChanges = true;
+        }
+
+        let job = Store.jobs.find(j => {
+            const sameProj = (j.project || '').toUpperCase() === seed.project.toUpperCase();
+            const sameSubTitle = (j.subTitle || j.title || '').toUpperCase() === seed.title.toUpperCase();
+            return sameProj && (sameSubTitle || j.matrixRow === seed.row);
+        });
+
+        const fullTitle = seed.title.startsWith('ÖNLİSANS') ? 'Önlisans Süre Uzatımı' : (seed.title.startsWith('T') || seed.title.includes('TESİS') ? 'Tesis Tamamlama Süre Uzatımı' : seed.title);
+
+        if (!job) {
+            job = {
+                id: generateId(),
+                project: seed.project,
+                title: fullTitle,
+                matrixRow: seed.row,
+                isYellow: seed.isYellow || false,
+                subTitle: seed.title,
+                status: 'pending',
+                currentStep: 1,
+                steps: {},
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+
+            for (let k = 1; k <= 13; k++) {
+                job.steps[`step${k}`] = { completed: false };
+            }
+
+            if (seed.s1Date) job.steps.step1 = { completed: true, date: seed.s1Date };
+            if (seed.s2Date) job.steps.step2 = { completed: true, izinlerDate: seed.s2Date, teknikDate: seed.s2Date, izinlerDondu: true, teknikDondu: true };
+            if (seed.aoDate) job.steps.step3 = { completed: true, date: seed.aoDate, aoDone: true };
+            if (seed.gdDate) job.steps.step4 = { completed: true, date: seed.gdDate, gdDone: true };
+            if (seed.epdkDate) {
+                job.steps.step5 = { completed: true, date: seed.epdkDate, hazir: true };
+                job.steps.step6 = { completed: true, date: seed.epdkDate, basvuruYapildi: true };
+                job.currentStep = 7;
+            } else if (seed.gdDate) {
+                job.currentStep = 5;
+            } else if (seed.aoDate) {
+                job.currentStep = 4;
+            } else if (seed.s2Date) {
+                job.currentStep = 3;
+            } else if (seed.s1Date) {
+                job.currentStep = 2;
+            }
+
+            Store.jobs.push(job);
+            hasChanges = true;
+        } else {
+            let updated = false;
+            if (seed.s1Date && !job.steps.step1?.date) {
+                job.steps.step1 = { ...job.steps.step1, completed: true, date: seed.s1Date };
+                updated = true;
+            }
+            if (seed.s2Date && !job.steps.step2?.izinlerDate) {
+                job.steps.step2 = { ...job.steps.step2, completed: true, izinlerDate: seed.s2Date, teknikDate: seed.s2Date, izinlerDondu: true, teknikDondu: true };
+                updated = true;
+            }
+            if (seed.aoDate && !job.steps.step3?.date) {
+                job.steps.step3 = { ...job.steps.step3, completed: true, date: seed.aoDate, aoDone: true };
+                updated = true;
+            }
+            if (seed.gdDate && !job.steps.step4?.date) {
+                job.steps.step4 = { ...job.steps.step4, completed: true, date: seed.gdDate, gdDone: true };
+                updated = true;
+            }
+            if (seed.epdkDate && !job.steps.step6?.date) {
+                job.steps.step5 = { ...job.steps.step5, completed: true, date: seed.epdkDate, hazir: true };
+                job.steps.step6 = { ...job.steps.step6, completed: true, date: seed.epdkDate, basvuruYapildi: true };
+                updated = true;
+            }
+            if (seed.isYellow) {
+                job.isYellow = true;
+                updated = true;
+            }
+            job.matrixRow = seed.row;
+            if (updated) hasChanges = true;
+        }
+    });
+
+    if (hasChanges && typeof saveData === 'function') {
+        saveData();
+    }
+}
 
 export function renderPrelicenceExtensionsMatrix() {
     const container = document.getElementById('extMatrixContainer');
     if (!container) return;
+
+    seedPrelicenceExcelData();
 
     const searchInput = document.getElementById('extMatrixSearchInput');
     const companyFilterEl = document.getElementById('extMatrixCompanyFilter');
@@ -3424,8 +3571,10 @@ export function renderPrelicenceExtensionsMatrix() {
     const statusFilter = statusFilterEl?.value || 'all';
 
     let jobs = (Store.jobs || []).filter(j => {
-        if (!j || !j.title) return false;
-        return j.title.includes('Süre Uzatımı') || j.title.includes('Süre Uzatım');
+        if (!j) return false;
+        if (j.matrixRow) return true;
+        const t = j.title || '';
+        return t.includes('Süre Uzatımı') || t.includes('Süre Uzatım') || t.includes('İLERLEME RAPORLARI');
     });
 
     // Populate Matrix Company Filter Options
@@ -3476,19 +3625,18 @@ export function renderPrelicenceExtensionsMatrix() {
     if (searchQuery) {
         jobs = jobs.filter(j => {
             const projName = (j.project || '').toLowerCase();
-            const title = (j.title || '').toLowerCase();
+            const title = (j.subTitle || j.title || '').toLowerCase();
             const p = (Store.projects || []).find(proj => proj.name === j.project);
             const company = (p?.company || '').toLowerCase();
             return projName.includes(searchQuery) || title.includes(searchQuery) || company.includes(searchQuery);
         });
     }
 
-    // Sort: Active first, then by last update date ascending
+    // Sort by Matrix Row number if available
     jobs.sort((a, b) => {
-        const aCompleted = a.status === 'completed';
-        const bCompleted = b.status === 'completed';
-        if (aCompleted && !bCompleted) return 1;
-        if (!aCompleted && bCompleted) return -1;
+        if (a.matrixRow && b.matrixRow) return a.matrixRow - b.matrixRow;
+        if (a.matrixRow) return -1;
+        if (b.matrixRow) return 1;
         return new Date(getJobActualLastUpdateDate(a) || 0) - new Date(getJobActualLastUpdateDate(b) || 0);
     });
 
@@ -3502,115 +3650,113 @@ export function renderPrelicenceExtensionsMatrix() {
         return;
     }
 
+    // Helper for rendering inline date input
+    const renderInlineDateInput = (jobId, stepKey, field, currentDateVal, accentColor = '#10b981') => {
+        const val = currentDateVal || '';
+        return `
+            <input type="date" 
+                   value="${val}" 
+                   class="matrix-date-input"
+                   onchange="window.updateMatrixCellDate('${jobId}', '${stepKey}', '${field}', this.value)"
+                   style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: ${val ? accentColor : 'var(--text-muted)'}; font-size: 11px; padding: 2px 4px; width: 100%; box-sizing: border-box; cursor: pointer; text-align: center;">
+        `;
+    };
+
     // Render Matrix HTML Table
     const tableRows = jobs.map((j, idx) => {
         const pObj = (Store.projects || []).find(p => p.name === j.project);
-        const companyName = pObj ? pObj.company : '-';
         const steps = j.steps || {};
+        const isYellowRow = j.isYellow || [14, 17, 29, 30].includes(j.matrixRow);
+
+        const rowBg = isYellowRow 
+            ? 'background: rgba(234, 179, 8, 0.18); border-left: 4px solid #eab308;' 
+            : 'border-bottom: 1px solid rgba(255,255,255,0.05);';
+
+        const rowNum = j.matrixRow || (idx + 1);
 
         // Step 1: Özet İsteme
         const s1 = steps.step1 || {};
-        const s1Text = s1.date ? `<span style="color:#10b981; font-weight:600;">${formatDate(s1.date)}</span>` : '<span style="color:var(--text-muted);">Bekliyor</span>';
+        const s1Input = renderInlineDateInput(j.id, 'step1', 'date', s1.date, '#10b981');
 
         // Step 2: Birimler Dönüş
         const s2 = steps.step2 || {};
-        const izText = s2.izinlerDate ? `İzinler: ${formatDate(s2.izinlerDate)}` : 'İzinler: ⏳';
-        const tkText = s2.teknikDate ? `Teknik: ${formatDate(s2.teknikDate)}` : 'Teknik: ⏳';
+        const s2Input = renderInlineDateInput(j.id, 'step2', 'izinlerDate', s2.izinlerDate || s2.date, '#60a5fa');
 
-        // Step 3: AO Hazırlık
+        // Step 3: AO Son Gönderim
         const s3 = steps.step3 || {};
-        const isAoActive = j.currentStep === 3 && j.status !== 'completed';
-        let aoContent = '-';
-        if (s3.completed || s3.aoDone) {
-            aoContent = `<span class="badge badge-success" style="font-size:10px;">✓ ${s3.date ? formatDate(s3.date) : 'Hazırladı'}</span>`;
-        } else if (isAoActive) {
-            aoContent = `<span class="badge badge-warning" style="font-size:10px; background:rgba(99,102,241,0.2); color:#818cf8; border:1px solid rgba(99,102,241,0.4);">✏️ Hazırlıyor</span>`;
-        }
+        const s3Input = renderInlineDateInput(j.id, 'step3', 'date', s3.date, '#818cf8');
 
-        // Step 4: GD Kontrol
+        // Step 4: GD Son Gönderim
         const s4 = steps.step4 || {};
-        const isGdActive = j.currentStep === 4 && j.status !== 'completed';
-        let gdContent = '-';
-        if (s4.completed || s4.gdDone) {
-            gdContent = `<span class="badge badge-success" style="font-size:10px;">✓ ${s4.date ? formatDate(s4.date) : 'Kontrol Etti'}</span>`;
-        } else if (isGdActive) {
-            gdContent = `<span class="badge badge-warning" style="font-size:10px; background:rgba(236,72,153,0.2); color:#f472b6; border:1px solid rgba(236,72,153,0.4);">🔍 Kontrol Ediyor</span>`;
-        }
+        const s4Input = renderInlineDateInput(j.id, 'step4', 'date', s4.date, '#f472b6');
 
-        // Step 5-6: EPDK Başvuru & Revizyon
+        // Step 5-6: EPDK Başvuru
         const s6 = steps.step6 || {};
-        let epdkContent = s6.date ? formatDate(s6.date) : '-';
-        if (s6.hasRevision && s6.revisionDate) {
-            epdkContent += `<br><span style="color:#fbbf24; font-size:10px; font-weight:bold;">⚠️ Revizyon: ${formatDate(s6.revisionDate)}</span>`;
-        }
-
-        // Step 7-8: KDB Görüş
-        const s7 = steps.step7 || {};
-        const s8 = steps.step8 || {};
-        let kdbContent = '-';
-        if (s8.date || s8.geldi) {
-            kdbContent = `<span style="color:#10b981; font-weight:600;">Geldi: ${s8.date ? formatDate(s8.date) : '✓'}</span>`;
-        } else if (s7.date || s7.cikildi) {
-            kdbContent = `<span style="color:#f59e0b;">Çıkıldı: ${s7.date ? formatDate(s7.date) : '✓'}</span>`;
-        }
+        const s6Input = renderInlineDateInput(j.id, 'step6', 'date', s6.date, '#fbbf24');
 
         // Expiry Date (Süre Bitiş Tarihi)
-        let expiryDateStr = '-';
+        let expiryDateVal = '';
         if (pObj && pObj.licenceExpiry) {
-            expiryDateStr = formatDate(pObj.licenceExpiry);
+            expiryDateVal = new Date(pObj.licenceExpiry).toISOString().split('T')[0];
         } else if (pObj && pObj.constructionDeadline) {
-            expiryDateStr = formatDate(pObj.constructionDeadline);
+            expiryDateVal = new Date(pObj.constructionDeadline).toISOString().split('T')[0];
         }
+
+        const expiryInput = `
+            <input type="date" 
+                   value="${expiryDateVal}" 
+                   class="matrix-date-input"
+                   onchange="window.updateMatrixProjectExpiry('${escapeHtml(j.project)}', this.value)"
+                   style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #f87171; font-size: 11px; padding: 2px 4px; width: 100%; box-sizing: border-box; cursor: pointer; text-align: center; font-weight: 600;">
+        `;
 
         // Current Stage Badge
         const stageBadge = j.status === 'completed'
-            ? '<span class="badge badge-success" style="font-size:10px;">🟢 Tamamlandı</span>'
-            : `<span class="badge badge-info" style="font-size:10px;">⚡ Aşama ${j.currentStep}/13</span>`;
+            ? '<span class="badge badge-success" style="font-size:10px; padding:2px 4px;">🟢 Tamamlandı</span>'
+            : `<span class="badge badge-info" style="font-size:10px; padding:2px 4px;">⚡ Aşama ${j.currentStep}/13</span>`;
 
         return `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
-                <td style="padding: 10px; font-weight: bold; color: var(--text-muted); font-size: 11px;">${idx + 1}</td>
-                <td style="padding: 10px; font-weight: 700; color: var(--accent-light); font-size: 12px; min-width: 140px;">${escapeHtml(j.project)}</td>
-                <td style="padding: 10px; font-size: 11px; color: var(--text-secondary);">${escapeHtml(companyName)}</td>
-                <td style="padding: 10px; font-size: 11px; color: var(--text-muted); min-width: 130px;">${escapeHtml(j.title)}</td>
-                <td style="padding: 10px; font-size: 11px;">${s1Text}</td>
-                <td style="padding: 10px; font-size: 10px; color: var(--text-secondary);">${izText}<br>${tkText}</td>
-                <td style="padding: 10px; font-size: 11px;">${aoContent}</td>
-                <td style="padding: 10px; font-size: 11px;">${gdContent}</td>
-                <td style="padding: 10px; font-size: 11px;">${epdkContent}</td>
-                <td style="padding: 10px; font-size: 11px;">${kdbContent}</td>
-                <td style="padding: 10px; font-size: 11px; font-weight: 600; color: #f87171;">${expiryDateStr}</td>
-                <td style="padding: 10px; font-size: 11px;">${stageBadge}</td>
-                <td style="padding: 10px;">
-                    <button type="button" class="btn btn-xs btn-secondary" onclick="window.openJobFromMatrix('${j.id}')" style="padding: 4px 8px; font-size: 10px; border-radius: 6px;">🔍 Detay</button>
+            <tr style="${rowBg} transition: background 0.2s;" onmouseover="if(!${isYellowRow}) this.style.background='rgba(255,255,255,0.03)'" onmouseout="if(!${isYellowRow}) this.style.background='transparent'">
+                <td style="padding: 4px 6px; font-weight: bold; color: ${isYellowRow ? '#fef08a' : 'var(--text-muted)'}; font-size: 11px; text-align: center;">${rowNum}</td>
+                <td style="padding: 4px 6px; font-weight: 700; color: ${isYellowRow ? '#fef08a' : 'var(--accent-light)'}; font-size: 11px;">${escapeHtml(j.project)}</td>
+                <td style="padding: 4px 6px; font-size: 10px; color: ${isYellowRow ? '#fef08a' : 'var(--text-secondary)'}; font-weight: 600;">${escapeHtml(j.subTitle || j.title)}</td>
+                <td style="padding: 4px 6px;">${s1Input}</td>
+                <td style="padding: 4px 6px;">${s2Input}</td>
+                <td style="padding: 4px 6px;">${s3Input}</td>
+                <td style="padding: 4px 6px;">${s4Input}</td>
+                <td style="padding: 4px 6px;">${s6Input}</td>
+                <td style="padding: 4px 6px;">${expiryInput}</td>
+                <td style="padding: 4px 6px; text-align: center;">${stageBadge}</td>
+                <td style="padding: 4px 6px; text-align: center;">
+                    <button type="button" class="btn btn-xs btn-secondary" onclick="window.openJobFromMatrix('${j.id}')" style="padding: 2px 6px; font-size: 10px; border-radius: 4px;">🔍 Detay</button>
                 </td>
             </tr>
         `;
     }).join('');
 
     container.innerHTML = `
-        <table class="modern-table" style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
-            <thead>
-                <tr style="border-bottom: 2px solid rgba(255,255,255,0.1); color: var(--text-muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">
-                    <th style="padding: 10px;">SIRA</th>
-                    <th style="padding: 10px;">PROJE ADI</th>
-                    <th style="padding: 10px;">ŞİRKET</th>
-                    <th style="padding: 10px;">KONU / İŞLEM</th>
-                    <th style="padding: 10px;">ÖZET İSTEME</th>
-                    <th style="padding: 10px;">BİRİM DÖNÜŞLERİ</th>
-                    <th style="padding: 10px; color: #818cf8;">AO SON GÖNDERİM</th>
-                    <th style="padding: 10px; color: #f472b6;">GD SON GÖNDERİM</th>
-                    <th style="padding: 10px;">EPDK BAŞVURU</th>
-                    <th style="padding: 10px;">KDB GÖRÜŞÜ</th>
-                    <th style="padding: 10px; color: #f87171;">SÜRE BİTİŞ</th>
-                    <th style="padding: 10px;">DURUM</th>
-                    <th style="padding: 10px;">İŞLEM</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${tableRows}
-            </tbody>
-        </table>
+        <div style="overflow-x: auto; width: 100%;">
+            <table class="modern-table" style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed;">
+                <thead>
+                    <tr style="border-bottom: 2px solid rgba(255,255,255,0.15); color: var(--text-muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; background: rgba(0,0,0,0.2);">
+                        <th style="padding: 8px 4px; width: 38px; text-align: center;">SIRA</th>
+                        <th style="padding: 8px 6px; width: 130px;">PROJE ADI</th>
+                        <th style="padding: 8px 6px; width: 160px;">KONU / AÇIKLAMA</th>
+                        <th style="padding: 8px 4px; width: 112px; text-align: center; color: #10b981;">1. ÖZET İSTEME</th>
+                        <th style="padding: 8px 4px; width: 112px; text-align: center; color: #60a5fa;">2. BİRİM DÖNÜŞ</th>
+                        <th style="padding: 8px 4px; width: 112px; text-align: center; color: #818cf8;">3. AO SON GÖNDERİM</th>
+                        <th style="padding: 8px 4px; width: 112px; text-align: center; color: #f472b6;">4. GD SON GÖNDERİM</th>
+                        <th style="padding: 8px 4px; width: 112px; text-align: center; color: #fbbf24;">5. BAŞVURU TARİHİ</th>
+                        <th style="padding: 8px 4px; width: 112px; text-align: center; color: #f87171;">SÜRE BİTİŞ</th>
+                        <th style="padding: 8px 4px; width: 95px; text-align: center;">DURUM</th>
+                        <th style="padding: 8px 4px; width: 60px; text-align: center;">İŞLEM</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
+        </div>
     `;
 }
 
@@ -3631,6 +3777,48 @@ export function initPrelicenceMatrixEvents() {
         };
     }
 }
+
+window.updateMatrixCellDate = function(jobId, stepKey, field, newDate) {
+    const job = Store.jobs.find(j => j.id == jobId);
+    if (!job) return;
+
+    if (!job.steps) job.steps = {};
+    if (!job.steps[stepKey]) job.steps[stepKey] = {};
+
+    job.steps[stepKey][field] = newDate;
+    if (newDate) {
+        job.steps[stepKey].completed = true;
+        if (field === 'aoDone') job.steps[stepKey].aoDone = true;
+        if (field === 'gdDone') job.steps[stepKey].gdDone = true;
+        if (field === 'basvuruYapildi') job.steps[stepKey].basvuruYapildi = true;
+        if (field === 'izinlerDate') {
+            job.steps[stepKey].teknikDate = newDate;
+            job.steps[stepKey].izinlerDondu = true;
+            job.steps[stepKey].teknikDondu = true;
+        }
+    }
+
+    job.updatedAt = new Date();
+    Store.updateJob(job.id, { steps: job.steps, updatedAt: job.updatedAt });
+
+    if (saveData()) {
+        showToast('Tarih güncellendi ve kaydedildi! ✅', 'success');
+        window.dispatchEvent(new CustomEvent('refresh-views'));
+    }
+};
+
+window.updateMatrixProjectExpiry = function(projectName, newDate) {
+    const proj = Store.projects.find(p => p.name.toUpperCase() === projectName.toUpperCase());
+    if (!proj) return;
+
+    proj.licenceExpiry = newDate ? new Date(newDate) : null;
+    proj.updatedAt = new Date();
+
+    if (saveData()) {
+        showToast('Süre bitiş tarihi güncellendi! ✅', 'success');
+        window.dispatchEvent(new CustomEvent('refresh-views'));
+    }
+};
 
 window.openJobFromMatrix = function(jobId) {
     const job = Store.jobs.find(j => j.id == jobId);

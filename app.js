@@ -24,7 +24,7 @@ import {
     updateAnalytics, initAnalytics
 } from './js/analytics.js';
 import {
-    updateJobsView, initJobsEventHandlers, refreshJobFilters, getWorkflowSteps, getInitialStepData
+    updateJobsView, initJobsEventHandlers, refreshJobFilters, getWorkflowSteps, getInitialStepData, seedPrelicenceExcelData
 } from './js/jobs.js';
 import {
     initNotifications, checkAndNotify, testNotifications
@@ -307,6 +307,9 @@ async function authorizedInit() {
         // Load data but don't let it block UI if it takes too long
         try {
             await loadData();
+            if (typeof seedPrelicenceExcelData === 'function') {
+                seedPrelicenceExcelData();
+            }
         } catch (e) {
             console.error('Data loading failed:', e);
         }

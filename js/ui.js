@@ -62,7 +62,17 @@ export function initNavigation() {
             const addJobBtn = document.getElementById('addJobBtn');
             const generateReportBtn = document.getElementById('generateReportBtn');
 
+            if (pageId === 'prelicence-extensions') {
+                if (typeof window.renderPrelicenceExtensionsMatrix === 'function') {
+                    window.renderPrelicenceExtensionsMatrix();
+                }
+            }
+
             if (pageId === 'jobs') {
+                if (addObligationBtn) addObligationBtn.style.display = 'none';
+                if (addJobBtn) addJobBtn.style.display = 'flex';
+                if (generateReportBtn) generateReportBtn.style.display = 'none';
+            } else if (pageId === 'prelicence-extensions') {
                 if (addObligationBtn) addObligationBtn.style.display = 'none';
                 if (addJobBtn) addJobBtn.style.display = 'flex';
                 if (generateReportBtn) generateReportBtn.style.display = 'none';

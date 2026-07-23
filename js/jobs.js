@@ -352,6 +352,7 @@ export function updateJobsView() {
     const companyFilter = document.getElementById('jobCompanyFilter')?.value || 'all';
     const projectFilter = document.getElementById('jobProjectFilter')?.value || 'all';
     const expertFilter = document.getElementById('jobExpertFilter')?.value || 'all';
+    const typeFilter = document.getElementById('jobTypeFilter')?.value || 'all';
     const statusFilter = document.getElementById('jobStatusFilter')?.value || 'all';
 
     let filteredJobs = Store.jobs || [];
@@ -378,6 +379,11 @@ export function updateJobsView() {
             const projectObj = Store.projects.find(p => p.name === j.project);
             return projectObj && projectObj.expert && projectObj.expert.name === expertFilter;
         });
+    }
+
+    // Apply Job Type Filter
+    if (typeFilter !== 'all') {
+        filteredJobs = filteredJobs.filter(j => j.title === typeFilter);
     }
 
     // Apply Status Filter
@@ -1185,10 +1191,12 @@ export function initJobsEventHandlers() {
         });
     }
 
-    ['jobProjectFilter', 'jobExpertFilter', 'jobStatusFilter'].forEach(id => {
+    ['jobProjectFilter', 'jobExpertFilter', 'jobTypeFilter', 'jobStatusFilter'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', updateJobsView);
     });
+
+    initPrelicenceMatrixEvents();
 
     // Click handlers for stats cards on the jobs page
     document.querySelectorAll('.job-stats-grid .stat-card').forEach(card => {
@@ -1278,6 +1286,15 @@ export function refreshJobFilters() {
         const currentExpert = expertFilter.value || 'all';
         expertFilter.innerHTML = '<option value="all">Tüm EPDK Uzmanları</option>' +
             filteredExperts.map(e => `<option value="${escapeHtml(e)}" ${e === currentExpert ? 'selected' : ''}>${escapeHtml(e)}</option>`).join('');
+    }
+
+    // 4. Populate Job Type Filter (Tadil Tipi)
+    const typeFilter = document.getElementById('jobTypeFilter');
+    if (typeFilter) {
+        const currentType = typeFilter.value || 'all';
+        const jobsTypes = [...new Set(jobs.map(j => j.title).filter(Boolean))].sort();
+        typeFilter.innerHTML = '<option value="all">Tüm Tadil Tipleri</option>' +
+            jobsTypes.map(t => `<option value="${escapeHtml(t)}" ${t === currentType ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('');
     }
 }
 
@@ -3389,3 +3406,237 @@ window.rollbackJobToStep = function(jobId, stepNum) {
         if (updated) showJobDetailModal(updated);
     }
 };
+
+// ==========================================
+// Önlisans Süre Uzatımları Matrix View
+// ==========================================
+
+export function renderPrelicenceExtensionsMatrix() {
+    const container = document.getElementById('extMatrixContainer');
+    if (!container) return;
+
+    const searchInput = document.getElementById('extMatrixSearchInput');
+    const companyFilterEl = document.getElementById('extMatrixCompanyFilter');
+    const statusFilterEl = document.getElementById('extMatrixStatusFilter');
+
+    const searchQuery = (searchInput?.value || '').toLowerCase().trim();
+    const companyFilter = companyFilterEl?.value || 'all';
+    const statusFilter = statusFilterEl?.value || 'all';
+
+    let jobs = (Store.jobs || []).filter(j => {
+        if (!j || !j.title) return false;
+        return j.title.includes('Süre Uzatımı') || j.title.includes('Süre Uzatım');
+    });
+
+    // Populate Matrix Company Filter Options
+    if (companyFilterEl) {
+        const currentCompany = companyFilterEl.value || 'all';
+        const companies = [...new Set(jobs.map(j => {
+            const p = (Store.projects || []).find(proj => proj.name === j.project);
+            return p ? p.company : null;
+        }).filter(Boolean))].sort();
+
+        companyFilterEl.innerHTML = '<option value="all">Tüm Şirketler</option>' +
+            companies.map(c => `<option value="${escapeHtml(c)}" ${c === currentCompany ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+    }
+
+    // Ensure steps structure
+    jobs.forEach(j => ensureTadilSteps(j));
+
+    // Update Stats
+    const totalCount = jobs.length;
+    const aoCount = jobs.filter(j => j.status !== 'completed' && j.currentStep === 3 && (!j.steps?.step3?.completed && !j.steps?.step3?.aoDone)).length;
+    const gdCount = jobs.filter(j => j.status !== 'completed' && j.currentStep === 4 && (!j.steps?.step4?.completed && !j.steps?.step4?.gdDone)).length;
+    const completedCount = jobs.filter(j => j.status === 'completed').length;
+
+    const elTotal = document.getElementById('extStatTotal');
+    const elAo = document.getElementById('extStatAoCount');
+    const elGd = document.getElementById('extStatGdCount');
+    const elComp = document.getElementById('extStatCompleted');
+
+    if (elTotal) elTotal.textContent = totalCount;
+    if (elAo) elAo.textContent = aoCount;
+    if (elGd) elGd.textContent = gdCount;
+    if (elComp) elComp.textContent = completedCount;
+
+    // Apply Filters
+    if (companyFilter !== 'all') {
+        jobs = jobs.filter(j => {
+            const p = (Store.projects || []).find(proj => proj.name === j.project);
+            return p && p.company === companyFilter;
+        });
+    }
+
+    if (statusFilter === 'pending') {
+        jobs = jobs.filter(j => j.status !== 'completed');
+    } else if (statusFilter === 'completed') {
+        jobs = jobs.filter(j => j.status === 'completed');
+    }
+
+    if (searchQuery) {
+        jobs = jobs.filter(j => {
+            const projName = (j.project || '').toLowerCase();
+            const title = (j.title || '').toLowerCase();
+            const p = (Store.projects || []).find(proj => proj.name === j.project);
+            const company = (p?.company || '').toLowerCase();
+            return projName.includes(searchQuery) || title.includes(searchQuery) || company.includes(searchQuery);
+        });
+    }
+
+    // Sort: Active first, then by last update date ascending
+    jobs.sort((a, b) => {
+        const aCompleted = a.status === 'completed';
+        const bCompleted = b.status === 'completed';
+        if (aCompleted && !bCompleted) return 1;
+        if (!aCompleted && bCompleted) return -1;
+        return new Date(getJobActualLastUpdateDate(a) || 0) - new Date(getJobActualLastUpdateDate(b) || 0);
+    });
+
+    if (jobs.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                <div style="font-size: 32px; margin-bottom: 8px;">⌛</div>
+                <div>Görüntülenecek önlisans süre uzatımı kaydı bulunamadı.</div>
+            </div>
+        `;
+        return;
+    }
+
+    // Render Matrix HTML Table
+    const tableRows = jobs.map((j, idx) => {
+        const pObj = (Store.projects || []).find(p => p.name === j.project);
+        const companyName = pObj ? pObj.company : '-';
+        const steps = j.steps || {};
+
+        // Step 1: Özet İsteme
+        const s1 = steps.step1 || {};
+        const s1Text = s1.date ? `<span style="color:#10b981; font-weight:600;">${formatDate(s1.date)}</span>` : '<span style="color:var(--text-muted);">Bekliyor</span>';
+
+        // Step 2: Birimler Dönüş
+        const s2 = steps.step2 || {};
+        const izText = s2.izinlerDate ? `İzinler: ${formatDate(s2.izinlerDate)}` : 'İzinler: ⏳';
+        const tkText = s2.teknikDate ? `Teknik: ${formatDate(s2.teknikDate)}` : 'Teknik: ⏳';
+
+        // Step 3: AO Hazırlık
+        const s3 = steps.step3 || {};
+        const isAoActive = j.currentStep === 3 && j.status !== 'completed';
+        let aoContent = '-';
+        if (s3.completed || s3.aoDone) {
+            aoContent = `<span class="badge badge-success" style="font-size:10px;">✓ ${s3.date ? formatDate(s3.date) : 'Hazırladı'}</span>`;
+        } else if (isAoActive) {
+            aoContent = `<span class="badge badge-warning" style="font-size:10px; background:rgba(99,102,241,0.2); color:#818cf8; border:1px solid rgba(99,102,241,0.4);">✏️ Hazırlıyor</span>`;
+        }
+
+        // Step 4: GD Kontrol
+        const s4 = steps.step4 || {};
+        const isGdActive = j.currentStep === 4 && j.status !== 'completed';
+        let gdContent = '-';
+        if (s4.completed || s4.gdDone) {
+            gdContent = `<span class="badge badge-success" style="font-size:10px;">✓ ${s4.date ? formatDate(s4.date) : 'Kontrol Etti'}</span>`;
+        } else if (isGdActive) {
+            gdContent = `<span class="badge badge-warning" style="font-size:10px; background:rgba(236,72,153,0.2); color:#f472b6; border:1px solid rgba(236,72,153,0.4);">🔍 Kontrol Ediyor</span>`;
+        }
+
+        // Step 5-6: EPDK Başvuru & Revizyon
+        const s6 = steps.step6 || {};
+        let epdkContent = s6.date ? formatDate(s6.date) : '-';
+        if (s6.hasRevision && s6.revisionDate) {
+            epdkContent += `<br><span style="color:#fbbf24; font-size:10px; font-weight:bold;">⚠️ Revizyon: ${formatDate(s6.revisionDate)}</span>`;
+        }
+
+        // Step 7-8: KDB Görüş
+        const s7 = steps.step7 || {};
+        const s8 = steps.step8 || {};
+        let kdbContent = '-';
+        if (s8.date || s8.geldi) {
+            kdbContent = `<span style="color:#10b981; font-weight:600;">Geldi: ${s8.date ? formatDate(s8.date) : '✓'}</span>`;
+        } else if (s7.date || s7.cikildi) {
+            kdbContent = `<span style="color:#f59e0b;">Çıkıldı: ${s7.date ? formatDate(s7.date) : '✓'}</span>`;
+        }
+
+        // Expiry Date (Süre Bitiş Tarihi)
+        let expiryDateStr = '-';
+        if (pObj && pObj.licenceExpiry) {
+            expiryDateStr = formatDate(pObj.licenceExpiry);
+        } else if (pObj && pObj.constructionDeadline) {
+            expiryDateStr = formatDate(pObj.constructionDeadline);
+        }
+
+        // Current Stage Badge
+        const stageBadge = j.status === 'completed'
+            ? '<span class="badge badge-success" style="font-size:10px;">🟢 Tamamlandı</span>'
+            : `<span class="badge badge-info" style="font-size:10px;">⚡ Aşama ${j.currentStep}/13</span>`;
+
+        return `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+                <td style="padding: 10px; font-weight: bold; color: var(--text-muted); font-size: 11px;">${idx + 1}</td>
+                <td style="padding: 10px; font-weight: 700; color: var(--accent-light); font-size: 12px; min-width: 140px;">${escapeHtml(j.project)}</td>
+                <td style="padding: 10px; font-size: 11px; color: var(--text-secondary);">${escapeHtml(companyName)}</td>
+                <td style="padding: 10px; font-size: 11px; color: var(--text-muted); min-width: 130px;">${escapeHtml(j.title)}</td>
+                <td style="padding: 10px; font-size: 11px;">${s1Text}</td>
+                <td style="padding: 10px; font-size: 10px; color: var(--text-secondary);">${izText}<br>${tkText}</td>
+                <td style="padding: 10px; font-size: 11px;">${aoContent}</td>
+                <td style="padding: 10px; font-size: 11px;">${gdContent}</td>
+                <td style="padding: 10px; font-size: 11px;">${epdkContent}</td>
+                <td style="padding: 10px; font-size: 11px;">${kdbContent}</td>
+                <td style="padding: 10px; font-size: 11px; font-weight: 600; color: #f87171;">${expiryDateStr}</td>
+                <td style="padding: 10px; font-size: 11px;">${stageBadge}</td>
+                <td style="padding: 10px;">
+                    <button type="button" class="btn btn-xs btn-secondary" onclick="window.openJobFromMatrix('${j.id}')" style="padding: 4px 8px; font-size: 10px; border-radius: 6px;">🔍 Detay</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <table class="modern-table" style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 2px solid rgba(255,255,255,0.1); color: var(--text-muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px;">
+                    <th style="padding: 10px;">SIRA</th>
+                    <th style="padding: 10px;">PROJE ADI</th>
+                    <th style="padding: 10px;">ŞİRKET</th>
+                    <th style="padding: 10px;">KONU / İŞLEM</th>
+                    <th style="padding: 10px;">ÖZET İSTEME</th>
+                    <th style="padding: 10px;">BİRİM DÖNÜŞLERİ</th>
+                    <th style="padding: 10px; color: #818cf8;">AO SON GÖNDERİM</th>
+                    <th style="padding: 10px; color: #f472b6;">GD SON GÖNDERİM</th>
+                    <th style="padding: 10px;">EPDK BAŞVURU</th>
+                    <th style="padding: 10px;">KDB GÖRÜŞÜ</th>
+                    <th style="padding: 10px; color: #f87171;">SÜRE BİTİŞ</th>
+                    <th style="padding: 10px;">DURUM</th>
+                    <th style="padding: 10px;">İŞLEM</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${tableRows}
+            </tbody>
+        </table>
+    `;
+}
+
+export function initPrelicenceMatrixEvents() {
+    const searchInput = document.getElementById('extMatrixSearchInput');
+    const companyFilter = document.getElementById('extMatrixCompanyFilter');
+    const statusFilter = document.getElementById('extMatrixStatusFilter');
+    const addBtn = document.getElementById('extMatrixAddBtn');
+
+    if (searchInput) searchInput.oninput = () => renderPrelicenceExtensionsMatrix();
+    if (companyFilter) companyFilter.onchange = () => renderPrelicenceExtensionsMatrix();
+    if (statusFilter) statusFilter.onchange = () => renderPrelicenceExtensionsMatrix();
+
+    if (addBtn) {
+        addBtn.onclick = () => {
+            const addJobBtn = document.getElementById('jobsPageAddBtn');
+            if (addJobBtn) addJobBtn.click();
+        };
+    }
+}
+
+window.openJobFromMatrix = function(jobId) {
+    const job = Store.jobs.find(j => j.id == jobId);
+    if (job && typeof showJobDetailModal === 'function') {
+        showJobDetailModal(job);
+    }
+};
+window.renderPrelicenceExtensionsMatrix = renderPrelicenceExtensionsMatrix;
+window.initPrelicenceMatrixEvents = initPrelicenceMatrixEvents;

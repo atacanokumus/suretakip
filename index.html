@@ -99,6 +99,10 @@
                     <span class="nav-icon">💼</span>
                     <span>Tadiller & Süreç Takibi</span>
                 </a>
+                <a href="#" class="nav-item" data-page="prelicence-extensions">
+                    <span class="nav-icon">⌛</span>
+                    <span>Önlisans Süre Uzatımları</span>
+                </a>
                 <a href="#" class="nav-item" data-page="obligations">
                     <span class="nav-icon">📋</span>
                     <span>Yükümlülükler</span>
@@ -345,6 +349,12 @@
                             </select>
                         </div>
                         <div class="filter-group">
+                            <label>Tadil Tipi:</label>
+                            <select id="jobTypeFilter">
+                                <option value="all">Tüm Tadil Tipleri</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
                             <label>Durum:</label>
                             <select id="jobStatusFilter">
                                 <option value="all">Tümü</option>
@@ -363,6 +373,73 @@
                         <div class="empty-state">
                             <span>💼</span>
                             <p>Henüz atanmış bir iş yok.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Önlisans Süre Uzatımları Matrix Page -->
+                <div class="page" id="prelicence-extensions">
+                    <!-- Stats Grid for Matrix -->
+                    <div class="stats-grid" style="margin-bottom: 20px;">
+                        <div class="stat-card total clickable-card" id="extStatTotalCard">
+                            <div class="stat-icon">⌛</div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="extStatTotal">0</span>
+                                <span class="stat-label">Toplam Süre Uzatımı</span>
+                            </div>
+                        </div>
+                        <div class="stat-card warning clickable-card" id="extStatAoCard">
+                            <div class="stat-icon">✏️</div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="extStatAoCount">0</span>
+                                <span class="stat-label">AO Hazırlığında</span>
+                            </div>
+                        </div>
+                        <div class="stat-card upcoming clickable-card" id="extStatGdCard">
+                            <div class="stat-icon">🔍</div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="extStatGdCount">0</span>
+                                <span class="stat-label">GD Kontrolünde</span>
+                            </div>
+                        </div>
+                        <div class="stat-card success clickable-card" id="extStatCompletedCard">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-content">
+                                <span class="stat-value" id="extStatCompleted">0</span>
+                                <span class="stat-label">Tamamlananlar</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filter Bar for Matrix -->
+                    <div class="filters-bar" style="margin-bottom: 20px;">
+                        <div class="filter-group">
+                            <label>Arama / Proje:</label>
+                            <input type="text" id="extMatrixSearchInput" class="modern-input" placeholder="Proje veya şirket ara..." style="padding: 6px 12px; font-size: 12px; width: 220px;">
+                        </div>
+                        <div class="filter-group">
+                            <label>Şirket:</label>
+                            <select id="extMatrixCompanyFilter" class="modern-select">
+                                <option value="all">Tüm Şirketler</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Durum:</label>
+                            <select id="extMatrixStatusFilter" class="modern-select">
+                                <option value="all">Tümü</option>
+                                <option value="pending" selected>Aktif Devam Edenler</option>
+                                <option value="completed">Tamamlananlar</option>
+                            </select>
+                        </div>
+                        <div class="filter-group ml-auto">
+                            <button class="btn btn-primary" id="extMatrixAddBtn">➕ Yeni Süre Uzatımı Aç</button>
+                        </div>
+                    </div>
+
+                    <!-- Excel Matrix Table Container -->
+                    <div class="matrix-table-card" style="background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: 16px; padding: 16px; overflow-x: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                        <div id="extMatrixContainer">
+                            <!-- Excel Matrix Table injected via JS -->
                         </div>
                     </div>
                 </div>

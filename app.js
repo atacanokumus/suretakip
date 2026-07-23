@@ -369,6 +369,9 @@ function refreshAllViews() {
         updateProjectsGrid();
         updateJobsView(); // Update Jobs View
         refreshJobFilters(); // Phase 10: Refresh Job Filters
+        if (typeof window.renderPrelicenceExtensionsMatrix === 'function') {
+            window.renderPrelicenceExtensionsMatrix();
+        }
         updateAnalytics();
         updateDataStats();
 

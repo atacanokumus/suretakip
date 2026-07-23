@@ -3650,11 +3650,35 @@ export function renderPrelicenceExtensionsMatrix() {
         return;
     }
 
+export function formatDateForInput(dVal) {
+    if (!dVal) return '';
+    if (dVal instanceof Date) {
+        if (isNaN(dVal.getTime())) return '';
+        return dVal.toISOString().split('T')[0];
+    }
+    if (typeof dVal === 'string') {
+        const str = dVal.trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+        if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(str)) {
+            const parts = str.split('.');
+            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+    }
+    try {
+        const d = new Date(dVal);
+        if (isNaN(d.getTime())) return '';
+        return d.toISOString().split('T')[0];
+    } catch (e) {
+        return '';
+    }
+}
+
     // Helper for rendering inline step cell with completion toggle
     const renderInlineStepCell = (job, stepNum, stepKey, dateField, currentDateVal) => {
         const step = (job.steps && job.steps[stepKey]) || {};
         const isCompleted = !!step.completed;
-        const dateVal = currentDateVal || step[dateField] || step.date || '';
+        const rawDate = currentDateVal || step[dateField] || step.date || '';
+        const dateVal = formatDateForInput(rawDate);
 
         const containerStyle = isCompleted
             ? 'background: rgba(16, 185, 129, 0.28); border: 1px solid #10b981; border-radius: 6px; padding: 3px 4px; text-align: center; box-shadow: inset 0 0 6px rgba(16, 185, 129, 0.2); transition: all 0.2s;'
@@ -3729,12 +3753,7 @@ export function renderPrelicenceExtensionsMatrix() {
         const dercCell = renderInlineStepCell(j, 11, 'step11', 'date', s11.date || s10.date || s9.date);
 
         // Expiry Date (Süre Bitiş Tarihi)
-        let expiryDateVal = '';
-        if (pObj && pObj.licenceExpiry) {
-            expiryDateVal = new Date(pObj.licenceExpiry).toISOString().split('T')[0];
-        } else if (pObj && pObj.constructionDeadline) {
-            expiryDateVal = new Date(pObj.constructionDeadline).toISOString().split('T')[0];
-        }
+        const expiryDateVal = formatDateForInput(pObj ? (pObj.licenceExpiry || pObj.constructionDeadline) : '');
 
         const expiryInput = `
             <div style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; padding: 3px 4px; text-align: center;">

@@ -326,8 +326,9 @@ exports.checkDeadlines = onSchedule({
 
         console.log("✅ Daily Schedule Match! Proceeding to check deadlines...");
 
-        // --- 2. Check Obligations ---
+        // --- 2. Check Obligations & Jobs ---
         const obligations = data.obligations || [];
+        const jobs = data.jobs || [];
         const todayAndOverdue = [];
         const upcomingNext7Days = [];
 
@@ -350,8 +351,27 @@ exports.checkDeadlines = onSchedule({
             }
         });
 
-        if (todayAndOverdue.length === 0 && upcomingNext7Days.length === 0) {
-            console.log("📭 No critical deadlines found. Skipping email to save quota.");
+        // Scan Active Jobs for AO & GD Tasks
+        const aoTasks = [];
+        const gdTasks = [];
+
+        jobs.forEach(j => {
+            if (j.status === 'completed') return;
+            const currentStep = j.currentStep || 1;
+            const steps = j.steps || {};
+            const sData = steps[`step${currentStep}`] || {};
+
+            if (j.title && j.title.includes('Süre Uzatımı')) {
+                if (currentStep === 3 && (!sData.completed && !sData.aoDone)) {
+                    aoTasks.push(j);
+                } else if (currentStep === 4 && (!sData.completed && !sData.gdDone)) {
+                    gdTasks.push(j);
+                }
+            }
+        });
+
+        if (todayAndOverdue.length === 0 && upcomingNext7Days.length === 0 && aoTasks.length === 0 && gdTasks.length === 0) {
+            console.log("📭 No critical deadlines or pending AO/GD tasks found. Skipping email to save quota.");
             return;
         }
 
@@ -369,15 +389,33 @@ exports.checkDeadlines = onSchedule({
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; color: #1f2937;">
                 <h2 style="color: #6366f1; border-bottom: 2px solid #f3f4f6; padding-bottom: 12px;">📅 Günlük Özet Hatırlatıcı</h2>
                 
+                ${aoTasks.length > 0 ? `
+                    <div style="background: #eef2ff; border-left: 4px solid #6366f1; padding: 12px 16px; border-radius: 8px; margin-top: 16px;">
+                        <h3 style="color: #4338ca; margin: 0 0 8px 0; font-size: 15px;">✏️ Atacan Okumuş - Hazırlanacak Yazılar (AO)</h3>
+                        <ul style="margin: 0; padding-left: 18px; color: #374151; font-size: 13px;">
+                            ${aoTasks.map(j => `<li style="margin-bottom: 4px;"><strong>${j.project}</strong> — ${j.title} (Başvuru Yazısı Hazırlığı)</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+
+                ${gdTasks.length > 0 ? `
+                    <div style="background: #fdf2f8; border-left: 4px solid #ec4899; padding: 12px 16px; border-radius: 8px; margin-top: 16px;">
+                        <h3 style="color: #be185d; margin: 0 0 8px 0; font-size: 15px;">🔍 Gamze Durum - Kontrol Edilecek Yazılar (GD)</h3>
+                        <ul style="margin: 0; padding-left: 18px; color: #374151; font-size: 13px;">
+                            ${gdTasks.map(j => `<li style="margin-bottom: 4px;"><strong>${j.project}</strong> — ${j.title} (Yazı Kontrolü & Onay)</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+
                 ${todayAndOverdue.length > 0 ? `
-                    <h3 style="color: #ef4444; margin-top: 24px;">🚨 Bugün ve Gecikmişler</h3>
+                    <h3 style="color: #ef4444; margin-top: 24px;">🚨 Bugün ve Gecikmiş Yükümlülükler</h3>
                     <table style="width: 100%; border-collapse: collapse;">
                         ${todayAndOverdue.map(renderRow).join('')}
                     </table>
                 ` : ''}
 
                 ${upcomingNext7Days.length > 0 ? `
-                    <h3 style="color: #f59e0b; margin-top: 24px;">🗓️ Önümüzdeki 7 Gün</h3>
+                    <h3 style="color: #f59e0b; margin-top: 24px;">🗓️ Önümüzdeki 7 Gün Yükümlülükler</h3>
                     <table style="width: 100%; border-collapse: collapse;">
                         ${upcomingNext7Days.map(renderRow).join('')}
                     </table>
@@ -391,14 +429,15 @@ exports.checkDeadlines = onSchedule({
         `;
 
         // --- 4. Send Email ---
+        const totalItemsCount = todayAndOverdue.length + upcomingNext7Days.length + aoTasks.length + gdTasks.length;
         const info = await resend.emails.send({
             from: FROM_EMAIL,
             to: TARGET_EMAIL,
-            subject: `📅 Günlük Özet: ${todayAndOverdue.length + upcomingNext7Days.length} Madde Bekliyor`,
+            subject: `📅 Günlük Özet: ${totalItemsCount} Madde Bekliyor`,
             html: html
         });
 
-        console.log(`🎉 Consolidated Daily Email Sent! Items: ${todayAndOverdue.length + upcomingNext7Days.length}`, info);
+        console.log(`🎉 Consolidated Daily Email Sent! Items: ${totalItemsCount}`, info);
     } catch (error) {
         console.error("❌ Error in checkDeadlines:", error);
     }

@@ -69,15 +69,19 @@ const WORKFLOWS = {
         { type: "YUKUMLULUK_TAMAMLAMA", short: "Yükümlülük Tamamlama", long: "9. Yükümlülüklerin Tamamlanması" }
     ],
     "Önlisans Süre Uzatımı": [
-        { type: "BILGI_NOTU_TALEBI", short: "Bilgi Notu", long: "1. Bilgi Notu Talebi" },
-        { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "2. Tadil Bedeli Talebi" },
-        { type: "BASVURU", short: "Başvuru", long: "3. Tadil Başvurusunun Yapılması" },
-        { type: "KURUM_GORUS_KDB", short: "KDB Görüşü", long: "4. KDB Kurum Görüşü" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "5. Müzekkere Yazılması" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "6. Müzekkerenin Gündeme Alınması" },
-        { type: "DERC_EDILME", short: "Önlisans Derç", long: "7. Tadilin Önlisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "8. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "9. Belgenin Dağıtımı" }
+        { type: "OZET_OZET_ISTEME", short: "Özet İsteme", long: "1. Özetin Diğer Birimlerden İstenmesi" },
+        { type: "OZET_BIRIM_DONUSU", short: "Birim Görüşleri", long: "2. Diğer Birimler Görüş Dönüşü (İzinler & Teknik)" },
+        { type: "AO_HAZIRLIK", short: "AO Hazırlık", long: "3. AO (Atacan Okumuş) Hazırlığı" },
+        { type: "GD_KONTROL", short: "GD Kontrol", long: "4. GD (Gamze Durum) Kontrolü" },
+        { type: "EPDK_BASVURU_HAZIRLIK", short: "Başvuru Hazırlık", long: "5. EPDK Başvurusuna Hazırlık" },
+        { type: "EPDK_BASVURU_YAPILMASI", short: "EPDK Başvuru", long: "6. EPDK'ya Başvuru Yapılması" },
+        { type: "KDB_GORUS_CIKIS", short: "KDB Görüş Çıkış", long: "7. KDB Kurum Görüşüne Çıkılması" },
+        { type: "KDB_GORUS_DONUS", short: "KDB Görüş Dönüş", long: "8. KDB Kurum Görüşünün Gelmesi" },
+        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "9. Müzekkere Hazırlanması" },
+        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "10. Müzekkerenin Gündeme Alınması" },
+        { type: "DERC_EDILME", short: "Derç Edilme", long: "11. Süre Uzatımının Ön/Lisansa Derç Edilmesi" },
+        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "12. Belgenin Teslim Alınması" },
+        { type: "DAGITIM", short: "Dağıtım", long: "13. Belgenin Dağıtımı" }
     ],
     "Saha Koordinat Tadili": [
         { type: "BILGI_NOTU_TALEBI", short: "Bilgi Notu", long: "1. Bilgi Notu Talebi" },
@@ -93,14 +97,19 @@ const WORKFLOWS = {
         { type: "DAGITIM", short: "Dağıtım", long: "11. Belgenin Dağıtımı" }
     ],
     "Tesis Tamamlama Süre Uzatımı": [
-        { type: "BILGI_NOTU_TALEBI", short: "Bilgi Notu", long: "1. Bilgi Notu İstenmesi" },
-        { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "2. Tadil Bedeli Talebi" },
-        { type: "BASVURU", short: "Başvuru", long: "3. Tadil Başvurusunun Yapılması" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "4. Müzekkere Yazımı" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "5. Müzekkerenin Gündeme Alınması" },
-        { type: "DERC_EDILME", short: "Lisans Derç", long: "6. Tadilin Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "7. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "8. Belgenin Dağıtımı" }
+        { type: "OZET_OZET_ISTEME", short: "Özet İsteme", long: "1. Özetin Diğer Birimlerden İstenmesi" },
+        { type: "OZET_BIRIM_DONUSU", short: "Birim Görüşleri", long: "2. Diğer Birimler Görüş Dönüşü (İzinler & Teknik)" },
+        { type: "AO_HAZIRLIK", short: "AO Hazırlık", long: "3. AO (Atacan Okumuş) Hazırlığı" },
+        { type: "GD_KONTROL", short: "GD Kontrol", long: "4. GD (Gamze Durum) Kontrolü" },
+        { type: "EPDK_BASVURU_HAZIRLIK", short: "Başvuru Hazırlık", long: "5. EPDK Başvurusuna Hazırlık" },
+        { type: "EPDK_BASVURU_YAPILMASI", short: "EPDK Başvuru", long: "6. EPDK'ya Başvuru Yapılması" },
+        { type: "KDB_GORUS_CIKIS", short: "KDB Görüş Çıkış", long: "7. KDB Kurum Görüşüne Çıkılması" },
+        { type: "KDB_GORUS_DONUS", short: "KDB Görüş Dönüş", long: "8. KDB Kurum Görüşünün Gelmesi" },
+        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "9. Müzekkere Hazırlanması" },
+        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "10. Müzekkerenin Gündeme Alınması" },
+        { type: "DERC_EDILME", short: "Derç Edilme", long: "11. Süre Uzatımının Lisansa Derç Edilmesi" },
+        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "12. Belgenin Teslim Alınması" },
+        { type: "DAGITIM", short: "Dağıtım", long: "13. Belgenin Dağıtımı" }
     ],
     "Ünite Koordinat Tadili": [
         { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
@@ -198,6 +207,22 @@ export function getInitialStepData(type, isCompleted) {
             return { completed: isCompleted, eigmDondu: isCompleted, eigmCikisSayi: '', eigmCikisTarih: '', eigmSayi: '', eigmTarih: '' };
         case 'KURUM_GORUS_KDB':
             return { completed: isCompleted, kdbDondu: isCompleted, kdbCikisSayi: '', kdbCikisTarih: '', kdbSayi: '', kdbTarih: '' };
+        case 'OZET_OZET_ISTEME':
+            return { completed: isCompleted, date: '' };
+        case 'OZET_BIRIM_DONUSU':
+            return { completed: isCompleted, izinlerDondu: isCompleted, izinlerDate: '', teknikDondu: isCompleted, teknikDate: '' };
+        case 'AO_HAZIRLIK':
+            return { completed: isCompleted, aoDone: isCompleted, date: '' };
+        case 'GD_KONTROL':
+            return { completed: isCompleted, gdDone: isCompleted, date: '' };
+        case 'EPDK_BASVURU_HAZIRLIK':
+            return { completed: isCompleted, hazir: isCompleted, date: '' };
+        case 'EPDK_BASVURU_YAPILMASI':
+            return { completed: isCompleted, basvuruYapildi: isCompleted, date: '', number: '', hasRevision: false, revisionDate: '', revisionNotes: '' };
+        case 'KDB_GORUS_CIKIS':
+            return { completed: isCompleted, cikildi: isCompleted, date: '', number: '' };
+        case 'KDB_GORUS_DONUS':
+            return { completed: isCompleted, geldi: isCompleted, date: '', number: '' };
         case 'OLUR_MUZEKKERE_YAZIMI':
             return { completed: isCompleted, yazildi: isCompleted, date: '', number: '' };
         case 'OLUR_IMZALANMASI_VE_GUNDEM':
@@ -440,19 +465,39 @@ function getLiveStatusText(job) {
             return `Aşama ${stepNum}: EİGM Kurum Görüşü Bekleniyor 🔍`;
         case 'KURUM_GORUS_KDB':
             return `Aşama ${stepNum}: KDB Kurum Görüşü Bekleniyor 🔍`;
-        case 'OLUR_MUZEKKERE_YAZIMI':
-            return `Aşama ${stepNum}: Olur / Müzekkere Hazırlanıyor 📝`;
-        case 'OLUR_IMZALANMASI_VE_GUNDEM':
+        case 'OZET_OZET_ISTEME':
+            return sData.date ? `Aşama ${stepNum}: Özet Diğer Birimlerden ${formatDate(sData.date)} tarihinde İstendi ✅` : `Aşama ${stepNum}: Özetin diğer birimlerden istenmesi bekleniyor ⏳`;
+        case 'OZET_BIRIM_DONUSU':
             {
-                const imza = sData.imzaDurumu || 'imzada';
-                if (imza === 'kurulda') {
-                    if (sData.date) {
-                        return `Aşama ${stepNum}: ${formatDate(sData.date)} tarihli Kurul gündemine alındı. Kurul Kararı tebliği bekleniyor 🏛️`;
-                    }
-                    return `Aşama ${stepNum}: Müzekkerenin Gündeme Alınması Bekleniyor 🏛️`;
-                }
-                return `Aşama ${stepNum}: Olur İmzalanması Bekleniyor ✍️`;
+                const iz = sData.izinlerDondu || sData.izinlerDate;
+                const tk = sData.teknikDondu || sData.teknikDate;
+                if (iz && tk) return `Aşama ${stepNum}: Özet İzinler (${sData.izinlerDate ? formatDate(sData.izinlerDate) : 'geldi'}) ve Teknik (${sData.teknikDate ? formatDate(sData.teknikDate) : 'geldi'}) birimlerinden geldi ✅`;
+                if (iz && !tk) return `Aşama ${stepNum}: Özet İzinler biriminden geldi, Teknik birimden gelmesi bekleniyor ⏳`;
+                if (!iz && tk) return `Aşama ${stepNum}: Özet Teknik birimden geldi, İzinler biriminden gelmesi bekleniyor ⏳`;
+                return `Aşama ${stepNum}: Özetin İzinler ve Teknik birimlerinden gelmesi bekleniyor ⏳`;
             }
+        case 'AO_HAZIRLIK':
+            return sData.completed || sData.aoDone ? `Aşama ${stepNum}: AO ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}Hazırladı ✅` : `Aşama ${stepNum}: AO (Atacan Okumuş) Hazırlıyor ✏️`;
+        case 'GD_KONTROL':
+            return sData.completed || sData.gdDone ? `Aşama ${stepNum}: GD ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}Kontrol Etti ✅` : `Aşama ${stepNum}: GD (Gamze Durum) Kontrol Ediyor 🔍`;
+        case 'EPDK_BASVURU_HAZIRLIK':
+            return sData.completed || sData.hazir ? `Aşama ${stepNum}: EPDK Başvurusuna Hazır ✅` : `Aşama ${stepNum}: EPDK Başvurusuna hazır olması bekleniyor ⏳`;
+        case 'EPDK_BASVURU_YAPILMASI':
+            {
+                let text = sData.completed || sData.basvuruYapildi ? `Aşama ${stepNum}: EPDK'ya ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}başvuru yapıldı 📬` : `Aşama ${stepNum}: EPDK'ya başvuru yapılması bekleniyor 📬`;
+                if (sData.hasRevision && sData.revisionDate) {
+                    text += ` (⚠️ Revizyon ${formatDate(sData.revisionDate)} tarihinde yapıldı)`;
+                }
+                return text;
+            }
+        case 'KDB_GORUS_CIKIS':
+            return sData.completed || sData.cikildi ? `Aşama ${stepNum}: KDB Kurum görüşüne ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}çıkıldı ✅` : `Aşama ${stepNum}: KDB Kurum Görüşü'ne çıkılması bekleniyor ⏳`;
+        case 'KDB_GORUS_DONUS':
+            return sData.completed || sData.geldi ? `Aşama ${stepNum}: KDB Kurum Görüşü ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}Geldi ✅` : `Aşama ${stepNum}: KDB Kurum görüşü bekleniyor ⏳`;
+        case 'OLUR_MUZEKKERE_YAZIMI':
+            return sData.completed || sData.hazirlandi ? `Aşama ${stepNum}: Müzekkere ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}hazırlandı ✅` : `Aşama ${stepNum}: Müzekkere hazırlanması bekleniyor 📝`;
+        case 'OLUR_IMZALANMASI_VE_GUNDEM':
+            return sData.completed || sData.gundemeAlindi ? `Aşama ${stepNum}: Müzekkere ${sData.date ? formatDate(sData.date) + ' tarihli ' : ''}Gündeme alındı 🏛️` : `Aşama ${stepNum}: Müzekkerenin gündeme alınması bekleniyor 🏛️`;
         case 'YUKUMLULUK_TANIMLAMA':
             return `Aşama ${stepNum}: Yükümlülük Tanımlaması Bekleniyor ⚠️`;
         case 'YUKUMLULUK_TAMAMLAMA':
@@ -749,9 +794,60 @@ function generateProcessSummaryHtml(job) {
                     lineText = `<strong>${sData.date ? formatDate(sData.date) : 'Belirtilmeyen tarihte'}</strong> ${escapeHtml(sData.number || '')} sayılı Olur / Müzekkere yazıldı.`;
                 }
                 break;
+            case 'OZET_OZET_ISTEME':
+                if (sData.date) {
+                    lineText = `Özet Diğer Birimlerden <strong>${formatDate(sData.date)}</strong> tarihinde İstendi.`;
+                }
+                break;
+            case 'OZET_BIRIM_DONUSU':
+                {
+                    const parts = [];
+                    if (sData.izinlerDate) parts.push(`İzinler biriminden <strong>${formatDate(sData.izinlerDate)}</strong> tarihinde geldi`);
+                    if (sData.teknikDate) parts.push(`Teknik birimden <strong>${formatDate(sData.teknikDate)}</strong> tarihinde geldi`);
+                    if (parts.length > 0) lineText = parts.join(', ') + '.';
+                }
+                break;
+            case 'AO_HAZIRLIK':
+                if (sData.completed || sData.aoDone || sData.date) {
+                    lineText = `AO (Atacan Okumuş) <strong>${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}</strong>başvuru yazısını hazırladı.`;
+                }
+                break;
+            case 'GD_KONTROL':
+                if (sData.completed || sData.gdDone || sData.date) {
+                    lineText = `GD (Gamze Durum) <strong>${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}</strong>yazıyı kontrol edip onayladı.`;
+                }
+                break;
+            case 'EPDK_BASVURU_HAZIRLIK':
+                if (sData.completed || sData.hazir || sData.date) {
+                    lineText = `EPDK Başvurusuna <strong>${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}</strong>hazır hale getirildi.`;
+                }
+                break;
+            case 'EPDK_BASVURU_YAPILMASI':
+                if (sData.completed || sData.basvuruYapildi || sData.date || sData.number) {
+                    lineText = `EPDK'ya <strong>${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}</strong>${sData.number ? sData.number + ' sayılı evrakla ' : ''}başvuru yapıldı.`;
+                    if (sData.hasRevision && sData.revisionDate) {
+                        lineText += ` <span style="color:#fbbf24; font-weight:600;">(⚠️ Revizyon ${formatDate(sData.revisionDate)} tarihinde yapıldı)</span>`;
+                    }
+                }
+                break;
+            case 'KDB_GORUS_CIKIS':
+                if (sData.completed || sData.cikildi || sData.date) {
+                    lineText = `KDB Kurum görüşüne <strong>${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}</strong>çıkıldı (${escapeHtml(sData.number || '-')}).`;
+                }
+                break;
+            case 'KDB_GORUS_DONUS':
+                if (sData.completed || sData.geldi || sData.date) {
+                    lineText = `KDB Kurum Görüşü <strong>${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}</strong>Geldi (${escapeHtml(sData.number || '-')}).`;
+                }
+                break;
+            case 'OLUR_MUZEKKERE_YAZIMI':
+                if (sData.completed || sData.hazirlandi || sData.date || sData.number) {
+                    lineText = `Müzekkere <strong>${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}</strong>hazırlandı (${escapeHtml(sData.number || '-')}).`;
+                }
+                break;
             case 'OLUR_IMZALANMASI_VE_GUNDEM':
-                if (sData.date || sData.number || sData.imzaDurumu === 'imzalandı') {
-                    lineText = `<strong>${sData.date ? formatDate(sData.date) : 'Belirtilmeyen tarihte'}</strong> ${escapeHtml(sData.number || '')} sayılı karar/olur imzalandı ve tamamlandı.`;
+                if (sData.completed || sData.gundemeAlindi || sData.date || sData.number) {
+                    lineText = `Müzekkere <strong>${sData.date ? formatDate(sData.date) + ' tarihli ' : ''}</strong>Gündeme alındı (${escapeHtml(sData.number || '-')}).`;
                 }
                 break;
             case 'YUKUMLULUK_TANIMLAMA':
@@ -1995,7 +2091,148 @@ function renderStepFields(job, stepNum) {
                     </div>
                 </div>
             `;
-        case 'GENEL_DEGERLENDIRME':
+        case 'OZET_OZET_ISTEME':
+            return `
+                <div class="form-group">
+                    <label>Özetin Diğer Birimlerden İstenme Tarihi</label>
+                    <input type="date" id="date-${stepNum}" value="${sData.date || ''}" class="modern-input">
+                </div>
+            `;
+        case 'OZET_BIRIM_DONUSU':
+            return `
+                <div class="gorus-box" style="border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; background:rgba(0,0,0,0.15); margin-bottom:12px;">
+                    <h5 style="color:var(--accent-light); margin:0 0 10px 0; font-size:13px; font-weight:bold;">🌲 İzinler Birimi Görüş Dönüşü</h5>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>İzinler Biriminden Geliş Tarihi</label>
+                            <input type="date" id="izinlerDate-${stepNum}" value="${sData.izinlerDate || ''}" class="modern-input">
+                        </div>
+                        <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;">
+                            <input type="checkbox" id="izinlerDondu-${stepNum}" ${sData.izinlerDondu ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+                            <label for="izinlerDondu-${stepNum}" style="font-weight:bold; color:#10b981; cursor:pointer; font-size:12px; margin-bottom:0;">İzinler Görüşü Geldi</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="gorus-box" style="border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; background:rgba(0,0,0,0.15);">
+                    <h5 style="color:var(--accent-light); margin:0 0 10px 0; font-size:13px; font-weight:bold;">⚙️ Teknik Birim Görüş Dönüşü</h5>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Teknik Birimden Geliş Tarihi</label>
+                            <input type="date" id="teknikDate-${stepNum}" value="${sData.teknikDate || ''}" class="modern-input">
+                        </div>
+                        <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;">
+                            <input type="checkbox" id="teknikDondu-${stepNum}" ${sData.teknikDondu ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+                            <label for="teknikDondu-${stepNum}" style="font-weight:bold; color:#10b981; cursor:pointer; font-size:12px; margin-bottom:0;">Teknik Görüş Geldi</label>
+                        </div>
+                    </div>
+                </div>
+            `;
+        case 'AO_HAZIRLIK':
+            return `
+                <div style="background:rgba(99,102,241,0.08); border-left:3px solid #6366f1; padding:12px; border-radius:8px; margin-bottom:12px;">
+                    <div style="font-size:12px; font-weight:700; color:#818cf8; margin-bottom:6px;">👤 AO (Atacan Okumuş) Sorumluluğu</div>
+                    <div style="font-size:11px; color:var(--text-muted);">Başvuru yazısının taslağı Atacan Okumuş tarafından hazırlanacaktır.</div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>AO Hazırlama Tarihi</label>
+                        <input type="date" id="date-${stepNum}" value="${sData.date || ''}" class="modern-input">
+                    </div>
+                    <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;">
+                        <input type="checkbox" id="aoDone-${stepNum}" ${sData.aoDone || sData.completed ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+                        <label for="aoDone-${stepNum}" style="font-weight:bold; color:#818cf8; cursor:pointer; font-size:12px; margin-bottom:0;">AO Yazıyı Hazırladı</label>
+                    </div>
+                </div>
+            `;
+        case 'GD_KONTROL':
+            return `
+                <div style="background:rgba(236,72,153,0.08); border-left:3px solid #ec4899; padding:12px; border-radius:8px; margin-bottom:12px;">
+                    <div style="font-size:12px; font-weight:700; color:#f472b6; margin-bottom:6px;">🔍 GD (Gamze Durum) Sorumluluğu</div>
+                    <div style="font-size:11px; color:var(--text-muted);">Hazırlanan başvuru yazısının kontrolü Gamze Durum tarafından yapılacaktır.</div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>GD Kontrol Tarihi</label>
+                        <input type="date" id="date-${stepNum}" value="${sData.date || ''}" class="modern-input">
+                    </div>
+                    <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;">
+                        <input type="checkbox" id="gdDone-${stepNum}" ${sData.gdDone || sData.completed ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+                        <label for="gdDone-${stepNum}" style="font-weight:bold; color:#f472b6; cursor:pointer; font-size:12px; margin-bottom:0;">GD Yazıyı Kontrol Edip Onayladı</label>
+                    </div>
+                </div>
+            `;
+        case 'EPDK_BASVURU_HAZIRLIK':
+            return `
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Başvuruya Hazır Olma Tarihi</label>
+                        <input type="date" id="date-${stepNum}" value="${sData.date || ''}" class="modern-input">
+                    </div>
+                    <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;">
+                        <input type="checkbox" id="hazir-${stepNum}" ${sData.hazir || sData.completed ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+                        <label for="hazir-${stepNum}" style="font-weight:bold; color:#10b981; cursor:pointer; font-size:12px; margin-bottom:0;">EPDK Başvurusuna Hazır</label>
+                    </div>
+                </div>
+            `;
+        case 'EPDK_BASVURU_YAPILMASI':
+            return `
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>EPDK Başvuru Tarihi</label>
+                        <input type="date" id="date-${stepNum}" value="${sData.date || ''}" class="modern-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Başvuru Evrak / Barkod Sayısı</label>
+                        <input type="text" id="number-${stepNum}" value="${escapeHtml(sData.number || '')}" class="modern-input" placeholder="Örn: E-10452">
+                    </div>
+                </div>
+                
+                <!-- Revizyon Yapılabilmesi İçin Revizyon Kutusu & Tuşu -->
+                <div class="revision-box" style="margin-top:12px; padding:12px; background:rgba(251,191,36,0.06); border:1px dashed rgba(251,191,36,0.25); border-radius:10px;">
+                    <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <input type="checkbox" id="hasRevision-${stepNum}" ${sData.hasRevision ? 'checked' : ''} onchange="document.getElementById('revisionSubFields-${stepNum}').style.display = this.checked ? 'block' : 'none';" style="width:16px; height:16px; cursor:pointer;">
+                        <label for="hasRevision-${stepNum}" style="font-weight:bold; color:#fbbf24; cursor:pointer; font-size:12px; margin-bottom:0;">🔄 Bu Başvuru İçin Revizyon Yapıldı</label>
+                    </div>
+                    <div id="revisionSubFields-${stepNum}" style="display: ${sData.hasRevision ? 'block' : 'none'}; margin-top:8px;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label style="font-size:11px; color:#fbbf24;">Revizyon Yapılma Tarihi</label>
+                                <input type="date" id="revisionDate-${stepNum}" value="${sData.revisionDate || ''}" class="modern-input">
+                            </div>
+                            <div class="form-group">
+                                <label style="font-size:11px; color:#fbbf24;">Revizyon Notları / Nedeni</label>
+                                <input type="text" id="revisionNotes-${stepNum}" value="${escapeHtml(sData.revisionNotes || '')}" class="modern-input" placeholder="Revizyon açıklaması">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        case 'KDB_GORUS_CIKIS':
+            return `
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>KDB Görüşüne Çıkış Tarihi</label>
+                        <input type="date" id="kdbCikisTarih-${stepNum}" value="${sData.kdbCikisTarih || sData.date || ''}" class="modern-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Görüş Çıkış Evrak Sayısı</label>
+                        <input type="text" id="kdbCikisSayi-${stepNum}" value="${escapeHtml(sData.kdbCikisSayi || sData.number || '')}" class="modern-input" placeholder="Örn: K-12345">
+                    </div>
+                </div>
+            `;
+        case 'KDB_GORUS_DONUS':
+            return `
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>KDB Görüş Gelme Tarihi</label>
+                        <input type="date" id="kdbTarih-${stepNum}" value="${sData.kdbTarih || sData.date || ''}" class="modern-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Görüş Cevap Evrak Sayısı</label>
+                        <input type="text" id="kdbSayi-${stepNum}" value="${escapeHtml(sData.kdbSayi || sData.number || '')}" class="modern-input" placeholder="Örn: 54321">
+                    </div>
+                </div>
+            `;
             return `
                 <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
                     <input type="checkbox" id="tamamlandi-${stepNum}" ${sData.tamamlandi ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
@@ -2505,6 +2742,132 @@ function saveStepData(jobId, stepNum) {
                     if (currentStep === stepNum) currentStep = stepNum + 1;
                 } else {
                     if (currentStep > stepNum) currentStep = stepNum;
+                }
+            }
+            break;
+
+        case 'OZET_OZET_ISTEME':
+            {
+                const dateVal = document.getElementById(`date-${stepNum}`).value;
+                steps[`step${stepNum}`] = { completed: true, date: dateVal };
+                if (currentStep === stepNum) currentStep = stepNum + 1;
+            }
+            break;
+
+        case 'OZET_BIRIM_DONUSU':
+            {
+                const izinlerDate = document.getElementById(`izinlerDate-${stepNum}`).value;
+                const izinlerDondu = document.getElementById(`izinlerDondu-${stepNum}`).checked || !!izinlerDate;
+                const teknikDate = document.getElementById(`teknikDate-${stepNum}`).value;
+                const teknikDondu = document.getElementById(`teknikDondu-${stepNum}`).checked || !!teknikDate;
+
+                const isAllDone = izinlerDondu && teknikDondu;
+                steps[`step${stepNum}`] = {
+                    completed: isAllDone,
+                    izinlerDondu, izinlerDate,
+                    teknikDondu, teknikDate
+                };
+
+                if (isAllDone) {
+                    if (currentStep === stepNum) currentStep = stepNum + 1;
+                } else {
+                    showToast('İzinler ve Teknik birimlerinin her ikisi de tamamlandıktan sonra sonraki aşamaya geçilir.', 'info');
+                }
+            }
+            break;
+
+        case 'AO_HAZIRLIK':
+            {
+                const dateVal = document.getElementById(`date-${stepNum}`).value;
+                const aoDone = document.getElementById(`aoDone-${stepNum}`).checked || !!dateVal;
+                steps[`step${stepNum}`] = { completed: aoDone, aoDone, date: dateVal };
+                if (aoDone) {
+                    if (currentStep === stepNum) currentStep = stepNum + 1;
+                }
+            }
+            break;
+
+        case 'GD_KONTROL':
+            {
+                const dateVal = document.getElementById(`date-${stepNum}`).value;
+                const gdDone = document.getElementById(`gdDone-${stepNum}`).checked || !!dateVal;
+                steps[`step${stepNum}`] = { completed: gdDone, gdDone, date: dateVal };
+                if (gdDone) {
+                    if (currentStep === stepNum) currentStep = stepNum + 1;
+                }
+            }
+            break;
+
+        case 'EPDK_BASVURU_HAZIRLIK':
+            {
+                const dateVal = document.getElementById(`date-${stepNum}`).value;
+                const hazir = document.getElementById(`hazir-${stepNum}`).checked || !!dateVal;
+                steps[`step${stepNum}`] = { completed: hazir, hazir, date: dateVal };
+                if (hazir) {
+                    if (currentStep === stepNum) currentStep = stepNum + 1;
+                }
+            }
+            break;
+
+        case 'EPDK_BASVURU_YAPILMASI':
+            {
+                const dateVal = document.getElementById(`date-${stepNum}`).value;
+                const numberVal = document.getElementById(`number-${stepNum}`).value.trim();
+                const hasRevision = document.getElementById(`hasRevision-${stepNum}`).checked;
+                const revisionDate = document.getElementById(`revisionDate-${stepNum}`)?.value || '';
+                const revisionNotes = document.getElementById(`revisionNotes-${stepNum}`)?.value.trim() || '';
+
+                const basvuruYapildi = !!dateVal || !!numberVal;
+                steps[`step${stepNum}`] = {
+                    completed: basvuruYapildi,
+                    basvuruYapildi,
+                    date: dateVal,
+                    number: numberVal,
+                    hasRevision,
+                    revisionDate,
+                    revisionNotes
+                };
+
+                if (basvuruYapildi) {
+                    if (currentStep === stepNum) currentStep = stepNum + 1;
+                }
+            }
+            break;
+
+        case 'KDB_GORUS_CIKIS':
+            {
+                const cikisTarih = document.getElementById(`kdbCikisTarih-${stepNum}`).value;
+                const cikisSayi = document.getElementById(`kdbCikisSayi-${stepNum}`).value.trim();
+                const cikildi = !!cikisTarih || !!cikisSayi;
+                steps[`step${stepNum}`] = {
+                    completed: cikildi,
+                    cikildi,
+                    date: cikisTarih,
+                    number: cikisSayi,
+                    kdbCikisTarih: cikisTarih,
+                    kdbCikisSayi: cikisSayi
+                };
+                if (cikildi) {
+                    if (currentStep === stepNum) currentStep = stepNum + 1;
+                }
+            }
+            break;
+
+        case 'KDB_GORUS_DONUS':
+            {
+                const cevapTarih = document.getElementById(`kdbTarih-${stepNum}`).value;
+                const cevapSayi = document.getElementById(`kdbSayi-${stepNum}`).value.trim();
+                const geldi = !!cevapTarih || !!cevapSayi;
+                steps[`step${stepNum}`] = {
+                    completed: geldi,
+                    geldi,
+                    date: cevapTarih,
+                    number: cevapSayi,
+                    kdbTarih: cevapTarih,
+                    kdbSayi: cevapSayi
+                };
+                if (geldi) {
+                    if (currentStep === stepNum) currentStep = stepNum + 1;
                 }
             }
             break;

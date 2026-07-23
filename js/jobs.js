@@ -3556,6 +3556,29 @@ export function seedPrelicenceExcelData() {
     }
 }
 
+export function formatDateForInput(dVal) {
+    if (!dVal) return '';
+    if (dVal instanceof Date) {
+        if (isNaN(dVal.getTime())) return '';
+        return dVal.toISOString().split('T')[0];
+    }
+    if (typeof dVal === 'string') {
+        const str = dVal.trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+        if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(str)) {
+            const parts = str.split('.');
+            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+    }
+    try {
+        const d = new Date(dVal);
+        if (isNaN(d.getTime())) return '';
+        return d.toISOString().split('T')[0];
+    } catch (e) {
+        return '';
+    }
+}
+
 export function renderPrelicenceExtensionsMatrix() {
     const container = document.getElementById('extMatrixContainer');
     if (!container) return;
@@ -3649,29 +3672,6 @@ export function renderPrelicenceExtensionsMatrix() {
         `;
         return;
     }
-
-export function formatDateForInput(dVal) {
-    if (!dVal) return '';
-    if (dVal instanceof Date) {
-        if (isNaN(dVal.getTime())) return '';
-        return dVal.toISOString().split('T')[0];
-    }
-    if (typeof dVal === 'string') {
-        const str = dVal.trim();
-        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-        if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(str)) {
-            const parts = str.split('.');
-            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-        }
-    }
-    try {
-        const d = new Date(dVal);
-        if (isNaN(d.getTime())) return '';
-        return d.toISOString().split('T')[0];
-    } catch (e) {
-        return '';
-    }
-}
 
     // Helper for rendering inline step cell with completion toggle
     const renderInlineStepCell = (job, stepNum, stepKey, dateField, currentDateVal) => {

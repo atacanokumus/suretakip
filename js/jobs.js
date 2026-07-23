@@ -3650,15 +3650,41 @@ export function renderPrelicenceExtensionsMatrix() {
         return;
     }
 
-    // Helper for rendering inline date input
-    const renderInlineDateInput = (jobId, stepKey, field, currentDateVal, accentColor = '#10b981') => {
-        const val = currentDateVal || '';
+    // Helper for rendering inline step cell with completion toggle
+    const renderInlineStepCell = (job, stepNum, stepKey, dateField, currentDateVal) => {
+        const step = (job.steps && job.steps[stepKey]) || {};
+        const isCompleted = !!step.completed;
+        const dateVal = currentDateVal || step[dateField] || step.date || '';
+
+        const containerStyle = isCompleted
+            ? 'background: rgba(16, 185, 129, 0.28); border: 1px solid #10b981; border-radius: 6px; padding: 3px 4px; text-align: center; box-shadow: inset 0 0 6px rgba(16, 185, 129, 0.2); transition: all 0.2s;'
+            : 'background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 3px 4px; text-align: center; transition: all 0.2s;';
+
+        const textStyle = isCompleted
+            ? 'color: #ecfdf5; font-weight: 700; font-size: 11px;'
+            : 'color: var(--text-muted); font-size: 11px;';
+
+        const btnStyle = isCompleted
+            ? 'background: #10b981; color: #ffffff; border: none; border-radius: 4px; font-size: 9px; font-weight: bold; padding: 2px 5px; margin-top: 2px; cursor: pointer; display: inline-flex; align-items: center; gap: 2px;'
+            : 'background: rgba(255,255,255,0.1); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; font-size: 9px; padding: 2px 5px; margin-top: 2px; cursor: pointer; display: inline-flex; align-items: center; gap: 2px;';
+
+        const btnLabel = isCompleted ? '✅ Tamamlandı' : '✓ Tamamla';
+
         return `
-            <input type="date" 
-                   value="${val}" 
-                   class="matrix-date-input"
-                   onchange="window.updateMatrixCellDate('${jobId}', '${stepKey}', '${field}', this.value)"
-                   style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: ${val ? accentColor : 'var(--text-muted)'}; font-size: 11px; padding: 2px 4px; width: 100%; box-sizing: border-box; cursor: pointer; text-align: center;">
+            <div style="${containerStyle}">
+                <input type="date" 
+                       value="${dateVal}" 
+                       onchange="window.updateMatrixCellDate('${job.id}', '${stepKey}', '${dateField}', this.value)"
+                       style="background: transparent; border: none; ${textStyle} width: 100%; box-sizing: border-box; cursor: pointer; text-align: center;">
+                <div style="text-align: center;">
+                    <button type="button" 
+                            onclick="window.toggleMatrixStepCompletion('${job.id}', ${stepNum})" 
+                            style="${btnStyle}" 
+                            title="Aşamayı tamamlandı olarak işaretle veya geri al">
+                        ${btnLabel}
+                    </button>
+                </div>
+            </div>
         `;
     };
 
@@ -3674,25 +3700,33 @@ export function renderPrelicenceExtensionsMatrix() {
 
         const rowNum = j.matrixRow || (idx + 1);
 
-        // Step 1: Özet İsteme
+        // Step Cells mapping to Workflow
         const s1 = steps.step1 || {};
-        const s1Input = renderInlineDateInput(j.id, 'step1', 'date', s1.date, '#10b981');
+        const s1Cell = renderInlineStepCell(j, 1, 'step1', 'date', s1.date);
 
-        // Step 2: Birimler Dönüş
         const s2 = steps.step2 || {};
-        const s2Input = renderInlineDateInput(j.id, 'step2', 'izinlerDate', s2.izinlerDate || s2.date, '#60a5fa');
+        const s2Cell = renderInlineStepCell(j, 2, 'step2', 'izinlerDate', s2.izinlerDate || s2.date);
 
-        // Step 3: AO Son Gönderim
         const s3 = steps.step3 || {};
-        const s3Input = renderInlineDateInput(j.id, 'step3', 'date', s3.date, '#818cf8');
+        const s3Cell = renderInlineStepCell(j, 3, 'step3', 'date', s3.date);
 
-        // Step 4: GD Son Gönderim
         const s4 = steps.step4 || {};
-        const s4Input = renderInlineDateInput(j.id, 'step4', 'date', s4.date, '#f472b6');
+        const s4Cell = renderInlineStepCell(j, 4, 'step4', 'date', s4.date);
 
-        // Step 5-6: EPDK Başvuru
+        const s5 = steps.step5 || {};
+        const s5Cell = renderInlineStepCell(j, 5, 'step5', 'date', s5.date);
+
         const s6 = steps.step6 || {};
-        const s6Input = renderInlineDateInput(j.id, 'step6', 'date', s6.date, '#fbbf24');
+        const s6Cell = renderInlineStepCell(j, 6, 'step6', 'date', s6.date);
+
+        const s8 = steps.step8 || {};
+        const s7 = steps.step7 || {};
+        const kdbCell = renderInlineStepCell(j, 8, 'step8', 'kdbTarih', s8.kdbTarih || s8.date || s7.kdbCikisTarih);
+
+        const s11 = steps.step11 || {};
+        const s10 = steps.step10 || {};
+        const s9 = steps.step9 || {};
+        const dercCell = renderInlineStepCell(j, 11, 'step11', 'date', s11.date || s10.date || s9.date);
 
         // Expiry Date (Süre Bitiş Tarihi)
         let expiryDateVal = '';
@@ -3703,11 +3737,12 @@ export function renderPrelicenceExtensionsMatrix() {
         }
 
         const expiryInput = `
-            <input type="date" 
-                   value="${expiryDateVal}" 
-                   class="matrix-date-input"
-                   onchange="window.updateMatrixProjectExpiry('${escapeHtml(j.project)}', this.value)"
-                   style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #f87171; font-size: 11px; padding: 2px 4px; width: 100%; box-sizing: border-box; cursor: pointer; text-align: center; font-weight: 600;">
+            <div style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; padding: 3px 4px; text-align: center;">
+                <input type="date" 
+                       value="${expiryDateVal}" 
+                       onchange="window.updateMatrixProjectExpiry('${escapeHtml(j.project)}', this.value)"
+                       style="background: transparent; border: none; color: #f87171; font-size: 11px; padding: 0; width: 100%; box-sizing: border-box; cursor: pointer; text-align: center; font-weight: 700;">
+            </div>
         `;
 
         // Current Stage Badge
@@ -3720,14 +3755,17 @@ export function renderPrelicenceExtensionsMatrix() {
                 <td style="padding: 4px 6px; font-weight: bold; color: ${isYellowRow ? '#fef08a' : 'var(--text-muted)'}; font-size: 11px; text-align: center;">${rowNum}</td>
                 <td style="padding: 4px 6px; font-weight: 700; color: ${isYellowRow ? '#fef08a' : 'var(--accent-light)'}; font-size: 11px;">${escapeHtml(j.project)}</td>
                 <td style="padding: 4px 6px; font-size: 10px; color: ${isYellowRow ? '#fef08a' : 'var(--text-secondary)'}; font-weight: 600;">${escapeHtml(j.subTitle || j.title)}</td>
-                <td style="padding: 4px 6px;">${s1Input}</td>
-                <td style="padding: 4px 6px;">${s2Input}</td>
-                <td style="padding: 4px 6px;">${s3Input}</td>
-                <td style="padding: 4px 6px;">${s4Input}</td>
-                <td style="padding: 4px 6px;">${s6Input}</td>
-                <td style="padding: 4px 6px;">${expiryInput}</td>
-                <td style="padding: 4px 6px; text-align: center;">${stageBadge}</td>
-                <td style="padding: 4px 6px; text-align: center;">
+                <td style="padding: 4px 4px;">${s1Cell}</td>
+                <td style="padding: 4px 4px;">${s2Cell}</td>
+                <td style="padding: 4px 4px;">${s3Cell}</td>
+                <td style="padding: 4px 4px;">${s4Cell}</td>
+                <td style="padding: 4px 4px;">${s5Cell}</td>
+                <td style="padding: 4px 4px;">${s6Cell}</td>
+                <td style="padding: 4px 4px;">${kdbCell}</td>
+                <td style="padding: 4px 4px;">${dercCell}</td>
+                <td style="padding: 4px 4px;">${expiryInput}</td>
+                <td style="padding: 4px 4px; text-align: center;">${stageBadge}</td>
+                <td style="padding: 4px 4px; text-align: center;">
                     <button type="button" class="btn btn-xs btn-secondary" onclick="window.openJobFromMatrix('${j.id}')" style="padding: 2px 6px; font-size: 10px; border-radius: 4px;">🔍 Detay</button>
                 </td>
             </tr>
@@ -3739,17 +3777,20 @@ export function renderPrelicenceExtensionsMatrix() {
             <table class="modern-table" style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed;">
                 <thead>
                     <tr style="border-bottom: 2px solid rgba(255,255,255,0.15); color: var(--text-muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; background: rgba(0,0,0,0.2);">
-                        <th style="padding: 8px 4px; width: 38px; text-align: center;">SIRA</th>
-                        <th style="padding: 8px 6px; width: 130px;">PROJE ADI</th>
-                        <th style="padding: 8px 6px; width: 160px;">KONU / AÇIKLAMA</th>
-                        <th style="padding: 8px 4px; width: 112px; text-align: center; color: #10b981;">1. ÖZET İSTEME</th>
-                        <th style="padding: 8px 4px; width: 112px; text-align: center; color: #60a5fa;">2. BİRİM DÖNÜŞ</th>
-                        <th style="padding: 8px 4px; width: 112px; text-align: center; color: #818cf8;">3. AO SON GÖNDERİM</th>
-                        <th style="padding: 8px 4px; width: 112px; text-align: center; color: #f472b6;">4. GD SON GÖNDERİM</th>
-                        <th style="padding: 8px 4px; width: 112px; text-align: center; color: #fbbf24;">5. BAŞVURU TARİHİ</th>
-                        <th style="padding: 8px 4px; width: 112px; text-align: center; color: #f87171;">SÜRE BİTİŞ</th>
+                        <th style="padding: 8px 4px; width: 35px; text-align: center;">SIRA</th>
+                        <th style="padding: 8px 6px; width: 125px;">PROJE ADI</th>
+                        <th style="padding: 8px 6px; width: 145px;">KONU / AÇIKLAMA</th>
+                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #10b981;">1. ÖZET İSTEME</th>
+                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #60a5fa;">2. BİRİM DÖNÜŞ</th>
+                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #818cf8;">3. AO HAZIRLIK</th>
+                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #f472b6;">4. GD KONTROL</th>
+                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #fbbf24;">5. EPDK HAZIRLIK</th>
+                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #f59e0b;">6. EPDK BAŞVURU</th>
+                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #a78bfa;">7-8. KDB GÖRÜŞÜ</th>
+                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #34d399;">9-11. DERÇ EDİLME</th>
+                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #f87171;">SÜRE BİTİŞ</th>
                         <th style="padding: 8px 4px; width: 95px; text-align: center;">DURUM</th>
-                        <th style="padding: 8px 4px; width: 60px; text-align: center;">İŞLEM</th>
+                        <th style="padding: 8px 4px; width: 55px; text-align: center;">İŞLEM</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -3778,6 +3819,59 @@ export function initPrelicenceMatrixEvents() {
     }
 }
 
+window.toggleMatrixStepCompletion = function(jobId, stepNum) {
+    const job = Store.jobs.find(j => j.id == jobId);
+    if (!job) return;
+
+    if (!job.steps) job.steps = {};
+    const stepKey = `step${stepNum}`;
+    if (!job.steps[stepKey]) job.steps[stepKey] = {};
+
+    const currentlyCompleted = !!job.steps[stepKey].completed;
+    const newCompleted = !currentlyCompleted;
+    job.steps[stepKey].completed = newCompleted;
+
+    const stepsConf = getWorkflowSteps(job);
+    const totalSteps = stepsConf.length;
+
+    if (newCompleted) {
+        if (stepNum === 3) job.steps[stepKey].aoDone = true;
+        if (stepNum === 4) job.steps[stepKey].gdDone = true;
+        if (stepNum === 5) job.steps[stepKey].hazir = true;
+        if (stepNum === 6) job.steps[stepKey].basvuruYapildi = true;
+
+        if (job.currentStep === stepNum && stepNum < totalSteps) {
+            job.currentStep = stepNum + 1;
+        } else if (stepNum === totalSteps) {
+            job.status = 'completed';
+            job.completedAt = new Date();
+        }
+        showToast(`${stepNum}. Aşama Tamamlandı olarak işaretlendi! ✅`, 'success');
+    } else {
+        if (job.status === 'completed') {
+            job.status = 'pending';
+            job.completedAt = null;
+        }
+        if (job.currentStep > stepNum) {
+            job.currentStep = stepNum;
+        }
+        showToast(`${stepNum}. Aşama Geri Alındı.`, 'info');
+    }
+
+    job.updatedAt = new Date();
+    Store.updateJob(job.id, {
+        steps: job.steps,
+        currentStep: job.currentStep,
+        status: job.status,
+        completedAt: job.completedAt,
+        updatedAt: job.updatedAt
+    });
+
+    if (saveData()) {
+        window.dispatchEvent(new CustomEvent('refresh-views'));
+    }
+};
+
 window.updateMatrixCellDate = function(jobId, stepKey, field, newDate) {
     const job = Store.jobs.find(j => j.id == jobId);
     if (!job) return;
@@ -3788,9 +3882,9 @@ window.updateMatrixCellDate = function(jobId, stepKey, field, newDate) {
     job.steps[stepKey][field] = newDate;
     if (newDate) {
         job.steps[stepKey].completed = true;
-        if (field === 'aoDone') job.steps[stepKey].aoDone = true;
-        if (field === 'gdDone') job.steps[stepKey].gdDone = true;
-        if (field === 'basvuruYapildi') job.steps[stepKey].basvuruYapildi = true;
+        if (field === 'aoDone' || stepKey === 'step3') job.steps[stepKey].aoDone = true;
+        if (field === 'gdDone' || stepKey === 'step4') job.steps[stepKey].gdDone = true;
+        if (field === 'basvuruYapildi' || stepKey === 'step6') job.steps[stepKey].basvuruYapildi = true;
         if (field === 'izinlerDate') {
             job.steps[stepKey].teknikDate = newDate;
             job.steps[stepKey].izinlerDondu = true;

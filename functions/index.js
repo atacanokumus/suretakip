@@ -14,10 +14,10 @@ const TeamsAIHelper = require("./teams_ai_helper");
 initializeApp();
 const db = getFirestore();
 
-// Resend API Key (set via Firebase config)
-const RESEND_API_KEY = process.env.RESEND_API_KEY || "re_RmxJt6pJ_4HtcMWxx32BTJEXaasNQMota";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "AIzaSyBNf6jtVpYnfZ0R5wEM89Iu_86bn7PFO6s"; // User provided key
-const resend = new Resend(RESEND_API_KEY);
+// Resend & Gemini API Keys (loaded via process.env)
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 const aiHelper = GEMINI_API_KEY ? new TeamsAIHelper(GEMINI_API_KEY) : null;
 
 // Target email (must match the email you used to sign up for Resend in Sandbox mode)

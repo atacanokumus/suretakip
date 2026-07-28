@@ -14,6 +14,16 @@ const TeamsAIHelper = require("./teams_ai_helper");
 initializeApp();
 const db = getFirestore();
 
+// Push notifications for the iOS shell. Required after initializeApp() so the
+// admin SDK is ready when push.js grabs Firestore/Auth/Messaging handles.
+const push = require("./push");
+
+exports.registerPushToken = push.registerPushToken;
+exports.unregisterPushToken = push.unregisterPushToken;
+exports.sendManualPush = push.sendManualPush;
+exports.listPushDevices = push.listPushDevices;
+exports.onMasterDataChanged = push.onMasterDataChanged;
+
 // Resend & Gemini API Keys (loaded via process.env)
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -438,6 +448,19 @@ exports.checkDeadlines = onSchedule({
         });
 
         console.log(`🎉 Consolidated Daily Email Sent! Items: ${totalItemsCount}`, info);
+
+        // --- 5. Same digest as a push, off the same computed lists ---
+        try {
+            await push.sendDigestPush(data, {
+                todayAndOverdue,
+                upcoming: upcomingNext7Days,
+                aoTasks,
+                gdTasks
+            });
+        } catch (pushErr) {
+            // A push failure must never cost us the e-mail, which already sent.
+            console.error("⚠️ Gunluk ozet push hatasi:", pushErr);
+        }
     } catch (error) {
         console.error("❌ Error in checkDeadlines:", error);
     }

@@ -1,9 +1,9 @@
 # XcodeGen definition — regenerate the Xcode project with:
 #   brew install xcodegen && cd SureTakip-iOS && xcodegen generate
 #
-# The shell has NO third-party dependencies. Authentication and all data access
-# happen inside the web app, so the Firebase iOS SDK is not needed here; that
-# keeps build times short and removes a whole class of version-drift problems.
+# The only third-party dependency is FirebaseMessaging, and only because APNs
+# push cannot be done from the web view. Authentication and all data access
+# still happen inside the web app, so no Firestore/Auth SDK is pulled in here.
 name: SureTakip
 
 options:
@@ -12,14 +12,25 @@ options:
     iOS: "16.0"
   createIntermediateGroups: true
 
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: "11.0.0"
+
 targets:
   SureTakip:
     type: application
     platform: iOS
+    dependencies:
+      - package: Firebase
+        product: FirebaseMessaging
     sources:
       - path: SureTakip
         excludes:
           - Info.plist
+          # Referenced via CODE_SIGN_ENTITLEMENTS below; listing them as
+          # sources would also copy them into the bundle as resources.
+          - "*.entitlements"
     # NOTE: deliberately no `info:` block here.
     #
     # In XcodeGen, `info: path:` does not mean "use the plist at this path" - it
@@ -36,10 +47,18 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davincienerji.suretakip
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
+        CURRENT_PROJECT_VERSION: "2"
         INFOPLIST_FILE: SureTakip/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1,2" # iPhone + iPad
         # No DEVELOPMENT_TEAM here on purpose: set it once in Xcode
         # (Signing & Capabilities) so the team ID stays out of the repo.
+      configs:
+        # Separate entitlements per configuration so the APNs environment
+        # matches how the build is actually distributed. One shared file would
+        # force a choice that is wrong for half the cases.
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: SureTakip/SureTakip.Debug.entitlements
+        Release:
+          CODE_SIGN_ENTITLEMENTS: SureTakip/SureTakip.Release.entitlements

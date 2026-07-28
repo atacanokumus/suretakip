@@ -87,6 +87,7 @@ final class WebViewController: UIViewController {
 
         let controller = WKUserContentController()
         controller.add(coordinator, name: "saveFile")
+        controller.add(coordinator, name: "updateWidget")
         controller.addUserScript(WebAppView.Coordinator.nativeBridgeScript)
         config.userContentController = controller
 
@@ -118,6 +119,14 @@ final class WebViewController: UIViewController {
 
         model.webView = webView
         webView.load(URLRequest(url: AppConfig.appURL))
+
+        // A token can arrive before the page is ready or long after it loaded;
+        // both paths funnel through the coordinator, which no-ops until the
+        // page exposes window.SureTakipPush.
+        PushCenter.shared.onToken = { [weak coordinator, weak webView] token in
+            guard let coordinator, let webView else { return }
+            coordinator.deliverPushToken(token, to: webView)
+        }
     }
 
     @available(*, unavailable)
@@ -167,12 +176,29 @@ struct WebAppView: UIViewControllerRepresentable {
                 platform: 'ios',
                 saveFile: function (name, base64) {
                     window.webkit.messageHandlers.saveFile.postMessage({ name: name, data: base64 });
+                },
+                updateWidget: function (json) {
+                    window.webkit.messageHandlers.updateWidget.postMessage(json);
                 }
             };
             """,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         )
+
+        /// Passes the FCM token into the page, which registers it against the
+        /// signed-in user. Silently does nothing until the page is ready - it
+        /// is re-sent on every `didFinish`.
+        func deliverPushToken(_ token: String, to webView: WKWebView) {
+            let escaped = token.replacingOccurrences(of: "\\", with: "\\\\")
+                               .replacingOccurrences(of: "'", with: "\\'")
+            let device = UIDevice.current.name.replacingOccurrences(of: "'", with: "\\'")
+            webView.evaluateJavaScript("""
+                if (window.SureTakipPush && window.SureTakipPush.onToken) {
+                    window.SureTakipPush.onToken('\(escaped)', '\(device)');
+                }
+                """, completionHandler: nil)
+        }
 
         @objc func handleRefresh(_ sender: UIRefreshControl) {
             model.webView?.reload()
@@ -209,6 +235,12 @@ struct WebAppView: UIViewControllerRepresentable {
             webView.scrollView.refreshControl?.endRefreshing()
             model.hasLoadedOnce = true
             model.loadError = nil
+
+            // Re-send on every load: a reload wipes window.SureTakipPush, and
+            // the token usually predates the first page load anyway.
+            if let token = PushCenter.shared.token {
+                deliverPushToken(token, to: webView)
+            }
         }
 
         func webView(_ webView: WKWebView,
@@ -251,6 +283,14 @@ struct WebAppView: UIViewControllerRepresentable {
 
         func userContentController(_ controller: WKUserContentController,
                                    didReceive message: WKScriptMessage) {
+            // Deadline summary for the app badge (and, later, the widget).
+            if message.name == "updateWidget" {
+                if let json = message.body as? String {
+                    WidgetStore.saveSnapshot(json: json)
+                }
+                return
+            }
+
             guard message.name == "saveFile",
                   let body = message.body as? [String: Any],
                   let name = body["name"] as? String,

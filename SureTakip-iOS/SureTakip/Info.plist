@@ -49,5 +49,14 @@
 	</array>
 	<key>UIUserInterfaceStyle</key>
 	<string>Dark</string>
+	<!-- Shown in the system Face ID prompt. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Süre Takip'i açarken kimliğinizi doğrulamak için Face ID kullanılır.</string>
+	<!-- Lets content-available pushes update the badge and the stored deadline
+	     summary while the app is in the background. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

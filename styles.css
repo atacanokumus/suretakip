@@ -798,6 +798,55 @@ body {
     letter-spacing: 0.05em;
 }
 
+/* ==========================================
+   Toggle Switch (push notification settings)
+   ========================================== */
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 30px;
+    flex-shrink: 0;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.switch .slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid var(--border-glass);
+    border-radius: 30px;
+    transition: background 0.25s var(--transition-subtle);
+}
+
+.switch .slider::before {
+    content: '';
+    position: absolute;
+    height: 22px;
+    width: 22px;
+    left: 3px;
+    bottom: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.25s var(--transition-subtle);
+}
+
+.switch input:checked+.slider {
+    background: var(--accent-gradient);
+    border-color: transparent;
+}
+
+.switch input:checked+.slider::before {
+    transform: translateX(22px);
+}
+
 /* Dashboard "Aktif Tadiller" widget - was inline-styled in index.html, moved
    here so mobile.css can cleanly override it (see active-jobs-* below). */
 .active-jobs-card {

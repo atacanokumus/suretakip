@@ -4,6 +4,8 @@ import SwiftUI
 /// a launch splash, an offline notice, and an error/retry state.
 struct RootView: View {
     @StateObject private var model = WebAppModel()
+    @StateObject private var lock = BiometricLock()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -34,13 +36,40 @@ struct RootView: View {
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
+
+            // Outermost layer: covers the page (including anything already
+            // rendered) whenever the app is locked, and while backgrounded so
+            // company data isn't exposed in the app switcher.
+            if lock.isLocked {
+                LockScreen(lock: lock)
+                    .transition(.opacity)
+            }
         }
         .animation(.easeInOut(duration: 0.25), value: model.hasLoadedOnce)
         .animation(.easeInOut(duration: 0.25), value: model.isOffline)
+        .animation(.easeInOut(duration: 0.2), value: lock.isLocked)
         // The PDF report is generated inside the web app; the shell receives the
         // bytes and presents the system share sheet (save to Files, mail, ...).
         .sheet(item: $model.pendingShare) { item in
             ShareSheet(items: [item.url])
+        }
+        .onAppear {
+            lock.authenticate()
+            // Asked only after the app is on screen, so the system prompt has
+            // context rather than appearing over a blank launch screen.
+            PushCenter.shared.requestAuthorization()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .background:
+                lock.appDidEnterBackground()
+            case .active:
+                let wasLocked = lock.isLocked
+                lock.appWillEnterForeground()
+                if lock.isLocked && !wasLocked { lock.authenticate() }
+            default:
+                break
+            }
         }
     }
 }

@@ -36,6 +36,7 @@ import {
     formatDateLong, formatDate, getStatus, getStatusText, getStatusLabel, escapeHtml, generateId, validateDate, validateString, convertToDate
 } from './js/utils.js';
 import { initEmojiPicker } from './js/emoji.js';
+import { initPush, syncWidgetSnapshot } from './js/push.js';
 
 // ==========================================
 // Initialization
@@ -67,9 +68,15 @@ function initApp() {
         initNavigation();
         initModals();
         initMobileMenu();
+        initPush();
     } catch (e) {
         console.error('UI Basic Init Error:', e);
     }
+
+    // Keep the iOS home-screen widget in step with whatever the app just
+    // loaded or saved. Push messages carry the same snapshot for when the app
+    // isn't running.
+    window.addEventListener('data-refreshed', syncWidgetSnapshot);
 }
 
 

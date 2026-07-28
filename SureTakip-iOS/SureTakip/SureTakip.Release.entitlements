@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- TestFlight and App Store builds use the production APNs environment.
+	     Shipping `development` here is the usual reason push works from Xcode
+	     but goes silent once the build is distributed. -->
+	<key>aps-environment</key>
+	<string>production</string>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.davincienerji.suretakip</string>
+	</array>
+</dict>
+</plist>

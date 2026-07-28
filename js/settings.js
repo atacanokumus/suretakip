@@ -108,20 +108,19 @@ async function saveSettings() {
         });
         const weeklyHour = parseInt(document.getElementById('weeklyReportHour').value);
 
-        const settings = {
-            daily: {
+        const docRef = doc(db, "daVinciData", "master");
+        // Field-path updates, not a whole-object replace: notificationSettings
+        // also holds `push` (written from js/push.js), and assigning the object
+        // wholesale here would silently delete those settings.
+        await updateDoc(docRef, {
+            "notificationSettings.daily": {
                 days: dailyDays,
                 hour: dailyHour
             },
-            weekly: {
+            "notificationSettings.weekly": {
                 days: weeklyDays, // Array of days
                 hour: weeklyHour
-            }
-        };
-
-        const docRef = doc(db, "daVinciData", "master");
-        await updateDoc(docRef, {
-            notificationSettings: settings,
+            },
             lastSettingsUpdate: new Date().toISOString()
         });
 

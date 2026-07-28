@@ -80,9 +80,9 @@ export function updateDashboard() {
             activeListEl.innerHTML = activeJobs.map((j, idx) => {
                 const color = getGradientColor(idx, total);
                 return `
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 5px 0; font-size: 11px;">
-                        <span style="font-weight: 700; color: ${color}; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 12px;" title="${escapeHtml(j.project)}">${escapeHtml(j.project)}</span>
-                        <span style="color: ${color}; opacity: 0.8; font-size: 10px; flex-shrink: 0; font-weight: 600;" title="${escapeHtml(j.title)}">${escapeHtml(j.title)}</span>
+                    <div class="active-job-row">
+                        <span class="active-job-project" style="color: ${color};" title="${escapeHtml(j.project)}">${escapeHtml(j.project)}</span>
+                        <span class="active-job-title" style="color: ${color};" title="${escapeHtml(j.title)}">${escapeHtml(j.title)}</span>
                     </div>
                 `;
             }).join('');

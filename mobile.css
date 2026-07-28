@@ -410,6 +410,94 @@ body {
         grid-template-columns: 1fr;
     }
 
+    /* ---- Header action buttons ----
+       .add-job-btn / .add-obligation-btn / #generateReportBtn are three
+       different desktop button styles (pill, gradient, outline) at three
+       different heights. On mobile they collapse to icon-only, which made the
+       mismatch obvious - one 48px, one 33px, one 44px tall, three different
+       border-radii. Unified here into one consistent icon-button style. */
+    .header-right {
+        gap: 10px;
+    }
+
+    .header-right button,
+    /* button_polish.css / styles.css style #addJobBtn directly by ID (higher
+       specificity than a class rule), so the class rule alone can't win here. */
+    .header-right #addJobBtn {
+        width: 44px !important;
+        height: 44px !important;
+        min-width: 44px;
+        padding: 0 !important;
+        border-radius: 12px !important;
+        background: var(--surface-glass) !important;
+        border: 1px solid var(--border-glass) !important;
+        box-shadow: none !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .header-right button .btn-icon {
+        font-size: 18px;
+        margin: 0;
+    }
+
+    .header-right button:active {
+        background: var(--bg-hover) !important;
+        transform: scale(0.94);
+    }
+
+    /* ---- Dashboard "Aktif Tadiller" widget ----
+       Was a fixed 123px box with a 2-column, 11px-font grid inside a 99px
+       scroll area - on a 375px screen that's two ~150px-wide columns of
+       ellipsis-truncated text, unreadable. Single column, real row height,
+       full project name visible. */
+    .active-jobs-card {
+        height: auto;
+        padding: 8px 14px;
+    }
+
+    .active-jobs-content {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: auto;
+        max-height: 260px;
+        font-size: 13px;
+        gap: 2px;
+        box-sizing: border-box;
+    }
+
+    .active-job-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        padding: 10px 0;
+    }
+
+    .active-job-project {
+        font-size: 14px;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+    }
+
+    .active-job-title {
+        font-size: 12px;
+    }
+
+    /* ---- Dashboard stat cards: restore depth lost when blur was disabled ---- */
+    .stat-card {
+        padding: 20px 18px;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .stat-group-header {
+        font-size: 12px;
+        margin-bottom: 12px;
+    }
+
     /* ---- Buttons / touch targets ---- */
     .btn {
         min-height: 44px;

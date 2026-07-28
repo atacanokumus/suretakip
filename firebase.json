@@ -11,6 +11,28 @@
         "source": "**",
         "destination": "/index.html"
       }
+    ],
+    "headers": [
+      {
+        "comment": "Firebase Hosting defaults to max-age=3600 for these, so a deploy took up to an hour to reach anyone - including the iOS shell, whose whole point is that web releases show up without a new build. Filenames here are not content-hashed, so the only safe way to guarantee freshness is to revalidate on every load; the responses are small and almost always come back as a 304.",
+        "source": "**/*.@(html|js|css|json)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "comment": "Images are stable, so they can be cached hard.",
+        "source": "**/*.@(png|jpg|jpeg|gif|svg|webp|ico)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=604800"
+          }
+        ]
+      }
     ]
   },
   "functions": [

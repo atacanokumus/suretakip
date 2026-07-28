@@ -79,10 +79,14 @@ export function updateDashboard() {
             const total = activeJobs.length;
             activeListEl.innerHTML = activeJobs.map((j, idx) => {
                 const color = getGradientColor(idx, total);
+                // The urgency colour goes on the row as a custom property so
+                // CSS decides how to express it: as text colour on desktop,
+                // as a left accent bar on mobile (where a list of multicolour
+                // project names reads as noise rather than as ranking).
                 return `
-                    <div class="active-job-row">
-                        <span class="active-job-project" style="color: ${color};" title="${escapeHtml(j.project)}">${escapeHtml(j.project)}</span>
-                        <span class="active-job-title" style="color: ${color};" title="${escapeHtml(j.title)}">${escapeHtml(j.title)}</span>
+                    <div class="active-job-row" style="--job-color: ${color};">
+                        <span class="active-job-project" title="${escapeHtml(j.project)}">${escapeHtml(j.project)}</span>
+                        <span class="active-job-title" title="${escapeHtml(j.title)}">${escapeHtml(j.title)}</span>
                     </div>
                 `;
             }).join('');

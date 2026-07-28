@@ -20,8 +20,18 @@ targets:
       - path: SureTakip
         excludes:
           - Info.plist
-    info:
-      path: SureTakip/Info.plist
+    # NOTE: deliberately no `info:` block here.
+    #
+    # In XcodeGen, `info: path:` does not mean "use the plist at this path" - it
+    # means "GENERATE a plist at this path", overwriting whatever is there with
+    # XcodeGen's own minimal defaults plus any `properties:` given. With no
+    # `properties:`, running `xcodegen generate` silently replaced the
+    # hand-written Info.plist and dropped UILaunchScreen, UIUserInterfaceStyle
+    # and the orientation list. An app with no launch screen declaration is
+    # treated by iOS as not supporting modern display sizes, so the whole window
+    # gets letterboxed - black bands above and below the app on every device.
+    # Pointing INFOPLIST_FILE at the checked-in plist (below) is what actually
+    # uses it.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.davincienerji.suretakip

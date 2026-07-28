@@ -849,6 +849,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     margin-right: 12px;
+    color: var(--job-color, var(--text-primary));
 }
 
 .active-job-title {
@@ -856,6 +857,7 @@ body {
     font-size: 10px;
     flex-shrink: 0;
     font-weight: 600;
+    color: var(--job-color, var(--text-secondary));
 }
 
 /* ==========================================

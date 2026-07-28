@@ -52,6 +52,20 @@ body {
 
 @media (max-width: 768px) {
 
+    /* ---- Performance: kill backdrop-filter blur ----
+       styles.css applies backdrop-filter blur (8-20px) to 12 different card/
+       panel/modal backgrounds. Each one forces the browser to allocate its own
+       compositing layer and re-blur everything behind it on every scroll/paint.
+       That's tolerable on a desktop GPU with a handful of cards on screen; on a
+       phone rendering dozens of job/obligation cards it is the single biggest
+       cause of the app feeling laggy, and iOS Simulator (software-composited)
+       makes it far worse than a real device will show. The cards already have
+       a solid-enough rgba background to read fine as flat panels without it. */
+    * {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
     /* ---- Safe areas (notch, dynamic island, home indicator) ---- */
     .header {
         padding-top: env(safe-area-inset-top);

@@ -73,6 +73,26 @@ function startReportTimer() {
     }, 1000);
 }
 
+/**
+ * Delivers the finished PDF.
+ *
+ * jsPDF's save() creates a blob: URL and clicks an <a download>. A browser
+ * downloads it; the iOS WKWebView shell silently drops it, so "Rapor Al" would
+ * appear to do nothing on the phone. When running inside the shell we hand the
+ * bytes to native code (see WebAppView.swift), which writes them to a file and
+ * opens the system share sheet.
+ */
+function savePdf(pdf, filename) {
+    const native = window.SureTakipNative;
+    if (native && typeof native.saveFile === 'function') {
+        // 'datauristring' -> "data:application/pdf;filename=...;base64,XXXX"
+        const base64 = pdf.output('datauristring').split(',').pop();
+        native.saveFile(filename, base64);
+        return;
+    }
+    pdf.save(filename);
+}
+
 function stopReportTimer() {
     if (reportCountdown) clearInterval(reportCountdown);
     const overlay = document.getElementById('reportLoadingOverlay');
@@ -281,7 +301,7 @@ export async function generateMeetingReport() {
         // --- FINAL PAGES: FUTURE OBLIGATION LIST ---
         await renderObligationTableSection(pdf, worker, pageWidth, "📅 GELECEK YÜKÜMLÜLÜK LİSTESİ", futureObligations);
 
-        pdf.save(`DaVinci_Haftalik_Bulten_${new Date().toISOString().split('T')[0]}.pdf`);
+        savePdf(pdf, `DaVinci_Haftalik_Bulten_${new Date().toISOString().split('T')[0]}.pdf`);
         console.log('✅ DaVinci Weekly Bulletin generated successfully.');
 
     } catch (err) {

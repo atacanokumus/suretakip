@@ -1,0 +1,422 @@
+/* ==========================================
+   Mobile / iOS Layer
+   ------------------------------------------
+   Loaded last so it can override the desktop rules in styles.css and the
+   per-feature stylesheets. Two jobs:
+     1. Make every page usable on a phone (the obligations table was 1070px
+        wide and the prelicence matrix 1445px inside a 341px viewport).
+     2. Make the page behave correctly inside the native iOS WKWebView shell
+        (safe areas for the notch/home indicator, no rubber-band bounce, no
+        tap highlight, no zoom-on-focus).
+   ========================================== */
+
+/* ==========================================
+   1. iOS WebView behaviour (all sizes)
+   ========================================== */
+
+html {
+    /* Keep text size stable when the device is rotated. */
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    /* Grey flash on every tap looks broken inside a native app. */
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+}
+
+/* iOS zooms the page in when a focused input has a font-size below 16px.
+   That zoom is not undone on blur, so the app ends up permanently scaled. */
+@supports (-webkit-touch-callout: none) {
+
+    input,
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* Momentum scrolling for every scroll container in the app. */
+.pages-container,
+.table-container,
+.modal-content,
+.jobs-container,
+.sidebar,
+.ext-matrix-scroll {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ==========================================
+   2. Phone layout
+   ========================================== */
+
+@media (max-width: 768px) {
+
+    /* ---- Safe areas (notch, dynamic island, home indicator) ---- */
+    .header {
+        padding-top: env(safe-area-inset-top);
+        padding-left: max(15px, env(safe-area-inset-left));
+        padding-right: max(15px, env(safe-area-inset-right));
+        height: auto;
+        min-height: 60px;
+    }
+
+    .sidebar {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+        width: min(84vw, 320px);
+    }
+
+    .pages-container {
+        padding-left: max(15px, env(safe-area-inset-left));
+        padding-right: max(15px, env(safe-area-inset-right));
+        /* Clear the home indicator so the last row is never trapped under it. */
+        padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    }
+
+    /* Belt-and-braces with the @supports rule above: on any phone-width screen
+       keep form controls at 16px so iOS never zooms the page on focus. */
+    input,
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+
+    /* ---- Filters: horizontal row -> stacked, full width ---- */
+    .filters-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .filters-bar .filter-group {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+
+    .filters-bar .filter-group label {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .filters-bar select,
+    .filters-bar input[type="date"],
+    .filters-bar .btn {
+        width: 100%;
+        min-height: 44px;
+    }
+
+    .filters-bar .filter-group.ml-auto {
+        margin-left: 0;
+    }
+
+    /* ---- Obligations table -> stacked cards ----
+       The global `table { min-width: 1200px }` rule in styles.css forces a
+       1070px+ layout that a phone can only reach by scrolling sideways. An
+       earlier fix attempt (styles.css "Strict Mobile Table & Scroll Fix")
+       narrowed that to `.data-table { min-width: 500px !important }` plus
+       `overflow-x: auto !important` - i.e. still a sideways scroll, just a
+       shorter one, with 11px text. The card layout below replaces it, so those
+       !important declarations have to be overridden explicitly.
+       Column names come from the data-label attributes set in js/obligations.js. */
+    #obligations .table-container {
+        overflow: visible !important;
+        max-height: none;
+        margin-top: 16px;
+    }
+
+    #obligations table,
+    #obligations thead,
+    #obligations tbody,
+    #obligations tr,
+    #obligations td {
+        display: block;
+        width: auto;
+        min-width: 0 !important;
+    }
+
+    #obligations thead {
+        /* Column names live on each cell now. */
+        display: none;
+    }
+
+    #obligations tbody tr {
+        background: var(--bg-card);
+        border: 1px solid var(--border-glass);
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+        height: auto;
+    }
+
+    #obligations tbody tr.row-completed {
+        opacity: 0.65;
+    }
+
+    #obligations td {
+        border: none !important;
+        padding: 5px 0 !important;
+        height: auto !important;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        display: flex;
+        gap: 12px;
+        align-items: baseline;
+        font-size: 14px !important;
+        color: var(--text-primary);
+    }
+
+    #obligations td::before {
+        content: attr(data-label);
+        flex: 0 0 92px;
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    /* Lead with the obligation itself, then the deadline. */
+    #obligations td[data-label="Yükümlülük"] {
+        display: block;
+        font-weight: 600;
+        font-size: 15px !important;
+        line-height: 1.35;
+        margin-bottom: 6px;
+    }
+
+    #obligations td[data-label="Yükümlülük"]::before {
+        display: block;
+        margin-bottom: 3px;
+    }
+
+    /* Notes are optional context - dim them and hide when empty. */
+    #obligations td[data-label="Notlar"] {
+        color: var(--text-secondary);
+        font-size: 13px !important;
+    }
+
+    /* ---- Prelicence matrix -> card list ----
+       js/jobs.js renders a phone-friendly card list instead of the 14-column
+       table when the viewport is narrow; these rules style it. */
+    .ext-matrix-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .ext-matrix-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-glass);
+        border-radius: 14px;
+        padding: 14px 16px;
+    }
+
+    .ext-matrix-card.is-yellow {
+        background: rgba(234, 179, 8, 0.14);
+        border-color: rgba(234, 179, 8, 0.45);
+    }
+
+    .ext-matrix-card__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 4px;
+    }
+
+    .ext-matrix-card__project {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--accent-light, #a5b4fc);
+        line-height: 1.25;
+    }
+
+    .ext-matrix-card__subtitle {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+        line-height: 1.35;
+    }
+
+    .ext-matrix-card__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .ext-matrix-card__expiry {
+        font-size: 12px;
+        font-weight: 700;
+        color: #f87171;
+        background: rgba(239, 68, 68, 0.14);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        padding: 4px 8px;
+    }
+
+    .ext-matrix-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        border-top: 1px solid var(--border-glass);
+        padding-top: 12px;
+    }
+
+    .ext-matrix-step {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-areas: "label action" "date action";
+        gap: 2px 10px;
+        align-items: center;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: rgba(0, 0, 0, 0.25);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .ext-matrix-step.is-done {
+        background: rgba(16, 185, 129, 0.22);
+        border-color: #10b981;
+    }
+
+    .ext-matrix-step.is-planned {
+        background: rgba(96, 165, 250, 0.1);
+        border: 1px dashed rgba(96, 165, 250, 0.45);
+    }
+
+    .ext-matrix-step__label {
+        grid-area: label;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text-secondary);
+    }
+
+    .ext-matrix-step.is-done .ext-matrix-step__label {
+        color: #ecfdf5;
+    }
+
+    .ext-matrix-step__date {
+        grid-area: date;
+        background: transparent;
+        border: none;
+        padding: 0;
+        color: var(--text-primary);
+        font-size: 16px;
+        width: 100%;
+        min-height: 28px;
+    }
+
+    .ext-matrix-step__toggle {
+        grid-area: action;
+        min-height: 44px;
+        min-width: 44px;
+        padding: 6px 10px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-secondary);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .ext-matrix-step.is-done .ext-matrix-step__toggle {
+        background: #10b981;
+        color: #fff;
+        border-color: #10b981;
+    }
+
+    .ext-matrix-card__actions {
+        margin-top: 12px;
+    }
+
+    .ext-matrix-card__actions .btn {
+        width: 100%;
+        min-height: 44px;
+    }
+
+    /* ---- Modals -> full-height sheet ----
+       .modal-content had no max-height, so a long form (job detail, project
+       detail) grew past the screen with no way to scroll to the submit button. */
+    .modal-overlay {
+        padding: 0;
+        align-items: flex-end;
+    }
+
+    .modal-content {
+        max-width: 100%;
+        width: 100%;
+        max-height: 92vh;
+        max-height: calc(100dvh - env(safe-area-inset-top) - 24px);
+        display: flex;
+        flex-direction: column;
+        border-radius: 20px 20px 0 0;
+        animation: modalSlideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    @keyframes modalSlideUp {
+        from {
+            transform: translateY(100%);
+        }
+
+        to {
+            transform: translateY(0);
+        }
+    }
+
+    .modal-header {
+        flex: 0 0 auto;
+    }
+
+    .modal-body {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+
+    .modal-close {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    /* The split-screen obligation panel has no room on a phone. */
+    .modal-overlay.split-active #tadilObligationPanel {
+        display: none;
+    }
+
+    /* ---- Job cards ---- */
+    .jobs-container {
+        grid-template-columns: 1fr;
+    }
+
+    /* ---- Buttons / touch targets ---- */
+    .btn {
+        min-height: 44px;
+    }
+
+    .nav-item {
+        min-height: 48px;
+    }
+}
+
+/* ==========================================
+   3. Small phones
+   ========================================== */
+
+@media (max-width: 380px) {
+    #obligations td::before {
+        flex-basis: 78px;
+        font-size: 10px;
+    }
+
+    .ext-matrix-card__project {
+        font-size: 14px;
+    }
+}

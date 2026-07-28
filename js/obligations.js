@@ -68,15 +68,17 @@ export function updateObligationsTable() {
         const status = getStatus(o.deadline, o.status);
         const statusText = getStatusText(o.deadline, o.status);
 
+        // data-label drives the mobile card layout in mobile.css, where each row
+        // is stacked and every cell shows its column name via td::before.
         return `
             <tr data-id="${o.id}" class="${status === 'completed' ? 'row-completed' : ''}">
-                <td><span class="status-badge ${status}">${getStatusLabel(status)}</span></td>
-                <td>${o.projectLink ? `<a href="${o.projectLink}" target="_blank" onclick="event.stopPropagation()">${escapeHtml(o.projectName)}</a>` : escapeHtml(o.projectName)}</td>
-                <td>${escapeHtml(o.obligationType)}</td>
-                <td>${escapeHtml(o.obligationDescription)}</td>
-                <td>${formatDate(o.deadline)}</td>
-                <td class="${status}">${statusText}</td>
-                <td>${escapeHtml(o.notes || '-')}</td>
+                <td data-label="Durum"><span class="status-badge ${status}">${getStatusLabel(status)}</span></td>
+                <td data-label="Proje">${o.projectLink ? `<a href="${o.projectLink}" target="_blank" onclick="event.stopPropagation()">${escapeHtml(o.projectName)}</a>` : escapeHtml(o.projectName)}</td>
+                <td data-label="Tür">${escapeHtml(o.obligationType)}</td>
+                <td data-label="Yükümlülük">${escapeHtml(o.obligationDescription)}</td>
+                <td data-label="Son Tarih">${formatDate(o.deadline)}</td>
+                <td data-label="Kalan" class="${status}">${statusText}</td>
+                <td data-label="Notlar">${escapeHtml(o.notes || '-')}</td>
             </tr>
         `;
     }).join('');

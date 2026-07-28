@@ -1,41 +1,25 @@
 import SwiftUI
-import FirebaseCore
-import FirebaseFirestore
-import FirebaseAuth
 
-/// Main app entry point
+/// Süre Takip — DaVinci Enerji Lisans Müdürlüğü
+///
+/// This is a thin native shell around the existing web application at
+/// https://sure-takip.web.app. It deliberately contains no data model, no
+/// Firestore code and no business logic.
+///
+/// Why: the web app owns a large amount of domain logic (a 13-stage workflow
+/// engine across 17 amendment types, the prelicence matrix, analytics and
+/// client-side PDF reporting). A second, native implementation of that logic
+/// drifted out of sync once already, to the point where saving from the phone
+/// would have wiped every job's workflow progress out of the shared Firestore
+/// document. Keeping exactly one implementation makes web/iOS parity a
+/// structural guarantee instead of something maintained by hand, and lets web
+/// releases reach the phone without a new TestFlight build.
 @main
 struct SureTakipApp: App {
-    @StateObject private var authService: AuthService
-    @StateObject private var firestoreService: FirestoreService
-    
-    init() {
-        // Initialize Firebase programmatically (no plist file needed!)
-        FirebaseConfiguration.shared.setLoggerLevel(.min)
-        
-        if FirebaseApp.app() == nil {
-            let options = FirebaseOptions(
-                googleAppID: "1:973425573379:ios:f29e606a2543644ded9836",
-                gcmSenderID: "973425573379"
-            )
-            options.apiKey = "AIzaSyAa_OLk_N5uK6RR1nopEDnQXFQHSjQP-As"
-            options.projectID = "sure-takip"
-            options.storageBucket = "sure-takip.firebasestorage.app"
-            options.bundleID = "com.davincienerji.suretakip"
-            
-            FirebaseApp.configure(options: options)
-        }
-        
-        _authService = StateObject(wrappedValue: AuthService())
-        _firestoreService = StateObject(wrappedValue: FirestoreService())
-    }
-    
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(authService)
-                .environmentObject(firestoreService)
-                .preferredColorScheme(.dark) // Premium dark mode by default
+            RootView()
+                .preferredColorScheme(.dark) // the web app is a dark-themed UI
         }
     }
 }

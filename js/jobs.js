@@ -3657,6 +3657,86 @@ export function formatDateForInput(dVal) {
     }
 }
 
+/** Shared column/stage definition for the prelicence matrix (table + cards). */
+const MATRIX_STEPS = [
+    { num: 1, key: 'step1', field: 'date', label: '1. Özet İsteme' },
+    { num: 2, key: 'step2', field: 'izinlerDate', label: '2. Birim Dönüş' },
+    { num: 3, key: 'step3', field: 'date', label: '3. AO Hazırlık' },
+    { num: 4, key: 'step4', field: 'date', label: '4. GD Kontrol' },
+    { num: 5, key: 'step5', field: 'date', label: '5. EPDK Hazırlık' },
+    { num: 6, key: 'step6', field: 'date', label: '6. EPDK Başvuru' },
+    { num: 8, key: 'step8', field: 'kdbTarih', label: '7-8. KDB Görüşü' },
+    { num: 11, key: 'step11', field: 'date', label: '9-11. Derç Edilme' }
+];
+
+const NARROW_VIEWPORT_QUERY = '(max-width: 768px)';
+
+function isNarrowViewport() {
+    return typeof window !== 'undefined' && window.matchMedia
+        ? window.matchMedia(NARROW_VIEWPORT_QUERY).matches
+        : false;
+}
+
+/**
+ * Phone layout for one matrix row. Same data and the same
+ * updateMatrixCellDate / toggleMatrixStepCompletion actions as the desktop
+ * table, stacked vertically with tappable targets. Styled by mobile.css.
+ */
+function renderMatrixCard(job, idx, projectsByName) {
+    const pObj = projectsByName.get(job.project);
+    const steps = job.steps || {};
+    const isYellow = job.isYellow || [14, 17, 29, 30].includes(job.matrixRow);
+    const rowNum = job.matrixRow || (idx + 1);
+
+    const expiryVal = formatDateForInput(pObj ? (pObj.licenceExpiry || pObj.constructionDeadline) : '');
+
+    const stageBadge = job.status === 'completed'
+        ? '<span class="badge badge-success" style="font-size:11px;">🟢 Tamamlandı</span>'
+        : `<span class="badge badge-info" style="font-size:11px;">⚡ Aşama ${job.currentStep}/13</span>`;
+
+    const stepsHtml = MATRIX_STEPS.map(sd => {
+        const step = steps[sd.key] || {};
+        const isCompleted = !!step.completed;
+        const rawDate = step[sd.field] || step.date || step.plannedDate || '';
+        const dateVal = formatDateForInput(rawDate);
+        const isPlanned = !isCompleted && !!dateVal && !isDateReached(dateVal);
+
+        const cls = isCompleted ? 'is-done' : (isPlanned ? 'is-planned' : '');
+        const btnLabel = isCompleted ? '✅' : (isPlanned ? '📅' : '✓');
+
+        return `
+            <div class="ext-matrix-step ${cls}">
+                <span class="ext-matrix-step__label">${sd.label}</span>
+                <input type="date" class="ext-matrix-step__date" value="${dateVal}"
+                       onchange="window.updateMatrixCellDate('${job.id}', '${sd.key}', '${sd.field}', this.value)">
+                <button type="button" class="ext-matrix-step__toggle"
+                        onclick="window.toggleMatrixStepCompletion('${job.id}', ${sd.num})"
+                        title="Aşamayı tamamlandı olarak işaretle veya geri al">${btnLabel}</button>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="ext-matrix-card ${isYellow ? 'is-yellow' : ''}">
+            <div class="ext-matrix-card__head">
+                <span class="ext-matrix-card__project">${rowNum}. ${escapeHtml(job.project)}</span>
+                ${stageBadge}
+            </div>
+            <div class="ext-matrix-card__subtitle">${escapeHtml(job.subTitle || job.title || '')}</div>
+            <div class="ext-matrix-card__meta">
+                <span class="ext-matrix-card__expiry">Süre Bitiş</span>
+                <input type="date" class="ext-matrix-step__date" style="flex:1; min-width:130px;" value="${expiryVal}"
+                       onchange="window.updateMatrixProjectExpiry('${escapeHtml(job.project)}', this.value)">
+            </div>
+            <div class="ext-matrix-steps">${stepsHtml}</div>
+            <div class="ext-matrix-card__actions">
+                <button type="button" class="btn btn-secondary"
+                        onclick="window.openJobFromMatrix('${job.id}')">🔍 Detayları Aç</button>
+            </div>
+        </div>
+    `;
+}
+
 export function renderPrelicenceExtensionsMatrix() {
     const container = document.getElementById('extMatrixContainer');
     if (!container) return;
@@ -3797,6 +3877,18 @@ export function renderPrelicenceExtensionsMatrix() {
         `;
     };
 
+    // The 14-column matrix is ~1445px wide - on a phone that is a sideways
+    // scroll through cells too small to tap. Render the same data (and the same
+    // edit/complete actions) as a vertical card list instead.
+    if (isNarrowViewport()) {
+        container.innerHTML = `
+            <div class="ext-matrix-cards">
+                ${jobs.map((j, idx) => renderMatrixCard(j, idx, projectsByName)).join('')}
+            </div>
+        `;
+        return;
+    }
+
     // Render Matrix HTML Table
     const tableRows = jobs.map((j, idx) => {
         const pObj = projectsByName.get(j.project);
@@ -3921,6 +4013,18 @@ export function initPrelicenceMatrixEvents() {
     }
     if (companyFilter) companyFilter.onchange = () => renderPrelicenceExtensionsMatrix();
     if (statusFilter) statusFilter.onchange = () => renderPrelicenceExtensionsMatrix();
+
+    // Swap between the desktop table and the phone card list when the viewport
+    // crosses the breakpoint (rotation, iPad split view). Bound once.
+    if (!initPrelicenceMatrixEvents._breakpointBound && window.matchMedia) {
+        const mq = window.matchMedia(NARROW_VIEWPORT_QUERY);
+        const onChange = () => {
+            if (document.getElementById('extMatrixContainer')) renderPrelicenceExtensionsMatrix();
+        };
+        if (mq.addEventListener) mq.addEventListener('change', onChange);
+        else mq.addListener(onChange);
+        initPrelicenceMatrixEvents._breakpointBound = true;
+    }
 
     if (addBtn) {
         addBtn.onclick = () => {

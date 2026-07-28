@@ -62,11 +62,9 @@ export function initNavigation() {
             const addJobBtn = document.getElementById('addJobBtn');
             const generateReportBtn = document.getElementById('generateReportBtn');
 
-            if (pageId === 'prelicence-extensions') {
-                if (typeof window.renderPrelicenceExtensionsMatrix === 'function') {
-                    window.renderPrelicenceExtensionsMatrix();
-                }
-            }
+            // Let the render scheduler (app.js) redraw this page if its data
+            // changed while it was hidden.
+            window.dispatchEvent(new CustomEvent('page-changed', { detail: { pageId } }));
 
             if (pageId === 'jobs') {
                 if (addObligationBtn) addObligationBtn.style.display = 'none';

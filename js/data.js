@@ -40,9 +40,11 @@ export function safeGetStorage(key) {
 export function safeSetStorage(key, value) {
     try {
         const serialized = JSON.stringify(value);
-        const sizeInMB = new Blob([serialized]).size / (1024 * 1024);
+        // Approximate the byte size from the string length instead of building a
+        // Blob - the Blob copied the whole payload a second time on every save.
+        const sizeInMB = serialized.length / (1024 * 1024);
         if (sizeInMB > MAX_STORAGE_SIZE_MB) {
-            console.warn(`Veri boyutu uyarısı: ${sizeInMB.toFixed(2)}MB`);
+            console.warn(`Veri boyutu uyarısı: ~${sizeInMB.toFixed(2)}MB`);
         }
         localStorage.setItem(key, serialized);
         return true;
@@ -289,6 +291,31 @@ export function loadEmbeddedData() {
     saveData(false); // Don't push demo data to cloud automatically
 }
 
+// Rapid successive edits (ticking several matrix cells, typing a date) used to
+// fire one full-document Firestore write each. Coalesce them into a single
+// write shortly after the user stops - local state and the UI update instantly.
+const CLOUD_SYNC_DEBOUNCE_MS = 800;
+let cloudSyncTimer = null;
+let backupReminderShown = false;
+
+function scheduleCloudSync() {
+    if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = setTimeout(() => {
+        cloudSyncTimer = null;
+        // Reuse the timestamp already written to localStorage so the onSnapshot
+        // listener recognises this write as our own and skips the echo re-render.
+        syncToFirestore(localStorage.getItem('epdk_lastUpdate') || new Date().toISOString());
+    }, CLOUD_SYNC_DEBOUNCE_MS);
+}
+
+/** Flushes any pending cloud write immediately (e.g. before logout/unload). */
+export function flushCloudSync() {
+    if (!cloudSyncTimer) return;
+    clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = null;
+    return syncToFirestore(localStorage.getItem('epdk_lastUpdate') || new Date().toISOString());
+}
+
 export function saveData(syncWithCloud = true) {
     const success = safeSetStorage(STORAGE_KEY, Store.obligations);
     if (success) {
@@ -301,17 +328,26 @@ export function saveData(syncWithCloud = true) {
         window.dispatchEvent(new CustomEvent('data-refreshed'));
 
         if (syncWithCloud && auth.currentUser) {
-            syncToFirestore(timestamp);
-            // Backup reminder (Hard Copy Support)
-            const lastBackup = localStorage.getItem('epdk_lastBackup');
-            const now = new Date();
-            if (!lastBackup || (now - new Date(lastBackup)) > 1000 * 60 * 60 * 24) {
-                showToast('🛡️ Veriler senkronize edildi. Bir yerel Excel yedeği (Hard Copy) almak ister misiniz?', 'info');
+            scheduleCloudSync();
+            // Backup reminder (Hard Copy Support) - once per session, not on
+            // every save, which previously spawned a toast on each click.
+            if (!backupReminderShown) {
+                const lastBackup = localStorage.getItem('epdk_lastBackup');
+                const now = new Date();
+                if (!lastBackup || (now - new Date(lastBackup)) > 1000 * 60 * 60 * 24) {
+                    backupReminderShown = true;
+                    showToast('🛡️ Veriler senkronize edildi. Bir yerel Excel yedeği (Hard Copy) almak ister misiniz?', 'info');
+                }
             }
         }
     }
     return success;
 }
+
+// Don't lose a debounced write if the tab is closed mid-edit.
+window.addEventListener('beforeunload', () => {
+    if (cloudSyncTimer) flushCloudSync();
+});
 
 export function clearAllData() {
     Store.clear();

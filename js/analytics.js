@@ -88,13 +88,14 @@ export function initAnalytics() {
         });
     }
 
-    // Initial render
-    updateChart(1);
-    updateChart(2);
+    // Charts are built lazily on first visit to the Analytics page (see
+    // renderAnalyticsPage) so app start-up doesn't pay for two Chart.js
+    // instances the user may never look at.
 }
 
 /**
- * Updates all analytics visualizations
+ * Updates all analytics visualizations.
+ * No-op for the charts until they have been created by renderAnalyticsPage().
  */
 export function updateAnalytics() {
     updateAnalyticsStats();
@@ -102,6 +103,15 @@ export function updateAnalytics() {
         updateChart(1);
         updateChart(2);
     }
+}
+
+/**
+ * Full render of the Analytics page - creates the charts on first call.
+ */
+export function renderAnalyticsPage() {
+    updateAnalyticsStats();
+    updateChart(1);
+    updateChart(2);
 }
 
 /**

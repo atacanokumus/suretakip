@@ -360,12 +360,12 @@ export function updateJobsView() {
     // Ensure all jobs have the new step structure
     filteredJobs.forEach(j => ensureTadilSteps(j));
 
+    // Single lookup table instead of a linear scan of Store.projects per job.
+    const projectsByName = new Map((Store.projects || []).map(p => [p.name, p]));
+
     // Apply Company Filter
     if (companyFilter !== 'all') {
-        filteredJobs = filteredJobs.filter(j => {
-            const projectObj = Store.projects.find(p => p.name === j.project);
-            return projectObj && projectObj.company === companyFilter;
-        });
+        filteredJobs = filteredJobs.filter(j => projectsByName.get(j.project)?.company === companyFilter);
     }
 
     // Apply Project Filter
@@ -375,10 +375,7 @@ export function updateJobsView() {
 
     // Apply EPDK Expert Filter
     if (expertFilter !== 'all') {
-        filteredJobs = filteredJobs.filter(j => {
-            const projectObj = Store.projects.find(p => p.name === j.project);
-            return projectObj && projectObj.expert && projectObj.expert.name === expertFilter;
-        });
+        filteredJobs = filteredJobs.filter(j => projectsByName.get(j.project)?.expert?.name === expertFilter);
     }
 
     // Apply Job Type Filter
@@ -3448,6 +3445,32 @@ export const PRELICENCE_EXCEL_SEED = [
     { row: 34, project: "SEYDAN RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2027-04-19", s2Date: "2027-04-29", aoDate: "2027-05-12", gdDate: "2027-05-17", epdkDate: "2027-05-20", expiryDate: "2027-05-31" }
 ];
 
+/**
+ * The dates in PRELICENCE_EXCEL_SEED are *planned* dates from the Excel sheet,
+ * not evidence that the step was carried out. A step only counts as completed
+ * once its planned date has actually arrived; anything still in the future is
+ * seeded as a plan with completed = false.
+ */
+function isDateReached(dateStr) {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    return d <= today;
+}
+
+/** Builds a seeded step: keeps the planned date, completes it only if due. */
+function plannedStep(existing, dateStr, extraWhenDone = {}) {
+    const done = isDateReached(dateStr);
+    return {
+        ...existing,
+        ...(done ? extraWhenDone : {}),
+        completed: done,
+        plannedDate: dateStr
+    };
+}
+
 export function seedPrelicenceExcelData() {
     if (!Store.jobs || !Store.projects) return;
 
@@ -3499,54 +3522,64 @@ export function seedPrelicenceExcelData() {
                 job.steps[`step${k}`] = { completed: false };
             }
 
-            if (seed.s1Date) job.steps.step1 = { completed: true, date: seed.s1Date };
-            if (seed.s2Date) job.steps.step2 = { completed: true, izinlerDate: seed.s2Date, teknikDate: seed.s2Date, izinlerDondu: true, teknikDondu: true };
-            if (seed.aoDate) job.steps.step3 = { completed: true, date: seed.aoDate, aoDone: true };
-            if (seed.gdDate) job.steps.step4 = { completed: true, date: seed.gdDate, gdDone: true };
+            if (seed.s1Date) job.steps.step1 = plannedStep({ date: seed.s1Date }, seed.s1Date);
+            if (seed.s2Date) job.steps.step2 = plannedStep({ izinlerDate: seed.s2Date, teknikDate: seed.s2Date }, seed.s2Date, { izinlerDondu: true, teknikDondu: true });
+            if (seed.aoDate) job.steps.step3 = plannedStep({ date: seed.aoDate }, seed.aoDate, { aoDone: true });
+            if (seed.gdDate) job.steps.step4 = plannedStep({ date: seed.gdDate }, seed.gdDate, { gdDone: true });
             if (seed.epdkDate) {
-                job.steps.step5 = { completed: true, date: seed.epdkDate, hazir: true };
-                job.steps.step6 = { completed: true, date: seed.epdkDate, basvuruYapildi: true };
-                job.currentStep = 7;
-            } else if (seed.gdDate) {
-                job.currentStep = 5;
-            } else if (seed.aoDate) {
-                job.currentStep = 4;
-            } else if (seed.s2Date) {
-                job.currentStep = 3;
-            } else if (seed.s1Date) {
-                job.currentStep = 2;
+                job.steps.step5 = plannedStep({ date: seed.epdkDate }, seed.epdkDate, { hazir: true });
+                job.steps.step6 = plannedStep({ date: seed.epdkDate }, seed.epdkDate, { basvuruYapildi: true });
             }
+
+            job.currentStep = deriveCurrentStep(job);
 
             Store.jobs.push(job);
             hasChanges = true;
         } else {
+            if (!job.steps) job.steps = {};
             let updated = false;
+
             if (seed.s1Date && !job.steps.step1?.date) {
-                job.steps.step1 = { ...job.steps.step1, completed: true, date: seed.s1Date };
+                job.steps.step1 = plannedStep({ ...job.steps.step1, date: seed.s1Date }, seed.s1Date);
                 updated = true;
             }
             if (seed.s2Date && !job.steps.step2?.izinlerDate) {
-                job.steps.step2 = { ...job.steps.step2, completed: true, izinlerDate: seed.s2Date, teknikDate: seed.s2Date, izinlerDondu: true, teknikDondu: true };
+                job.steps.step2 = plannedStep({ ...job.steps.step2, izinlerDate: seed.s2Date, teknikDate: seed.s2Date }, seed.s2Date, { izinlerDondu: true, teknikDondu: true });
                 updated = true;
             }
             if (seed.aoDate && !job.steps.step3?.date) {
-                job.steps.step3 = { ...job.steps.step3, completed: true, date: seed.aoDate, aoDone: true };
+                job.steps.step3 = plannedStep({ ...job.steps.step3, date: seed.aoDate }, seed.aoDate, { aoDone: true });
                 updated = true;
             }
             if (seed.gdDate && !job.steps.step4?.date) {
-                job.steps.step4 = { ...job.steps.step4, completed: true, date: seed.gdDate, gdDone: true };
+                job.steps.step4 = plannedStep({ ...job.steps.step4, date: seed.gdDate }, seed.gdDate, { gdDone: true });
                 updated = true;
             }
             if (seed.epdkDate && !job.steps.step6?.date) {
-                job.steps.step5 = { ...job.steps.step5, completed: true, date: seed.epdkDate, hazir: true };
-                job.steps.step6 = { ...job.steps.step6, completed: true, date: seed.epdkDate, basvuruYapildi: true };
+                job.steps.step5 = plannedStep({ ...job.steps.step5, date: seed.epdkDate }, seed.epdkDate, { hazir: true });
+                job.steps.step6 = plannedStep({ ...job.steps.step6, date: seed.epdkDate }, seed.epdkDate, { basvuruYapildi: true });
                 updated = true;
             }
-            if (seed.isYellow) {
+            if (seed.isYellow && !job.isYellow) {
                 job.isYellow = true;
                 updated = true;
             }
-            job.matrixRow = seed.row;
+            if (job.matrixRow !== seed.row) {
+                job.matrixRow = seed.row;
+                updated = true;
+            }
+
+            // Repair rows the earlier seed logic marked as done purely because a
+            // *planned* date existed. A step whose date has not arrived yet
+            // cannot have been carried out.
+            if (uncompleteFutureSteps(job)) updated = true;
+
+            const derived = deriveCurrentStep(job);
+            if (job.currentStep !== derived) {
+                job.currentStep = derived;
+                updated = true;
+            }
+
             if (updated) hasChanges = true;
         }
     });
@@ -3554,6 +3587,51 @@ export function seedPrelicenceExcelData() {
     if (hasChanges && typeof saveData === 'function') {
         saveData();
     }
+
+    return hasChanges;
+}
+
+/**
+ * Clears `completed` on any matrix step dated in the future, and drops a
+ * `status: 'completed'` that is no longer justified.
+ * Returns true if anything changed.
+ */
+function uncompleteFutureSteps(job) {
+    if (!job.steps) return false;
+    let changed = false;
+
+    for (let k = 1; k <= 13; k++) {
+        const step = job.steps[`step${k}`];
+        if (!step || !step.completed) continue;
+
+        const stepDate = step.date || step.izinlerDate || step.kdbTarih || step.plannedDate;
+        if (stepDate && !isDateReached(stepDate)) {
+            step.completed = false;
+            if (step.aoDone) step.aoDone = false;
+            if (step.gdDone) step.gdDone = false;
+            if (step.hazir) step.hazir = false;
+            if (step.basvuruYapildi) step.basvuruYapildi = false;
+            if (step.izinlerDondu) step.izinlerDondu = false;
+            if (step.teknikDondu) step.teknikDondu = false;
+            changed = true;
+        }
+    }
+
+    if (changed && job.status === 'completed') {
+        job.status = 'pending';
+        job.completedAt = null;
+    }
+
+    return changed;
+}
+
+/** Current step = first not-yet-completed step (1-based). */
+function deriveCurrentStep(job) {
+    const total = getWorkflowSteps(job).length || 13;
+    for (let k = 1; k <= total; k++) {
+        if (!job.steps?.[`step${k}`]?.completed) return k;
+    }
+    return total;
 }
 
 export function formatDateForInput(dVal) {
@@ -3583,7 +3661,11 @@ export function renderPrelicenceExtensionsMatrix() {
     const container = document.getElementById('extMatrixContainer');
     if (!container) return;
 
-    seedPrelicenceExcelData();
+    // NOTE: seedPrelicenceExcelData() is deliberately NOT called here. It mutates
+    // the store and calls saveData(), which dispatches 'data-refreshed' and
+    // re-entered this very function - a render -> save -> render feedback loop
+    // that fired on every keystroke in the search box. Seeding happens once at
+    // start-up (app.js) instead.
 
     const searchInput = document.getElementById('extMatrixSearchInput');
     const companyFilterEl = document.getElementById('extMatrixCompanyFilter');
@@ -3592,6 +3674,10 @@ export function renderPrelicenceExtensionsMatrix() {
     const searchQuery = (searchInput?.value || '').toLowerCase().trim();
     const companyFilter = companyFilterEl?.value || 'all';
     const statusFilter = statusFilterEl?.value || 'all';
+
+    // One lookup table instead of a linear Store.projects.find() per job, per
+    // filter pass, per row (previously 4+ full scans for every row rendered).
+    const projectsByName = new Map((Store.projects || []).map(p => [p.name, p]));
 
     let jobs = (Store.jobs || []).filter(j => {
         if (!j) return false;
@@ -3603,10 +3689,7 @@ export function renderPrelicenceExtensionsMatrix() {
     // Populate Matrix Company Filter Options
     if (companyFilterEl) {
         const currentCompany = companyFilterEl.value || 'all';
-        const companies = [...new Set(jobs.map(j => {
-            const p = (Store.projects || []).find(proj => proj.name === j.project);
-            return p ? p.company : null;
-        }).filter(Boolean))].sort();
+        const companies = [...new Set(jobs.map(j => projectsByName.get(j.project)?.company || null).filter(Boolean))].sort();
 
         companyFilterEl.innerHTML = '<option value="all">Tüm Şirketler</option>' +
             companies.map(c => `<option value="${escapeHtml(c)}" ${c === currentCompany ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
@@ -3633,10 +3716,7 @@ export function renderPrelicenceExtensionsMatrix() {
 
     // Apply Filters
     if (companyFilter !== 'all') {
-        jobs = jobs.filter(j => {
-            const p = (Store.projects || []).find(proj => proj.name === j.project);
-            return p && p.company === companyFilter;
-        });
+        jobs = jobs.filter(j => projectsByName.get(j.project)?.company === companyFilter);
     }
 
     if (statusFilter === 'pending') {
@@ -3649,8 +3729,7 @@ export function renderPrelicenceExtensionsMatrix() {
         jobs = jobs.filter(j => {
             const projName = (j.project || '').toLowerCase();
             const title = (j.subTitle || j.title || '').toLowerCase();
-            const p = (Store.projects || []).find(proj => proj.name === j.project);
-            const company = (p?.company || '').toLowerCase();
+            const company = (projectsByName.get(j.project)?.company || '').toLowerCase();
             return projName.includes(searchQuery) || title.includes(searchQuery) || company.includes(searchQuery);
         });
     }
@@ -3677,22 +3756,28 @@ export function renderPrelicenceExtensionsMatrix() {
     const renderInlineStepCell = (job, stepNum, stepKey, dateField, currentDateVal) => {
         const step = (job.steps && job.steps[stepKey]) || {};
         const isCompleted = !!step.completed;
-        const rawDate = currentDateVal || step[dateField] || step.date || '';
+        const rawDate = currentDateVal || step[dateField] || step.date || step.plannedDate || '';
         const dateVal = formatDateForInput(rawDate);
+        // A date still in the future is a plan, not an accomplishment.
+        const isPlanned = !isCompleted && !!dateVal && !isDateReached(dateVal);
 
         const containerStyle = isCompleted
             ? 'background: rgba(16, 185, 129, 0.28); border: 1px solid #10b981; border-radius: 6px; padding: 3px 4px; text-align: center; box-shadow: inset 0 0 6px rgba(16, 185, 129, 0.2); transition: all 0.2s;'
-            : 'background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 3px 4px; text-align: center; transition: all 0.2s;';
+            : isPlanned
+                ? 'background: rgba(96, 165, 250, 0.10); border: 1px dashed rgba(96, 165, 250, 0.45); border-radius: 6px; padding: 3px 4px; text-align: center; transition: all 0.2s;'
+                : 'background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 3px 4px; text-align: center; transition: all 0.2s;';
 
         const textStyle = isCompleted
             ? 'color: #ecfdf5; font-weight: 700; font-size: 11px;'
-            : 'color: var(--text-muted); font-size: 11px;';
+            : isPlanned
+                ? 'color: #93c5fd; font-size: 11px;'
+                : 'color: var(--text-muted); font-size: 11px;';
 
         const btnStyle = isCompleted
             ? 'background: #10b981; color: #ffffff; border: none; border-radius: 4px; font-size: 9px; font-weight: bold; padding: 2px 5px; margin-top: 2px; cursor: pointer; display: inline-flex; align-items: center; gap: 2px;'
             : 'background: rgba(255,255,255,0.1); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; font-size: 9px; padding: 2px 5px; margin-top: 2px; cursor: pointer; display: inline-flex; align-items: center; gap: 2px;';
 
-        const btnLabel = isCompleted ? '✅ Tamamlandı' : '✓ Tamamla';
+        const btnLabel = isCompleted ? '✅ Tamamlandı' : (isPlanned ? '📅 Planlandı' : '✓ Tamamla');
 
         return `
             <div style="${containerStyle}">
@@ -3714,7 +3799,7 @@ export function renderPrelicenceExtensionsMatrix() {
 
     // Render Matrix HTML Table
     const tableRows = jobs.map((j, idx) => {
-        const pObj = (Store.projects || []).find(p => p.name === j.project);
+        const pObj = projectsByName.get(j.project);
         const steps = j.steps || {};
         const isYellowRow = j.isYellow || [14, 17, 29, 30].includes(j.matrixRow);
 
@@ -3826,7 +3911,14 @@ export function initPrelicenceMatrixEvents() {
     const statusFilter = document.getElementById('extMatrixStatusFilter');
     const addBtn = document.getElementById('extMatrixAddBtn');
 
-    if (searchInput) searchInput.oninput = () => renderPrelicenceExtensionsMatrix();
+    // Re-rendering the whole matrix on every keystroke made typing feel frozen.
+    let searchTimer = null;
+    if (searchInput) {
+        searchInput.oninput = () => {
+            if (searchTimer) clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => renderPrelicenceExtensionsMatrix(), 200);
+        };
+    }
     if (companyFilter) companyFilter.onchange = () => renderPrelicenceExtensionsMatrix();
     if (statusFilter) statusFilter.onchange = () => renderPrelicenceExtensionsMatrix();
 
@@ -3859,9 +3951,23 @@ window.toggleMatrixStepCompletion = function(jobId, stepNum) {
         if (stepNum === 5) job.steps[stepKey].hazir = true;
         if (stepNum === 6) job.steps[stepKey].basvuruYapildi = true;
 
-        if (job.currentStep === stepNum && stepNum < totalSteps) {
-            job.currentStep = stepNum + 1;
-        } else if (stepNum === totalSteps) {
+        // Marking a step done by hand means it happened - stamp today unless the
+        // cell already carries a real (already-arrived) date, so the step is not
+        // immediately re-opened by the future-date repair pass.
+        const existingDate = job.steps[stepKey].date || job.steps[stepKey].izinlerDate || job.steps[stepKey].kdbTarih;
+        if (!existingDate || !isDateReached(existingDate)) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (stepKey === 'step2') {
+                job.steps[stepKey].izinlerDate = todayStr;
+                job.steps[stepKey].teknikDate = todayStr;
+            } else if (stepKey === 'step8') {
+                job.steps[stepKey].kdbTarih = todayStr;
+            } else {
+                job.steps[stepKey].date = todayStr;
+            }
+        }
+
+        if (stepNum === totalSteps) {
             job.status = 'completed';
             job.completedAt = new Date();
         }
@@ -3871,12 +3977,10 @@ window.toggleMatrixStepCompletion = function(jobId, stepNum) {
             job.status = 'pending';
             job.completedAt = null;
         }
-        if (job.currentStep > stepNum) {
-            job.currentStep = stepNum;
-        }
         showToast(`${stepNum}. Aşama Geri Alındı.`, 'info');
     }
 
+    job.currentStep = deriveCurrentStep(job);
     job.updatedAt = new Date();
     Store.updateJob(job.id, {
         steps: job.steps,
@@ -3899,24 +4003,33 @@ window.updateMatrixCellDate = function(jobId, stepKey, field, newDate) {
     if (!job.steps[stepKey]) job.steps[stepKey] = {};
 
     job.steps[stepKey][field] = newDate;
+
+    // A date on its own is a *plan*. Only a date that has actually arrived marks
+    // the step done - entering a future target date must not complete it.
+    const reached = isDateReached(newDate);
     if (newDate) {
-        job.steps[stepKey].completed = true;
-        if (field === 'aoDone' || stepKey === 'step3') job.steps[stepKey].aoDone = true;
-        if (field === 'gdDone' || stepKey === 'step4') job.steps[stepKey].gdDone = true;
-        if (field === 'basvuruYapildi' || stepKey === 'step6') job.steps[stepKey].basvuruYapildi = true;
+        job.steps[stepKey].completed = reached;
+        if (stepKey === 'step3') job.steps[stepKey].aoDone = reached;
+        if (stepKey === 'step4') job.steps[stepKey].gdDone = reached;
+        if (stepKey === 'step6') job.steps[stepKey].basvuruYapildi = reached;
         if (field === 'izinlerDate') {
             job.steps[stepKey].teknikDate = newDate;
-            job.steps[stepKey].izinlerDondu = true;
-            job.steps[stepKey].teknikDondu = true;
+            job.steps[stepKey].izinlerDondu = reached;
+            job.steps[stepKey].teknikDondu = reached;
         }
     }
 
+    job.currentStep = deriveCurrentStep(job);
     job.updatedAt = new Date();
-    Store.updateJob(job.id, { steps: job.steps, updatedAt: job.updatedAt });
+    Store.updateJob(job.id, { steps: job.steps, currentStep: job.currentStep, updatedAt: job.updatedAt });
 
     if (saveData()) {
-        showToast('Tarih güncellendi ve kaydedildi! ✅', 'success');
-        window.dispatchEvent(new CustomEvent('refresh-views'));
+        showToast(
+            newDate && !reached
+                ? 'Planlanan tarih kaydedildi (tarihi gelmedi, aşama açık kaldı).'
+                : 'Tarih güncellendi ve kaydedildi! ✅',
+            'success'
+        );
     }
 };
 

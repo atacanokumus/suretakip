@@ -21,7 +21,7 @@ import {
     updateProjectsGrid
 } from './js/projects.js';
 import {
-    updateAnalytics, initAnalytics
+    updateAnalytics, initAnalytics, renderAnalyticsPage
 } from './js/analytics.js';
 import {
     updateJobsView, initJobsEventHandlers, refreshJobFilters, getWorkflowSteps, getInitialStepData, seedPrelicenceExcelData
@@ -365,28 +365,75 @@ async function authorizedInit() {
     }
 }
 
-function refreshAllViews() {
-    try {
-        updateDashboard();
-        updateObligationsTable();
-        updateProjectsGrid();
-        updateJobsView(); // Update Jobs View
-        refreshJobFilters(); // Phase 10: Refresh Job Filters
-        if (typeof window.renderPrelicenceExtensionsMatrix === 'function') {
-            window.renderPrelicenceExtensionsMatrix();
-        }
-        updateAnalytics();
-        updateDataStats();
+// ==========================================
+// Render Scheduler (Performance)
+// ==========================================
+// Previously every save re-rendered *all* pages (dashboard + charts, obligations
+// table, projects grid, job cards, the prelicence matrix and both Chart.js
+// canvases) - and often twice, because saveData() dispatches 'data-refreshed'
+// while callers also invoked refreshAllViews() directly. Only the page the user
+// is actually looking at needs to be redrawn; the rest are marked dirty and
+// rebuilt lazily when navigated to.
 
-        try {
-            checkAndNotify();
-        } catch (e) {
-            console.warn('Notification check failed:', e);
-        }
+const PAGE_RENDERERS = {
+    dashboard: () => updateDashboard(),
+    obligations: () => updateObligationsTable(),
+    jobs: () => updateJobsView(), // calls refreshJobFilters() internally
+    'prelicence-extensions': () => window.renderPrelicenceExtensionsMatrix?.(),
+    projects: () => updateProjectsGrid(),
+    analytics: () => renderAnalyticsPage(),
+    settings: () => { }
+};
+
+const dirtyPages = new Set();
+let renderScheduled = false;
+
+function getActivePageId() {
+    return document.querySelector('.pages-container .page.active')?.id || 'dashboard';
+}
+
+function renderPage(pageId) {
+    const renderer = PAGE_RENDERERS[pageId];
+    if (!renderer) return;
+    try {
+        renderer();
     } catch (e) {
-        console.error('View refresh failed:', e);
+        console.error(`View refresh failed for page "${pageId}":`, e);
     }
 }
+
+/** Renders the visible page now; every other page is redrawn when opened. */
+function scheduleRender() {
+    if (renderScheduled) return;
+    renderScheduled = true;
+    requestAnimationFrame(() => {
+        renderScheduled = false;
+        const active = getActivePageId();
+        if (dirtyPages.delete(active)) renderPage(active);
+        try {
+            updateDataStats();
+        } catch (e) {
+            console.warn('Stats refresh failed:', e);
+        }
+    });
+}
+
+function refreshAllViews() {
+    Object.keys(PAGE_RENDERERS).forEach(id => dirtyPages.add(id));
+    scheduleRender();
+}
+
+/** Marks specific pages dirty without forcing a full-app invalidation. */
+function invalidatePages(...pageIds) {
+    pageIds.forEach(id => dirtyPages.add(id));
+    scheduleRender();
+}
+
+// Redraw a page the moment it becomes visible, if data changed while it was hidden.
+window.addEventListener('page-changed', (e) => {
+    const pageId = e.detail?.pageId;
+    if (pageId && dirtyPages.delete(pageId)) renderPage(pageId);
+});
 
 function updateDataStats() {
     const totalRecords = document.getElementById('totalRecords');
@@ -418,7 +465,12 @@ function setupEventHandlers() {
     // Project Search (Live Filter)
     const projectSearch = document.getElementById('projectSearch');
     if (projectSearch) {
-        projectSearch.addEventListener('input', updateProjectsGrid);
+        // Debounced so a full grid rebuild doesn't run on every keystroke.
+        let projectSearchTimer = null;
+        projectSearch.addEventListener('input', () => {
+            if (projectSearchTimer) clearTimeout(projectSearchTimer);
+            projectSearchTimer = setTimeout(updateProjectsGrid, 200);
+        });
     }
 
     // Dashboard Stats Interactivity
@@ -469,7 +521,7 @@ function setupEventHandlers() {
             const typeFilter = document.getElementById('typeFilter');
             if (statusFilter) statusFilter.value = '';
             if (typeFilter) typeFilter.value = '';
-            updateObligationsTable();
+            invalidatePages('obligations');
         });
     }
 
@@ -1036,8 +1088,9 @@ function updateObligationStatus(id, newStatus) {
     });
 
     if (success) {
+        // saveData() dispatches 'data-refreshed', which already schedules the
+        // re-render - calling refreshAllViews() here too rendered everything twice.
         if (saveData()) {
-            refreshAllViews();
             showToast(newStatus === 'completed' ? 'Yükümlülük tamamlandı! 🎉' : 'Yükümlülük bekleyene alındı.', 'success');
         }
     }
@@ -1054,7 +1107,6 @@ function updateObligationDeadline(id, newDate) {
 
     if (success) {
         if (saveData()) {
-            refreshAllViews();
             showToast('Tarih başarıyla güncellendi.', 'success');
         }
     }

@@ -1,5 +1,51 @@
 import { Store } from './store.js';
-import { formatDate, getStatusText, getStatus, isInThisCalendarWeek, isInLastCalendarWeek, isInNextCalendarWeek, isInThisCalendarMonth } from './utils.js';
+import { formatDate, getStatusText, getStatus, isInThisCalendarWeek, isInLastCalendarWeek, isInNextCalendarWeek, isInThisCalendarMonth, escapeHtml } from './utils.js';
+
+/**
+ * Jobs created through the normal "Tadil Başvurusu" flow always have
+ * dueDate = null (see js/jobs.js addJobForm handler - "Workflow based"), so a
+ * forecast that only looked at job.dueDate silently excluded almost every
+ * pending tadil from the 12-month intensity chart. This resolves the best
+ * available forecast date for a pending job, in priority order:
+ *   1) an explicit dueDate, if one was ever set,
+ *   2) the project's license/construction expiry (the real deadline driving
+ *      "Önlisans Süre Uzatımı" / "Tesis Tamamlama" jobs),
+ *   3) the latest planned/actual date entered anywhere in the job's workflow
+ *      steps (users fill these in as they go, so the furthest one is the
+ *      best guess at when the job will conclude).
+ * Returns null when nothing usable is found, rather than falling back to a
+ * past date like createdAt/updatedAt, which would misreport an undated job
+ * as due "this month".
+ */
+function getJobForecastDate(job) {
+    if (job.dueDate) {
+        const d = new Date(job.dueDate);
+        if (!isNaN(d.getTime())) return d;
+    }
+
+    const project = Store.projects.find(p => p.name === job.project);
+    const expiry = project?.licenceExpiry || project?.constructionDeadline;
+    if (expiry) {
+        const d = new Date(expiry);
+        if (!isNaN(d.getTime())) return d;
+    }
+
+    let latest = null;
+    (function traverse(obj) {
+        if (!obj || typeof obj !== 'object') return;
+        for (const key in obj) {
+            const val = obj[key];
+            if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) {
+                const d = new Date(val);
+                if (!isNaN(d.getTime()) && (!latest || d > latest)) latest = d;
+            } else if (typeof val === 'object') {
+                traverse(val);
+            }
+        }
+    })(job.steps);
+
+    return latest;
+}
 
 const { jsPDF } = window.jspdf;
 
@@ -54,7 +100,6 @@ export async function generateMeetingReport() {
     try {
         const pdf = new jsPDF('p', 'mm', 'a4');
         const pageWidth = 210;
-        let currentPage = 1;
 
         // --- DATA PREPARATION ---
         const projects = Store.projects || [];
@@ -105,24 +150,31 @@ export async function generateMeetingReport() {
             .sort((a, b) => b[1] - a[1])
             .slice(0, 8);
 
-        // 6. 12-Month Rolling Future Intensity
+        // 6. 12-Month Rolling Future Intensity - obligations AND tadil applications,
+        // tracked as two separate series so both are visible (see getJobForecastDate
+        // above for how a job's forecast month is resolved).
         const rollingMonths = [];
         const monthNames = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+        const pendingJobsForForecast = jobs.filter(j => j.status !== 'completed');
         for (let i = 0; i < 12; i++) {
             const d = new Date();
             d.setMonth(d.getMonth() + i);
             const m = d.getMonth();
             const y = d.getFullYear();
             const label = `${monthNames[m]} ${y.toString().slice(-2)}`;
-            const count = futureObligations.filter(o => {
+
+            const obCount = futureObligations.filter(o => {
+                if (o.status === 'completed') return false;
                 const od = new Date(o.deadline);
-                return o.status !== 'completed' && od.getMonth() === m && od.getFullYear() === y;
-            }).length + jobs.filter(j => {
-                if (j.status === 'completed' || !j.dueDate) return false;
-                const jd = new Date(j.dueDate);
-                return jd.getMonth() === m && jd.getFullYear() === y;
+                return od.getMonth() === m && od.getFullYear() === y;
             }).length;
-            rollingMonths.push({ label, count });
+
+            const jobCount = pendingJobsForForecast.filter(j => {
+                const fd = getJobForecastDate(j);
+                return fd && fd.getMonth() === m && fd.getFullYear() === y;
+            }).length;
+
+            rollingMonths.push({ label, obCount, jobCount, count: obCount + jobCount });
         }
         const maxRollingCount = Math.max(...rollingMonths.map(m => m.count), 1);
 
@@ -179,30 +231,39 @@ export async function generateMeetingReport() {
             </div>
             
             <div style="margin-top: 30px; border: 2px solid #000; border-radius: 12px; padding: 25px;">
-                <h3 style="margin: 0 0 20px 0; font-size: 14px; font-weight: 800; border-bottom: 3px solid #000; padding-bottom: 10px;">📅 12 AYLIK GELECEK YOĞUNLUĞU</h3>
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; height: 120px; padding: 0 10px;">
-                    ${rollingMonths.map(m => `
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h3 style="margin: 0; font-size: 14px; font-weight: 800;">📅 12 AYLIK GELECEK YOĞUNLUĞU (TADİL + YÜKÜMLÜLÜK)</h3>
+                    <div style="display: flex; gap: 12px; font-size: 9px; font-weight: 800;">
+                        <span><span style="display:inline-block; width:9px; height:9px; background:#3b82f6; border-radius:2px; margin-right:4px;"></span>Yükümlülük</span>
+                        <span><span style="display:inline-block; width:9px; height:9px; background:#f59e0b; border-radius:2px; margin-right:4px;"></span>Tadil Başvurusu</span>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; height: 130px; padding: 0 10px;">
+                    ${rollingMonths.map(m => {
+            const obH = maxRollingCount > 0 ? Math.round((m.obCount / maxRollingCount) * 100) : 0;
+            const jobH = maxRollingCount > 0 ? Math.round((m.jobCount / maxRollingCount) * 100) : 0;
+            return `
                         <div style="display: flex; flex-direction: column; align-items: center; flex: 1;">
                             <div style="font-size: 8px; font-weight: 900; margin-bottom: 4px;">${m.count > 0 ? m.count : ''}</div>
-                            <div style="background: #000; width: 60%; height: ${Math.min((m.count / maxRollingCount) * 100, 100)}px; border-radius: 3px 3px 0 0;"></div>
+                            <div style="display: flex; flex-direction: column-reverse; width: 60%;">
+                                <div style="background: #3b82f6; height: ${obH}px; ${jobH === 0 ? 'border-radius: 3px 3px 0 0;' : ''}"></div>
+                                <div style="background: #f59e0b; height: ${jobH}px; border-radius: 3px 3px 0 0;"></div>
+                            </div>
                             <span style="font-size: 8px; font-weight: 800; margin-top: 5px; white-space: nowrap;">${m.label}</span>
                         </div>
-                    `).join('')}
+                    `;
+        }).join('')}
                 </div>
             </div>
         `;
 
         await renderPage(pdf, page1, pageWidth);
 
-        // --- PAGE 2+: KULLANICI BAZLI BEKLEYEN İİŞLER (Paginated) ---
-        const userGroups = {};
-        jobs.filter(j => j.status !== 'completed').forEach(j => {
-            const userName = Store.getUserName(j.assignee);
-            if (!userGroups[userName]) userGroups[userName] = [];
-            userGroups[userName].push(j);
-        });
-
-        await renderMultiPageSection(pdf, worker, pageWidth, "👤 KULLANICI BAZLI BEKLEYEN İŞLER", userGroups, 'user-grid');
+        // --- PAGE 2+: BEKLEYEN TADİL BAŞVURULARI (Proje Bazlı, Paginated) ---
+        // Previously grouped by assignee - the reporting plan no longer wants a
+        // per-user breakdown, so this groups by project like every other section.
+        const pendingJobsGrouped = groupProjects(jobs.filter(j => j.status !== 'completed'), []);
+        await renderMultiPageSection(pdf, worker, pageWidth, "💼 BEKLEYEN TADİL BAŞVURULARI (PROJE BAZLI)", pendingJobsGrouped, 'summary-grid', '#f8fafc');
 
         // --- PAGE 3+: GEÇEN HAFTA ÖZETİ (Two-column, Paginated) ---
         const lastWeekGrouped = groupProjects(lastWeekJobs, lastWeekObs);
@@ -218,49 +279,7 @@ export async function generateMeetingReport() {
 
 
         // --- FINAL PAGES: FUTURE OBLIGATION LIST ---
-        const itemsPerPage = 18;
-        for (let i = 0; i < futureObligations.length; i += itemsPerPage) {
-            const chunk = futureObligations.slice(i, i + itemsPerPage);
-            pdf.addPage();
-            currentPage = pdf.internal.getNumberOfPages();
-
-            const tablePage = document.createElement('div');
-            tablePage.style.cssText = `width: 800px; padding: 40px; background: white; font-family: 'Inter', sans-serif; color: #000000; min-height: 1100px;`;
-            worker.innerHTML = '';
-            worker.appendChild(tablePage);
-
-            tablePage.innerHTML = `
-                <div style="border-bottom: 4px solid #000; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
-                    <h2 style="margin: 0; font-size: 18px; font-weight: 800;">📅 GELECEK YÜKÜMLÜLÜK LİSTESİ</h2>
-                    <span style="font-size: 12px; font-weight: 800;">SAYFA ${currentPage}</span>
-                </div>
-                <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                    <thead>
-                        <tr style="background: #000; color: #fff; text-align: left;">
-                            <th style="padding: 10px; border: 1px solid #000;">PROJE</th>
-                            <th style="padding: 10px; border: 1px solid #000;">KONU</th>
-                            <th style="padding: 10px; border: 1px solid #000;">VADE</th>
-                            <th style="padding: 10px; border: 1px solid #000;">DURUM</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${chunk.map(o => {
-                let pName = o.projectName || 'Genel';
-                if (pName === 'undefined') pName = 'Genel';
-                return `
-                                <tr>
-                                    <td style="padding: 8px; border: 1px solid #000; font-weight: 800;">${pName.substring(0, 25)}</td>
-                                    <td style="padding: 8px; border: 1px solid #000;">${o.obligationType}</td>
-                                    <td style="padding: 8px; border: 1px solid #000; font-weight: 700;">${formatDate(o.deadline)}</td>
-                                    <td style="padding: 8px; border: 1px solid #000; font-weight: 800;">${getStatusText(o.deadline, o.status)}</td>
-                                </tr>
-                            `;
-            }).join('')}
-                    </tbody>
-                </table>
-            `;
-            await renderPage(pdf, tablePage, pageWidth);
-        }
+        await renderObligationTableSection(pdf, worker, pageWidth, "📅 GELECEK YÜKÜMLÜLÜK LİSTESİ", futureObligations);
 
         pdf.save(`DaVinci_Haftalik_Bulten_${new Date().toISOString().split('T')[0]}.pdf`);
         console.log('✅ DaVinci Weekly Bulletin generated successfully.');
@@ -357,32 +376,106 @@ async function renderMultiPageSection(pdf, worker, pageWidth, title, dataGroups,
 }
 
 /**
+ * Renders the future-obligations list as flex "rows" instead of a real
+ * <table>. The app's global stylesheet (styles.css) defines bare
+ * `table`/`th`/`td` selectors - min-width:1200px, light gray text
+ * (var(--text-secondary), meant for the dark in-app theme), and forced
+ * nowrap+ellipsis with `!important` font sizes. Because this report worker
+ * is appended to document.body while rendering, those rules used to bleed
+ * straight into the PDF export: the table was forced wider than the page
+ * (content ran off the side) and the text was nearly invisible (light gray
+ * on a white PDF background). Plain divs don't match those selectors, so
+ * width/wrapping/color are fully under our control again. Pagination is
+ * measured with a probe (like renderMultiPageSection) rather than a fixed
+ * items-per-page guess, since wrapped long text changes row height.
+ */
+async function renderObligationTableSection(pdf, worker, pageWidth, title, obligations) {
+    if (obligations.length === 0) return;
+
+    const columns = [
+        { label: 'PROJE', flex: 26 },
+        { label: 'KONU', flex: 34 },
+        { label: 'VADE', flex: 16 },
+        { label: 'DURUM', flex: 24 }
+    ];
+
+    const headerHtml = `
+        <div style="display: flex; background: #000; color: #ffffff; font-size: 10px; font-weight: 800; text-transform: uppercase;">
+            ${columns.map(c => `<div style="flex: ${c.flex}; padding: 8px 10px; border: 1px solid #000;">${c.label}</div>`).join('')}
+        </div>
+    `;
+
+    const rowHtml = (o) => {
+        let pName = o.projectName || 'Genel';
+        if (pName === 'undefined') pName = 'Genel';
+        return `
+            <div style="display: flex; font-size: 10px;">
+                <div style="flex: ${columns[0].flex}; padding: 7px 10px; border: 1px solid #000; color: #000000; font-weight: 800; word-break: break-word;">${escapeHtml(pName)}</div>
+                <div style="flex: ${columns[1].flex}; padding: 7px 10px; border: 1px solid #000; color: #000000; word-break: break-word;">${escapeHtml(o.obligationType || '')}</div>
+                <div style="flex: ${columns[2].flex}; padding: 7px 10px; border: 1px solid #000; color: #000000; font-weight: 700;">${formatDate(o.deadline)}</div>
+                <div style="flex: ${columns[3].flex}; padding: 7px 10px; border: 1px solid #000; color: #000000; font-weight: 800;">${getStatusText(o.deadline, o.status)}</div>
+            </div>
+        `;
+    };
+
+    // 1. Pre-calculate page chunks using a hidden probe (mirrors renderMultiPageSection).
+    const probe = document.createElement('div');
+    probe.style.cssText = `position: absolute; left: -9999px; width: 800px; padding: 40px; background: white; font-family: 'Inter', sans-serif; box-sizing: border-box; visibility: hidden;`;
+    document.body.appendChild(probe);
+
+    const footerBuffer = 60;
+    const totalHeightLimit = 1120 - footerBuffer;
+    const headerBlockHtml = `
+        <div style="border-bottom: 4px solid #000; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
+            <h2 style="margin: 0; font-size: 18px; font-weight: 800; color:#000;">PROBE</h2>
+        </div>
+    `;
+
+    const chunks = [];
+    let currentChunk = [];
+    for (const o of obligations) {
+        const tempChunk = [...currentChunk, o];
+        probe.innerHTML = `${headerBlockHtml}${headerHtml}${tempChunk.map(rowHtml).join('')}`;
+        if (probe.offsetHeight > totalHeightLimit && currentChunk.length > 0) {
+            chunks.push(currentChunk);
+            currentChunk = [o];
+        } else {
+            currentChunk = tempChunk;
+        }
+    }
+    if (currentChunk.length > 0) chunks.push(currentChunk);
+    document.body.removeChild(probe);
+
+    // 2. Render each chunk to its own page.
+    for (let i = 0; i < chunks.length; i++) {
+        pdf.addPage();
+        const currentPageNum = pdf.internal.getNumberOfPages();
+
+        const tablePage = document.createElement('div');
+        tablePage.style.cssText = `width: 800px; padding: 40px; background: white; font-family: 'Inter', sans-serif; color: #000000; min-height: 1100px; box-sizing: border-box;`;
+        worker.innerHTML = '';
+        worker.appendChild(tablePage);
+
+        tablePage.innerHTML = `
+            <div style="border-bottom: 4px solid #000; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end;">
+                <h2 style="margin: 0; font-size: 18px; font-weight: 800; color:#000;">${title}${i > 0 ? ' (DEVAMI)' : ''}</h2>
+                <span style="font-size: 12px; font-weight: 800; color:#000;">SAYFA ${currentPageNum}</span>
+            </div>
+            ${headerHtml}
+            ${chunks[i].map(rowHtml).join('')}
+        `;
+        await renderPage(pdf, tablePage, pageWidth);
+    }
+}
+
+/**
  * Shared HTML generator for report boxes
  */
 function renderReportItemHtml(name, data, layoutType, accentColor) {
     let displayName = name;
     if (!displayName || displayName === 'undefined' || displayName === 'null') displayName = 'Genel / Projesiz';
 
-    if (layoutType === 'user-grid') {
-        return `
-            <div style="border: 2px solid #000; border-radius: 10px; padding: 15px; background: #f8fafc; break-inside: avoid;">
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 10px;">
-                    <span style="font-weight: 900; font-size: 14px;">${displayName}</span>
-                    <span style="background: #000; color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 11px;">${data.length || 0} İş</span>
-                </div>
-                ${data.map(j => {
-            let jpName = j.project || 'Genel';
-            if (jpName === 'undefined') jpName = 'Genel';
-            return `
-                        <div style="font-size: 11px; margin-bottom: 6px; padding-left: 10px; border-left: 3px solid ${j.priority === 'high' ? '#ef4444' : '#3b82f6'};">
-                            <b>${j.title}</b>
-                            <div style="font-size: 9px; color: #64748b;">${jpName}</div>
-                        </div>
-                    `;
-        }).join('')}
-            </div>
-        `;
-    } else {
+    {
         return `
             <div style="margin-bottom: 15px; border: 1.5px solid #000; border-radius: 8px; overflow: hidden; break-inside: avoid;">
                 <div style="background: ${accentColor}; padding: 8px 10px; border-bottom: 1.5px solid #000; font-weight: 900; font-size: 12px;">🏢 ${displayName}</div>

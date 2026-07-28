@@ -51,12 +51,28 @@ final class WebAppModel: ObservableObject {
     }
 }
 
-struct WebAppView: UIViewRepresentable {
-    @ObservedObject var model: WebAppModel
+/// Hosts the WKWebView inside its own UIViewController and pins it to that
+/// controller's own view edges with Auto Layout (`view.topAnchor`, not
+/// `view.safeAreaLayoutGuide.topAnchor`).
+///
+/// The first version of this used `UIViewRepresentable` and relied on
+/// SwiftUI's `.ignoresSafeArea()` to size the raw WKWebView. In practice that
+/// left black bars under the notch and above the home indicator on every
+/// device - the modifier affects SwiftUI's own layout, but a
+/// `UIViewRepresentable`'s size negotiation with UIKit doesn't reliably
+/// inherit it, so the WKWebView ended up sized to the *safe* area while
+/// RootView's plain SwiftUI `Color` behind it (which isn't a
+/// UIViewRepresentable) correctly filled the whole screen - the mismatch was
+/// exactly the top/bottom bands being reported. Explicit Auto Layout
+/// constraints to the view's own edges remove that ambiguity entirely: this
+/// view controller's `view` gets the full screen from `.ignoresSafeArea()`
+/// on the SwiftUI side (that part does work reliably), and the webview is
+/// then pinned to fill 100% of it, no negotiation involved.
+final class WebViewController: UIViewController {
+    let webView: WKWebView
+    private let coordinator: WebAppView.Coordinator
 
-    func makeCoordinator() -> Coordinator { Coordinator(model: model) }
-
-    func makeUIView(context: Context) -> WKWebView {
+    init(model: WebAppModel, coordinator: WebAppView.Coordinator) {
         let config = WKWebViewConfiguration()
 
         // Persistent store: Firebase Auth keeps its session in IndexedDB /
@@ -70,13 +86,16 @@ struct WebAppView: UIViewRepresentable {
         config.mediaTypesRequiringUserActionForPlayback = []
 
         let controller = WKUserContentController()
-        controller.add(context.coordinator, name: "saveFile")
-        controller.addUserScript(Coordinator.nativeBridgeScript)
+        controller.add(coordinator, name: "saveFile")
+        controller.addUserScript(WebAppView.Coordinator.nativeBridgeScript)
         config.userContentController = controller
 
-        let webView = WKWebView(frame: .zero, configuration: config)
-        webView.navigationDelegate = context.coordinator
-        webView.uiDelegate = context.coordinator
+        self.webView = WKWebView(frame: .zero, configuration: config)
+        self.coordinator = coordinator
+        super.init(nibName: nil, bundle: nil)
+
+        webView.navigationDelegate = coordinator
+        webView.uiDelegate = coordinator
         webView.allowsBackForwardNavigationGestures = true
         webView.backgroundColor = UIColor(Color.appBackground)
         webView.isOpaque = false
@@ -85,22 +104,50 @@ struct WebAppView: UIViewRepresentable {
         // The page is a fixed-layout app; bouncing past its edges exposes the
         // window behind it and reads as a rendering glitch.
         webView.scrollView.bounces = false
+        // Paired with the edge-to-edge Auto Layout below and viewport-fit=cover
+        // in index.html, this is what lets CSS env(safe-area-inset-*) report
+        // real values instead of the webview quietly padding for them itself.
         webView.scrollView.contentInsetAdjustmentBehavior = .never
 
-        // Pull-to-refresh, since there is no browser reload button.
         let refresh = UIRefreshControl()
         refresh.tintColor = .white
-        refresh.addTarget(context.coordinator,
-                          action: #selector(Coordinator.handleRefresh(_:)),
+        refresh.addTarget(coordinator,
+                          action: #selector(WebAppView.Coordinator.handleRefresh(_:)),
                           for: .valueChanged)
         webView.scrollView.refreshControl = refresh
 
         model.webView = webView
         webView.load(URLRequest(url: AppConfig.appURL))
-        return webView
     }
 
-    func updateUIView(_ webView: WKWebView, context: Context) {}
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = UIColor(Color.appBackground)
+
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(webView)
+        NSLayoutConstraint.activate([
+            webView.topAnchor.constraint(equalTo: view.topAnchor),
+            webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+    }
+}
+
+struct WebAppView: UIViewControllerRepresentable {
+    @ObservedObject var model: WebAppModel
+
+    func makeCoordinator() -> Coordinator { Coordinator(model: model) }
+
+    func makeUIViewController(context: Context) -> WebViewController {
+        WebViewController(model: model, coordinator: context.coordinator)
+    }
+
+    func updateUIViewController(_ controller: WebViewController, context: Context) {}
 
     // MARK: - Coordinator
 

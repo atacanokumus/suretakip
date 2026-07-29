@@ -576,6 +576,22 @@ body {
         font-size: 13px;
     }
 
+    /* ---- Push notification toggles ----
+       .settings-item stacks into a column on mobile, which is right for rows
+       whose control is a full-width button but leaves these 52px toggles
+       stranded on their own line under the label. Keep them on one line. */
+    #pushSettingsCard .settings-item {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+    }
+
+    #pushSettingsCard .settings-info {
+        flex: 1;
+        min-width: 0;
+    }
+
     /* ---- Dashboard stat cards: restore depth lost when blur was disabled ---- */
     .stat-card {
         padding: 20px 18px;

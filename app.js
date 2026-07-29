@@ -540,7 +540,7 @@ function setupEventHandlers() {
     if (addBtn) {
         addBtn.addEventListener('click', () => {
             // Populate Project Select (Phase 4)
-            const projectSelect = document.getElementById('projectName');
+            const projectSelect = document.getElementById('obligationProjectSelect');
             if (projectSelect) {
                 const allProjects = (Store.projects || []).map(p => p.name).sort();
                 projectSelect.innerHTML = '<option value="">Proje SeÃ§iniz...</option>' +
@@ -574,7 +574,7 @@ function setupEventHandlers() {
             e.preventDefault();
             const newObligation = {
                 id: generateId(),
-                projectName: validateString(document.getElementById('projectName').value),
+                projectName: validateString(document.getElementById('obligationProjectSelect').value),
                 projectLink: document.getElementById('projectLink').value,
                 obligationType: validateString(document.getElementById('obligationType').value),
                 obligationDescription: validateString(document.getElementById('obligationDescription').value),

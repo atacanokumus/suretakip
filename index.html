@@ -4,6 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <script>
+        // window.SureTakipNative is injected only by the iOS shell's WKWebView
+        // (see WebAppView.swift, injected at document-start, so it exists before
+        // this line runs there). Flags the WebView-only CSS in mobile.css - kept
+        // out of that reach on desktop/mobile browsers, where it previously broke
+        // mouse-wheel scrolling by disabling overscroll on <body> for everyone.
+        if (window.SureTakipNative) {
+            document.documentElement.classList.add('ios-shell');
+        }
+    </script>
+    <script>
         window.addEventListener('error', function(e) {
             console.error("Global JS Error caught:", e);
             alert("Sistem Hatası:\n" + e.message + "\nDosya: " + e.filename + "\nSatır: " + e.lineno);
@@ -1038,8 +1048,8 @@
                 <form id="addObligationForm">
                     <div class="form-grid">
                         <div class="form-group">
-                            <label for="projectName">🏭 Proje Adı</label>
-                            <select id="projectName" class="glass-input" required>
+                            <label for="obligationProjectSelect">🏭 Proje Adı</label>
+                            <select id="obligationProjectSelect" class="glass-input" required>
                                 <option value="">Proje Seçiniz...</option>
                             </select>
                         </div>

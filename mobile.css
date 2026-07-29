@@ -11,15 +11,24 @@
    ========================================== */
 
 /* ==========================================
-   1. iOS WebView behaviour (all sizes)
+   1. iOS WebView behaviour (native shell only)
+   ------------------------------------------
+   Scoped to html.ios-shell, a class the inline script at the top of
+   index.html <head> adds only when window.SureTakipNative exists (that
+   object is injected exclusively by WebAppView.swift's WKWebView bridge).
+   This first shipped unscoped - applying to every visitor including plain
+   desktop/mobile browsers - and `overscroll-behavior-y: none` on <body> broke
+   mouse-wheel scrolling inside dropdowns/menus there. `-webkit-*` prefixed
+   properties are silently ignored outside WebKit anyway, but scoping the
+   whole block keeps this section doing only what its name says.
    ========================================== */
 
-html {
+html.ios-shell {
     /* Keep text size stable when the device is rotated. */
     -webkit-text-size-adjust: 100%;
 }
 
-body {
+html.ios-shell body {
     /* Grey flash on every tap looks broken inside a native app. */
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: none;
@@ -29,20 +38,20 @@ body {
    That zoom is not undone on blur, so the app ends up permanently scaled. */
 @supports (-webkit-touch-callout: none) {
 
-    input,
-    select,
-    textarea {
+    html.ios-shell input,
+    html.ios-shell select,
+    html.ios-shell textarea {
         font-size: 16px !important;
     }
 }
 
 /* Momentum scrolling for every scroll container in the app. */
-.pages-container,
-.table-container,
-.modal-content,
-.jobs-container,
-.sidebar,
-.ext-matrix-scroll {
+html.ios-shell .pages-container,
+html.ios-shell .table-container,
+html.ios-shell .modal-content,
+html.ios-shell .jobs-container,
+html.ios-shell .sidebar,
+html.ios-shell .ext-matrix-scroll {
     -webkit-overflow-scrolling: touch;
 }
 

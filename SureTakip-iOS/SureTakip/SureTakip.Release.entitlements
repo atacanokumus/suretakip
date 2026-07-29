@@ -7,9 +7,11 @@
 	     but goes silent once the build is distributed. -->
 	<key>aps-environment</key>
 	<string>production</string>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.com.davincienerji.suretakip</string>
-	</array>
+	<!-- App Groups deliberately left out: the Developer Portal App ID doesn't
+	     have it enabled yet (removed during TestFlight troubleshooting), and
+	     declaring it here without that would fail signing. WidgetStore.swift
+	     already falls back to standard UserDefaults when the App Group suite
+	     isn't available, so nothing breaks - re-add both here and on the App ID
+	     when the home-screen widget actually gets built. -->
 </dict>
 </plist>

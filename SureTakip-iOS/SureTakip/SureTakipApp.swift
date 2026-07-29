@@ -35,6 +35,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
                      didFinishLaunchingWithOptions launchOptions:
                      [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         PushCenter.shared.configure()
+
+        // Drop any HTTP response WKWebView is still holding from a previous
+        // run. Without this, a build that shipped before the cache headers
+        // were corrected can keep serving an old page indefinitely. Auth state
+        // is untouched (see purgeHTTPCaches).
+        Task { await WebAppModel.purgeHTTPCaches() }
         return true
     }
 

@@ -44,10 +44,37 @@ final class WebAppModel: ObservableObject {
     deinit { monitor.cancel() }
 
     func reload() {
+        loadFresh()
+    }
+
+    /// Loads the app, always revalidating with the server first.
+    ///
+    /// The whole point of this shell is that a web deploy reaches the phone
+    /// without a new TestFlight build - but WKWebView's default
+    /// (`useProtocolCachePolicy`) happily served a stale copy of the page, so
+    /// changes shipped to production simply didn't appear on the device. That
+    /// silently breaks the core promise of the architecture, so freshness wins
+    /// over the handful of bytes a cache hit would save; the responses are
+    /// small and mostly come back as 304s anyway.
+    func loadFresh() {
         loadError = nil
-        if let webView {
-            webView.load(URLRequest(url: AppConfig.appURL))
-        }
+        guard let webView else { return }
+        var request = URLRequest(url: AppConfig.appURL)
+        request.cachePolicy = .reloadRevalidatingCacheData
+        webView.load(request)
+    }
+
+    /// Clears only the HTTP caches, never cookies / localStorage / IndexedDB -
+    /// the Firebase Auth session lives in those, and wiping it would force
+    /// everyone to log in again on every launch.
+    static func purgeHTTPCaches() async {
+        let types: Set<String> = [
+            WKWebsiteDataTypeDiskCache,
+            WKWebsiteDataTypeMemoryCache,
+            WKWebsiteDataTypeOfflineWebApplicationCache
+        ]
+        await WKWebsiteDataStore.default()
+            .removeData(ofTypes: types, modifiedSince: .distantPast)
     }
 }
 
@@ -118,7 +145,7 @@ final class WebViewController: UIViewController {
         webView.scrollView.refreshControl = refresh
 
         model.webView = webView
-        webView.load(URLRequest(url: AppConfig.appURL))
+        model.loadFresh()
 
         // A token can arrive before the page is ready or long after it loaded;
         // both paths funnel through the coordinator, which no-ops until the
@@ -200,8 +227,11 @@ struct WebAppView: UIViewControllerRepresentable {
                 """, completionHandler: nil)
         }
 
+        /// `reloadFromOrigin()`, not `reload()`: the latter still consults the
+        /// cache, so pulling to refresh could hand back the very stale page the
+        /// user was trying to get rid of.
         @objc func handleRefresh(_ sender: UIRefreshControl) {
-            model.webView?.reload()
+            model.webView?.reloadFromOrigin()
         }
 
         // MARK: Navigation

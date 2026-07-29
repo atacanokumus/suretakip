@@ -6,6 +6,7 @@ struct RootView: View {
     @StateObject private var model = WebAppModel()
     @StateObject private var lock = BiometricLock()
     @Environment(\.scenePhase) private var scenePhase
+    @State private var backgroundedAt: Date?
 
     var body: some View {
         ZStack {
@@ -65,10 +66,21 @@ struct RootView: View {
             switch phase {
             case .background:
                 lock.appDidEnterBackground()
+                backgroundedAt = Date()
             case .active:
                 let wasLocked = lock.isLocked
                 lock.appWillEnterForeground()
                 if lock.isLocked && !wasLocked { lock.authenticate() }
+
+                // Pick up web deploys without the user thinking to pull to
+                // refresh. Only after a real absence, so switching apps for a
+                // moment doesn't throw away what they were looking at.
+                if let since = backgroundedAt,
+                   Date().timeIntervalSince(since) >= 5 * 60,
+                   model.hasLoadedOnce {
+                    model.loadFresh()
+                }
+                backgroundedAt = nil
             default:
                 break
             }

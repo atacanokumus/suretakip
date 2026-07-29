@@ -100,6 +100,10 @@ Web'deki e-posta/şifrenizle giriş yapın; verilerin siteyle aynı olduğunu g�
 
 ### 5. TestFlight'a yükleyin
 
+Ayrıntılı adım adım anlatım için: **[TESTFLIGHT.md](TESTFLIGHT.md)**
+
+Kısaca:
+
 1. Üst çubukta cihaz olarak **Any iOS Device (arm64)** seçin
 2. **Product → Archive**
 3. Açılan pencerede **Distribute App → TestFlight & App Store → Upload**
@@ -110,6 +114,37 @@ Web'deki e-posta/şifrenizle giriş yapın; verilerin siteyle aynı olduğunu g�
 > **My Apps → + → New App**, bundle ID olarak `com.davincienerji.suretakip` seçin.
 > Internal Testing kullandığınız için Apple'ın inceleme (review) sürecini
 > beklemenize gerek yoktur — dakikalar içinde test edilebilir olur.
+
+---
+
+## Bildirimler (Push Notifications)
+
+Bildirimler **yalnızca gerçek telefonda** çalışır — simülatörde çalışmaz.
+Çalışması için Apple ve Firebase tarafında tek seferlik kurulum gerekir;
+adımlar [TESTFLIGHT.md](TESTFLIGHT.md) içinde.
+
+Gönderilen bildirimler:
+
+| Ne zaman | Bildirim |
+|---|---|
+| Hafta içi sabah 08:00 | Günlük özet (mailin aynısı) |
+| Yeni yükümlülük tanımlandığında | Proje adı + yükümlülük türü |
+| Tadilde aşama kaydedildiğinde | Proje adı + aşama numarası |
+| Ayarlar → Manuel gönderim | Yazdığınız başlık ve mesaj |
+
+Toplu değişikliklerde (Excel içe aktarma gibi) tek bir özet bildirim gönderilir,
+onlarca bildirim yağmaz. Hepsi **Ayarlar → Mobil Bildirimler**'den açılıp
+kapatılabilir.
+
+### Diğer native özellikler
+
+- **Face ID kilidi** — uygulama açılışında ve 5 dakikadan uzun arka planda
+  kaldıktan sonra kimlik doğrulaması ister. Face ID yoksa cihaz şifresine düşer.
+- **Uygulama rozeti** — ikonun üzerinde bugünkü + gecikmiş yükümlülük sayısı.
+
+> **Ana ekran widget'ı** henüz eklenmedi; uygulamanın telefonda sorunsuz
+> çalıştığı doğrulandıktan sonraki adımda eklenecek. Widget'ın okuyacağı veri
+> (`WidgetStore`) şimdiden App Group'a yazılıyor.
 
 ---
 

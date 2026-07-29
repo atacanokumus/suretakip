@@ -108,9 +108,18 @@ function widgetSnapshot(data) {
         }));
 }
 
-async function getTokens() {
+/** @returns {Promise<Array<{token: string, email: string, device: string, updatedAt: string}>>} */
+async function getTokenRecords() {
     const snap = await db().collection(TOKENS).get();
-    return snap.docs.map((d) => d.id);
+    return snap.docs.map((d) => {
+        const data = d.data();
+        return {
+            token: d.id,
+            email: data.email || "?",
+            device: data.device || "?",
+            updatedAt: data.updatedAt ? data.updatedAt.toDate().toISOString() : "?"
+        };
+    });
 }
 
 /**
@@ -147,11 +156,12 @@ async function pruneDeadTokens(tokens, responses) {
  * @param {object} [opts] { badge, snapshot, type }
  */
 async function sendToAllDevices(title, body, opts = {}) {
-    const tokens = await getTokens();
-    if (!tokens.length) {
+    const records = await getTokenRecords();
+    if (!records.length) {
         console.log("📭 Kayitli cihaz yok, push atlandi.");
         return { sent: 0, failed: 0 };
     }
+    const tokens = records.map((r) => r.token);
 
     const data = {};
     if (opts.type) data.type = String(opts.type);
@@ -190,14 +200,18 @@ async function sendToAllDevices(title, body, opts = {}) {
 
     const result = await getMessaging().sendEachForMulticast(message);
 
-    // Temporary: log the real reason for each failure. The aggregate count
-    // alone doesn't say whether this is a dead token (expected, gets pruned
-    // below) or a config problem (APNs key/environment mismatch) that would
-    // silently keep failing for every token forever.
+    // Per-device outcome, with who/what the token belongs to. The aggregate
+    // count alone can't distinguish a dead token from an APNs key/environment
+    // problem, and without the owner it's impossible to tell which devices are
+    // affected (e.g. TestFlight/production builds failing while a development
+    // build succeeds).
     result.responses.forEach((r, i) => {
-        if (!r.success) {
-            const tokenTail = tokens[i].slice(-12);
-            console.log(`❌ Token …${tokenTail}: ${r.error && r.error.code} - ${r.error && r.error.message}`);
+        const rec = records[i];
+        const who = `${rec.email} | ${rec.device} | kayit: ${rec.updatedAt}`;
+        if (r.success) {
+            console.log(`✅ GITTI  → ${who}`);
+        } else {
+            console.log(`❌ GITMEDI → ${who} :: ${r.error && r.error.code} - ${r.error && r.error.message}`);
         }
     });
 

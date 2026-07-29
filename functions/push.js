@@ -162,12 +162,25 @@ async function sendToAllDevices(title, body, opts = {}) {
             payload: {
                 aps: {
                     sound: "default",
-                    // content-available lets the app update its badge/widget
-                    // data even when the user doesn't tap the notification.
-                    "content-available": 1,
+                    // NOTE: deliberately no `content-available: 1` here.
+                    //
+                    // It was added so a closed app could still refresh its
+                    // badge/widget data, but that flag marks the push as a
+                    // BACKGROUND push: APNs then delivers it silently to the
+                    // app and never shows anything to the user. FCM still
+                    // reports it as successfully sent, which is why the logs
+                    // said "1 basarili, 0 basarisiz" while nothing appeared on
+                    // the phone in any app state (foreground, background, or
+                    // terminated - a background push doesn't even call
+                    // willPresent, so the foreground banner never fired either).
+                    //
+                    // Nothing real is lost: `badge` below is applied by iOS
+                    // itself without the app running, and the snapshot in
+                    // `data` is read when the app opens or the user taps.
                     ...(typeof opts.badge === "number" ? { badge: opts.badge } : {})
                 }
             },
+            // 10 = deliver immediately, correct for user-visible alerts.
             headers: { "apns-priority": "10" }
         }
     };

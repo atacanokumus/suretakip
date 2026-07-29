@@ -45,9 +45,16 @@ targets:
     # uses it.
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.davincienerji.suretakip
+        # com.davincienerji.suretakip is permanently unusable: an App Store
+        # Connect app record was created under it at some point (before this
+        # session) and later deleted, which Apple does not allow reusing
+        # through normal signing/upload - Xcode's own distribute step returns
+        # "was previously removed from App Store Connect... contact Apple to
+        # restore" for that exact bundle ID. Moved to a fresh identifier rather
+        # than wait on an Apple support ticket with no known turnaround time.
+        PRODUCT_BUNDLE_IDENTIFIER: com.davincienerji.suretakipapp
         MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "2"
+        CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_FILE: SureTakip/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         SWIFT_VERSION: "5.0"

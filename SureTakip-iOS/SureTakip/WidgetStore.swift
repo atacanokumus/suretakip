@@ -10,7 +10,7 @@ import Foundation
 /// adding the home-screen widget target later is a matter of adding the
 /// extension: the data it needs is being kept up to date from today.
 enum WidgetStore {
-    static let appGroup = "group.com.davincienerji.suretakip"
+    static let appGroup = "group.com.davincienerji.suretakipapp"
 
     private static var defaults: UserDefaults {
         // Falls back to standard defaults until the App Group capability is

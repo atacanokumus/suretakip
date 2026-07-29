@@ -6,6 +6,12 @@ iPhone'unuza ve ekipteki diğer 2 kişiye indirmenizi anlatır.
 Toplam süre: ilk seferde yaklaşık **1–1.5 saat** (çoğu bekleme).
 Sonraki güncellemeler 10 dakika.
 
+> **Not:** Uygulamanın kimliği (bundle ID) `com.davincienerji.suretakipapp`.
+> `com.davincienerji.suretakip` (sonunda "app" olmadan) kalıcı olarak
+> kullanılamaz durumda — bir önceki denemede App Store Connect'te bir kez
+> uygulama olarak açılıp silinmiş, Apple bu kimliği normal yollarla geri
+> vermiyor. Karışmasın diye burada belirtiyoruz.
+
 ---
 
 ## Bölüm 1 — Bildirim altyapısı (tek seferlik)
@@ -37,7 +43,7 @@ Sağ üstte hesap adınızın altındaki **Team ID**'yi (10 karakter) de not edi
 1. [console.firebase.google.com](https://console.firebase.google.com) → **sure-takip**
 2. Sol üstte ⚙️ → **Project settings**
 3. **Your apps** → **Add app** → **iOS** (elma ikonu)
-4. **Apple bundle ID:** `com.davincienerji.suretakip`
+4. **Apple bundle ID:** `com.davincienerji.suretakipapp`
 5. **Register app** → **GoogleService-Info.plist** dosyasını indirin
 6. Kalan adımlarda **Next** deyip geçin (kod adımları zaten yapıldı)
 
@@ -84,7 +90,7 @@ paketini indiriyor. **Birkaç dakika sürebilir**, bitmesini bekleyin.
 3. **Team** kutusundan şirket hesabınızı seçin
 4. Aynı ekranda şu ikisinin listede olduğunu doğrulayın:
    - **Push Notifications**
-   - **App Groups** (`group.com.davincienerji.suretakip` işaretli olmalı)
+   - **App Groups** (`group.com.davincienerji.suretakipapp` işaretli olmalı)
 
 Yoksa **+ Capability** ile ekleyin.
 
@@ -113,7 +119,7 @@ Derleme hatası alırsanız hata metnini bana gönderin.
 4. **Name:** `Süre Takip` (App Store'da benzersiz olmalı; doluysa
    `DaVinci Süre Takip` deneyin)
 5. **Primary Language:** Turkish
-6. **Bundle ID:** listeden `com.davincienerji.suretakip`
+6. **Bundle ID:** listeden `com.davincienerji.suretakipapp`
 7. **SKU:** `suretakip-001` (herhangi bir şey olabilir, sadece sizin referansınız)
 8. **Create**
 

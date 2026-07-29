@@ -79,7 +79,7 @@ open SureTakip.xcodeproj
 
 1. Xcode → **File → New → Project → iOS → App**
 2. Product Name: `SureTakip`, Interface: **SwiftUI**, Language: **Swift**
-3. Bundle Identifier: `com.davincienerji.suretakip`
+3. Bundle Identifier: `com.davincienerji.suretakipapp`
 4. Oluşan projedeki hazır dosyaları silin
 5. Bu klasördeki `SureTakip/` içeriğini (Swift dosyaları, `Info.plist`,
    `Assets.xcassets`) Xcode'a sürükleyip bırakın — "Copy items if needed" işaretli olsun
@@ -111,7 +111,7 @@ Kısaca:
 5. **Internal Testing** grubuna 3 kullanıcıyı e-postalarıyla ekleyin
 
 > İlk yüklemede App Store Connect'te uygulamayı bir kez oluşturmanız istenebilir:
-> **My Apps → + → New App**, bundle ID olarak `com.davincienerji.suretakip` seçin.
+> **My Apps → + → New App**, bundle ID olarak `com.davincienerji.suretakipapp` seçin.
 > Internal Testing kullandığınız için Apple'ın inceleme (review) sürecini
 > beklemenize gerek yoktur — dakikalar içinde test edilebilir olur.
 

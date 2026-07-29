@@ -211,7 +211,25 @@ async function sendToAllDevices(title, body, opts = {}) {
         if (r.success) {
             console.log(`✅ GITTI  → ${who}`);
         } else {
-            console.log(`❌ GITMEDI → ${who} :: ${r.error && r.error.code} - ${r.error && r.error.message}`);
+            // Dump the whole error, not just code+message: the summary message
+            // ("missing authentication credential") is generic and identical
+            // for several different underlying APNs rejections. The nested
+            // detail is what actually names the cause.
+            let detail = "";
+            try {
+                const e = r.error;
+                detail = JSON.stringify({
+                    code: e && e.code,
+                    message: e && e.message,
+                    // Admin SDK stashes the raw FCM/APNs response here.
+                    info: e && e.errorInfo,
+                    cause: e && e.cause ? String(e.cause) : undefined,
+                    stackTop: e && e.stack ? String(e.stack).split("\n")[0] : undefined
+                });
+            } catch (_) {
+                detail = String(r.error);
+            }
+            console.log(`❌ GITMEDI → ${who} :: ${detail}`);
         }
     });
 

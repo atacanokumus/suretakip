@@ -52,7 +52,22 @@ final class PushCenter: NSObject {
     }
 
     func setAPNSToken(_ deviceToken: Data) {
-        Messaging.messaging().setAPNSToken(deviceToken, type: .unknown)
+        // Declared explicitly per build configuration instead of `.unknown`.
+        //
+        // `.unknown` asks FCM to infer sandbox vs production by inspecting the
+        // embedded provisioning profile at runtime. That inference is what the
+        // Firebase docs recommend, but it is also a known source of
+        // "third-party-auth-error" on TestFlight builds: if FCM guesses the
+        // wrong environment it pairs the token with the wrong APNs credential
+        // and Apple rejects it, with no way to tell from the server logs.
+        // The build config already knows the answer for certain, so say it.
+        #if DEBUG
+        let type: MessagingAPNSTokenType = .sandbox
+        #else
+        let type: MessagingAPNSTokenType = .prod
+        #endif
+        Messaging.messaging().setAPNSToken(deviceToken, type: type)
+        print("APNs token FCM'e verildi (\(type == .prod ? "production" : "sandbox")).")
     }
 
     fileprivate func publish(token: String) {

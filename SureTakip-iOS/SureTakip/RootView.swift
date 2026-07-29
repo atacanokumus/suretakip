@@ -59,7 +59,9 @@ struct RootView: View {
             // context rather than appearing over a blank launch screen.
             PushCenter.shared.requestAuthorization()
         }
-        .onChange(of: scenePhase) { _, phase in
+        // Single-parameter form: the two-parameter (oldValue, newValue) overload
+        // used above previously requires iOS 17, but the app targets iOS 16.
+        .onChange(of: scenePhase) { phase in
             switch phase {
             case .background:
                 lock.appDidEnterBackground()

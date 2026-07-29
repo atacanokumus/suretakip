@@ -121,13 +121,16 @@ async function pruneDeadTokens(tokens, responses) {
     const dead = [];
     responses.forEach((r, i) => {
         const code = r.error && r.error.code;
+        // Only codes that genuinely mean "this device is gone".
+        //
+        // messaging/third-party-auth-error was briefly listed here and that was
+        // wrong: it means FCM could not authenticate with APNs (a server-side
+        // key/environment problem), not that the token is dead. Pruning on it
+        // deleted every real phone from the collection on each send, so the
+        // devices list emptied itself and the problem looked like a
+        // registration failure instead of a config one.
         if (code === "messaging/registration-token-not-registered" ||
-            code === "messaging/invalid-argument" ||
-            // Seen for tokens registered under a since-changed bundle ID /
-            // APNs key config (e.g. the bundle ID migration on 2026-07-29) -
-            // Apple rejects them outright, and a fresh token from the same
-            // device will register cleanly the next time the app opens.
-            code === "messaging/third-party-auth-error") {
+            code === "messaging/invalid-argument") {
             dead.push(tokens[i]);
         }
     });

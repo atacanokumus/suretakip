@@ -907,6 +907,17 @@
                                     </div>
                                     <div id="pushDeviceList"></div>
                                 </div>
+
+                                <div style="margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--border-glass);">
+                                    <h3 style="font-size: 15px; margin: 0 0 4px 0;">Bu Cihazın Durumu</h3>
+                                    <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 12px;">
+                                        Bildirim gelmiyorsa bu sayfayı <strong>telefondaki uygulamadan</strong> açın;
+                                        zincirin hangi adımında takıldığı burada görünür.
+                                    </p>
+                                    <div id="pushDiagnostics"></div>
+                                    <button class="btn btn-secondary" id="pushRetryBtn"
+                                        style="margin-top: 12px;">🔁 Bu Cihazı Kaydet</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1350,7 +1361,7 @@
     </div>
 
 
-    <script type="module" src="app.js?v=3"></script>
+    <script type="module" src="app.js?v=4"></script>
     <!-- Inline Drill-down Back Button (Dynamic) -->
     <div id="drilldownControls" class="drilldown-controls hidden">
         <button id="btnBackToSummary" class="btn-back">

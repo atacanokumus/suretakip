@@ -122,7 +122,12 @@ async function pruneDeadTokens(tokens, responses) {
     responses.forEach((r, i) => {
         const code = r.error && r.error.code;
         if (code === "messaging/registration-token-not-registered" ||
-            code === "messaging/invalid-argument") {
+            code === "messaging/invalid-argument" ||
+            // Seen for tokens registered under a since-changed bundle ID /
+            // APNs key config (e.g. the bundle ID migration on 2026-07-29) -
+            // Apple rejects them outright, and a fresh token from the same
+            // device will register cleanly the next time the app opens.
+            code === "messaging/third-party-auth-error") {
             dead.push(tokens[i]);
         }
     });
@@ -168,6 +173,18 @@ async function sendToAllDevices(title, body, opts = {}) {
     };
 
     const result = await getMessaging().sendEachForMulticast(message);
+
+    // Temporary: log the real reason for each failure. The aggregate count
+    // alone doesn't say whether this is a dead token (expected, gets pruned
+    // below) or a config problem (APNs key/environment mismatch) that would
+    // silently keep failing for every token forever.
+    result.responses.forEach((r, i) => {
+        if (!r.success) {
+            const tokenTail = tokens[i].slice(-12);
+            console.log(`❌ Token …${tokenTail}: ${r.error && r.error.code} - ${r.error && r.error.message}`);
+        }
+    });
+
     await pruneDeadTokens(tokens, result.responses);
     console.log(`📲 Push: ${result.successCount} basarili, ${result.failureCount} basarisiz.`);
     return { sent: result.successCount, failed: result.failureCount };

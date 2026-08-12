@@ -342,6 +342,46 @@ function ensureTadilSteps(job) {
 // Core Views & Renderers
 // ==========================================
 
+/**
+ * True for the rows that belong to the prelicence extension matrix.
+ *
+ * Same predicate the matrix page itself uses, extracted so the jobs page and
+ * the dashboard can agree on what counts as a matrix row.
+ */
+export function isPrelicenceMatrixJob(job) {
+    if (!job) return false;
+    if (job.matrixRow) return true;
+    const t = job.title || '';
+    return t.includes('Süre Uzatımı') || t.includes('Süre Uzatım') || t.includes('İLERLEME RAPORLARI');
+}
+
+/**
+ * Has any real work happened on this extension yet?
+ *
+ * The matrix is seeded with every project that will eventually need an
+ * extension, most of them dated years out. Those are plans, not live work.
+ * A row counts as started only once a stage has actually been ticked off -
+ * checking every stage rather than only the first, so a row someone completed
+ * out of order still registers as started.
+ */
+export function hasPrelicenceWorkflowStarted(job) {
+    if (!job) return false;
+    if (job.status === 'completed') return true;
+    const steps = job.steps || {};
+    return Object.keys(steps).some(k => steps[k] && steps[k].completed);
+}
+
+/**
+ * Matrix rows that haven't started belong on the prelicence page only.
+ *
+ * Listing them alongside real amendments turned the jobs page into 47 entries,
+ * 30-odd of them untouched future extensions, which buried the handful of
+ * things actually in progress.
+ */
+export function isDormantPrelicenceJob(job) {
+    return isPrelicenceMatrixJob(job) && !hasPrelicenceWorkflowStarted(job);
+}
+
 export function updateJobsView() {
     const listContainer = document.getElementById('jobsList');
     if (!listContainer) return;
@@ -359,6 +399,11 @@ export function updateJobsView() {
 
     // Ensure all jobs have the new step structure
     filteredJobs.forEach(j => ensureTadilSteps(j));
+
+    // Extensions that haven't been started live on the prelicence matrix page
+    // only. They join this list the moment a stage is ticked off there.
+    const dormantCount = filteredJobs.filter(isDormantPrelicenceJob).length;
+    filteredJobs = filteredJobs.filter(j => !isDormantPrelicenceJob(j));
 
     // Single lookup table instead of a linear scan of Store.projects per job.
     const projectsByName = new Map((Store.projects || []).map(p => [p.name, p]));
@@ -404,13 +449,33 @@ export function updateJobsView() {
     listContainer.innerHTML = '';
     updateJobStats();
 
-    if (filteredJobs.length === 0) {
-        listContainer.innerHTML = `
-            <div class="empty-state">
-                <span>💼</span>
-                <p>Görüntülenecek tadil süreci bulunamadı.</p>
+    // Say where the hidden rows went, so an unexpectedly short list doesn't
+    // read as missing data.
+    if (dormantCount > 0) {
+        const notice = document.createElement('div');
+        notice.className = 'dormant-prelicence-notice';
+        notice.innerHTML = `
+            <span>⏳</span>
+            <div>
+                <strong>${dormantCount} önlisans süre uzatımı</strong> henüz başlamadı, bu listede gösterilmiyor.
+                İlk aşaması işaretlendiğinde buraya taşınır.
             </div>
+            <button type="button" class="btn btn-secondary" data-goto-prelicence>Matrise Git</button>
         `;
+        notice.querySelector('[data-goto-prelicence]').onclick = () => {
+            document.querySelector('.nav-item[data-page="prelicence-extensions"]')?.click();
+        };
+        listContainer.appendChild(notice);
+    }
+
+    if (filteredJobs.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.innerHTML = `
+            <span>💼</span>
+            <p>Görüntülenecek tadil süreci bulunamadı.</p>
+        `;
+        listContainer.appendChild(empty);
         return;
     }
 

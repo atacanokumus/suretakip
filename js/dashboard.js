@@ -3,6 +3,7 @@ import { Store } from './store.js';
 import {
     getDaysUntil, getStatus, getStatusText, formatDate, getQuarter, escapeHtml, isInThisCalendarMonth, getJobActualLastUpdateDate
 } from './utils.js';
+import { isDormantPrelicenceJob } from './jobs.js';
 
 function getGradientColor(index, total) {
     if (total <= 1) return 'hsl(35, 95%, 65%)';
@@ -27,7 +28,10 @@ function getGradientColor(index, total) {
  */
 export function updateDashboard() {
     const obligations = Store.obligations;
-    const jobs = Store.jobs || [];
+    // Same rule as the jobs page: prelicence extensions that haven't started
+    // are future plans, not active work. Counting them here reported 47 active
+    // amendments when only a handful were actually in progress.
+    const jobs = (Store.jobs || []).filter(j => !isDormantPrelicenceJob(j));
     const currentUserEmail = auth.currentUser?.email;
 
     // 1. My Pending Jobs

@@ -271,6 +271,231 @@ function generateWeeklyReportEmail(obligations) {
 }
 
 /**
+ * Stages tracked on the prelicence extension matrix, and the field each one
+ * keeps its date in. Mirrors MATRIX_STEPS in js/jobs.js.
+ */
+const PRELICENCE_STAGES = [
+    { key: "step1", field: "date", label: "1. Özet İsteme" },
+    { key: "step2", field: "izinlerDate", label: "2. Birim Görüş Dönüşü" },
+    { key: "step3", field: "date", label: "3. AO Hazırlık" },
+    { key: "step4", field: "date", label: "4. GD Kontrol" },
+    { key: "step5", field: "date", label: "5. EPDK Başvuru Hazırlık" },
+    { key: "step6", field: "date", label: "6. EPDK Başvuru" },
+    { key: "step8", field: "kdbTarih", label: "7-8. KDB Görüşü" },
+    { key: "step11", field: "date", label: "9-11. Derç Edilme" }
+];
+
+/** Rows that come from the prelicence matrix (same test as js/jobs.js). */
+function isPrelicenceMatrixJob(job) {
+    if (!job) return false;
+    if (job.matrixRow) return true;
+    const t = job.title || "";
+    return t.includes("Süre Uzatımı") || t.includes("Süre Uzatım") || t.includes("İLERLEME RAPORLARI");
+}
+
+/**
+ * Prelicence matrix stages falling due within the next 7 days, or already
+ * overdue.
+ *
+ * These are deliberately NOT modelled as obligations: ~30 projects x ~10
+ * stages would dump ~300 rows into the obligations list for work that already
+ * has its own page and its own workflow. The digest reports them as a separate
+ * block instead, so the two are read and judged independently.
+ */
+function collectPrelicenceStageItems(jobs) {
+    const items = [];
+
+    (jobs || []).forEach((job) => {
+        if (!isPrelicenceMatrixJob(job) || job.status === "completed") return;
+        const steps = job.steps || {};
+
+        PRELICENCE_STAGES.forEach((stage) => {
+            const step = steps[stage.key];
+            if (!step || step.completed) return;
+
+            const raw = step[stage.field] || step.date || step.plannedDate;
+            if (!raw) return;
+
+            const days = getDaysUntil(raw);
+            if (!Number.isFinite(days) || days > 7) return;
+
+            items.push({
+                project: job.project || "",
+                title: job.subTitle || job.title || "",
+                stage: stage.label,
+                days
+            });
+        });
+    });
+
+    // Most urgent first, overdue at the top.
+    items.sort((a, b) => a.days - b.days);
+    return items;
+}
+
+/**
+ * Builds the daily digest: the computed lists, the subject line and the HTML.
+ *
+ * This exists as one function because the digest previously had two separate
+ * implementations - the real 08:00 send in checkDeadlines, and a different one
+ * behind testEmail?type=real ("Günlük Analiz Raporu") that ignored the 7-day
+ * window and just listed the nearest 10 obligations. The test button therefore
+ * never showed what would actually be sent, which makes testing worthless.
+ * Both paths now call this.
+ *
+ * @returns {{subject: string, html: string, counts: object, isEmpty: boolean,
+ *            todayAndOverdue: Array, upcomingNext7Days: Array,
+ *            aoTasks: Array, gdTasks: Array, prelicenceItems: Array}}
+ */
+function buildDailyDigest(data) {
+    const obligations = data.obligations || [];
+    const jobs = data.jobs || [];
+    const todayAndOverdue = [];
+    const upcomingNext7Days = [];
+
+    obligations.forEach((o) => {
+        if (o.status === 'completed') return;
+        const days = getDaysUntil(o.deadline);
+        if (!Number.isFinite(days)) return;
+        if (days <= 0) {
+            todayAndOverdue.push({ ...o, days });
+        } else if (days <= 7) {
+            upcomingNext7Days.push({ ...o, days });
+        }
+    });
+
+    todayAndOverdue.sort((a, b) => a.days - b.days);
+    upcomingNext7Days.sort((a, b) => a.days - b.days);
+
+    // Writing tasks sitting on the current stage of an extension.
+    const aoTasks = [];
+    const gdTasks = [];
+    jobs.forEach((j) => {
+        if (j.status === 'completed') return;
+        const currentStep = j.currentStep || 1;
+        const sData = (j.steps || {})[`step${currentStep}`] || {};
+        if (j.title && j.title.includes('Süre Uzatımı')) {
+            if (currentStep === 3 && !sData.completed && !sData.aoDone) aoTasks.push(j);
+            else if (currentStep === 4 && !sData.completed && !sData.gdDone) gdTasks.push(j);
+        }
+    });
+
+    const prelicenceItems = collectPrelicenceStageItems(jobs);
+
+    const isEmpty = todayAndOverdue.length === 0 && upcomingNext7Days.length === 0 &&
+        aoTasks.length === 0 && gdTasks.length === 0 && prelicenceItems.length === 0;
+
+    const renderRow = (o) => `
+        <tr>
+            <td style="padding:10px; border-bottom:1px solid #eee;"><strong>${o.projectName}</strong></td>
+            <td style="padding:10px; border-bottom:1px solid #eee;">${o.obligationType}</td>
+            <td style="padding:10px; border-bottom:1px solid #eee; color:${o.days <= 0 ? '#ef4444' : '#f59e0b'};">
+                <strong>${o.days === 0 ? 'BUGÜN' : (o.days < 0 ? Math.abs(o.days) + ' gün geçti' : o.days + ' gün kaldı')}</strong>
+            </td>
+        </tr>`;
+
+    const renderPrelicenceRow = (p) => `
+        <tr>
+            <td style="padding:10px; border-bottom:1px solid #eee;"><strong>${p.project}</strong><br>
+                <span style="color:#6b7280; font-size:12px;">${p.title}</span></td>
+            <td style="padding:10px; border-bottom:1px solid #eee; color:#0ea5e9; font-size:13px;">${p.stage}</td>
+            <td style="padding:10px; border-bottom:1px solid #eee; color:${p.days <= 0 ? '#ef4444' : '#f59e0b'};">
+                <strong>${p.days === 0 ? 'BUGÜN' : (p.days < 0 ? Math.abs(p.days) + ' gün geçti' : p.days + ' gün kaldı')}</strong>
+            </td>
+        </tr>`;
+
+    const html = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; color: #1f2937;">
+            <h2 style="color: #6366f1; border-bottom: 2px solid #f3f4f6; padding-bottom: 12px;">📅 Günlük Özet Hatırlatıcı</h2>
+
+            ${aoTasks.length > 0 ? `
+                <div style="background: #eef2ff; border-left: 4px solid #6366f1; padding: 12px 16px; border-radius: 8px; margin-top: 16px;">
+                    <h3 style="color: #4338ca; margin: 0 0 8px 0; font-size: 15px;">✏️ Atacan Okumuş - Hazırlanacak Yazılar (AO)</h3>
+                    <ul style="margin: 0; padding-left: 18px; color: #374151; font-size: 13px;">
+                        ${aoTasks.map(j => `<li style="margin-bottom: 4px;"><strong>${j.project}</strong> — ${j.title} (Başvuru Yazısı Hazırlığı)</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+
+            ${gdTasks.length > 0 ? `
+                <div style="background: #fdf2f8; border-left: 4px solid #ec4899; padding: 12px 16px; border-radius: 8px; margin-top: 16px;">
+                    <h3 style="color: #be185d; margin: 0 0 8px 0; font-size: 15px;">🔍 Gamze Durum - Kontrol Edilecek Yazılar (GD)</h3>
+                    <ul style="margin: 0; padding-left: 18px; color: #374151; font-size: 13px;">
+                        ${gdTasks.map(j => `<li style="margin-bottom: 4px;"><strong>${j.project}</strong> — ${j.title} (Yazı Kontrolü & Onay)</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+
+            <!-- BLOCK 1: obligations -->
+            ${todayAndOverdue.length > 0 ? `
+                <h3 style="color: #ef4444; margin-top: 24px;">🚨 Bugün ve Gecikmiş Yükümlülükler (${todayAndOverdue.length})</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    ${todayAndOverdue.map(renderRow).join('')}
+                </table>
+            ` : ''}
+
+            ${upcomingNext7Days.length > 0 ? `
+                <h3 style="color: #f59e0b; margin-top: 24px;">🗓️ Önümüzdeki 7 Gün — Yükümlülükler (${upcomingNext7Days.length})</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    ${upcomingNext7Days.map(renderRow).join('')}
+                </table>
+            ` : ''}
+
+            ${todayAndOverdue.length === 0 && upcomingNext7Days.length === 0 ? `
+                <p style="color:#6b7280; font-size:13px; margin-top:24px;">
+                    Önümüzdeki 7 gün içinde vadesi gelen yükümlülük yok.
+                </p>
+            ` : ''}
+
+            <!-- BLOCK 2: prelicence extension stages, judged separately -->
+            <div style="margin-top: 32px; padding-top: 24px; border-top: 3px solid #e5e7eb;">
+                <h3 style="color: #0ea5e9; margin: 0 0 4px 0;">🔄 Önümüzdeki 7 Gün — Önlisans Süre Uzatımı İş Kalemleri (${prelicenceItems.length})</h3>
+                <p style="color: #6b7280; font-size: 12px; margin: 0 0 12px 0;">
+                    Bu kalemler yükümlülük değildir; önlisans süre uzatımı matrisinden gelir ve ayrı değerlendirilir.
+                </p>
+                ${prelicenceItems.length > 0 ? `
+                    <table style="width: 100%; border-collapse: collapse;">
+                        ${prelicenceItems.map(renderPrelicenceRow).join('')}
+                    </table>
+                ` : `
+                    <p style="color:#6b7280; font-size:13px; margin:0;">
+                        Önümüzdeki 7 gün içinde vadesi gelen önlisans süre uzatımı aşaması yok.
+                    </p>
+                `}
+            </div>
+
+            <div style="margin-top: 32px; padding: 16px; background: #f9fafb; border-radius: 8px; font-size: 14px; text-align: center;">
+                Bu mail e-posta kotanızı korumak için toplu olarak gönderilmiştir.<br>
+                <a href="https://sure-takip.web.app" style="color: #6366f1; text-decoration: none; font-weight: bold;">Platforma Git ➝</a>
+            </div>
+        </div>
+    `;
+
+    const obligationCount = todayAndOverdue.length + upcomingNext7Days.length + aoTasks.length + gdTasks.length;
+    // Counted separately on purpose: obligations and prelicence stages are two
+    // different things and are never summed into one number.
+    const subject = `📅 Günlük Özet: ${obligationCount} yükümlülük · ${prelicenceItems.length} önlisans aşaması`;
+
+    return {
+        subject,
+        html,
+        isEmpty,
+        counts: {
+            todayAndOverdue: todayAndOverdue.length,
+            upcoming7: upcomingNext7Days.length,
+            ao: aoTasks.length,
+            gd: gdTasks.length,
+            prelicence: prelicenceItems.length
+        },
+        todayAndOverdue,
+        upcomingNext7Days,
+        aoTasks,
+        gdTasks,
+        prelicenceItems
+    };
+}
+
+/**
  * SCHEDULED FUNCTION: Daily Deadline Check (Consolidated)
  * Runs every day at 08:00 AM Turkey time
  * Runs EVERY HOUR to check if it's time to send the report
@@ -336,118 +561,25 @@ exports.checkDeadlines = onSchedule({
 
         console.log("✅ Daily Schedule Match! Proceeding to check deadlines...");
 
-        // --- 2. Check Obligations & Jobs ---
-        const obligations = data.obligations || [];
-        const jobs = data.jobs || [];
-        const todayAndOverdue = [];
-        const upcomingNext7Days = [];
+        // --- 2. Build the digest (shared with testEmail?type=real) ---
+        const digest = buildDailyDigest(data);
+        console.log(`📊 Digest: ${JSON.stringify(digest.counts)}`);
 
-        console.log(`📊 Total obligations in Firestore: ${obligations.length}`);
-        const completedCount = obligations.filter(o => o.status === 'completed').length;
-        console.log(`✅ Completed obligations (will skip): ${completedCount}`);
-
-        obligations.forEach(o => {
-            if (o.status === 'completed') {
-                console.log(`⏭️ Skipping completed: ${o.projectName} - ${o.obligationType}`);
-                return;
-            }
-            const days = getDaysUntil(o.deadline);
-            console.log(`📋 Checking: ${o.projectName} | Status: "${o.status}" | Days: ${days}`);
-
-            if (days <= 0) {
-                todayAndOverdue.push({ ...o, days });
-            } else if (days <= 7) {
-                upcomingNext7Days.push({ ...o, days });
-            }
-        });
-
-        // Scan Active Jobs for AO & GD Tasks
-        const aoTasks = [];
-        const gdTasks = [];
-
-        jobs.forEach(j => {
-            if (j.status === 'completed') return;
-            const currentStep = j.currentStep || 1;
-            const steps = j.steps || {};
-            const sData = steps[`step${currentStep}`] || {};
-
-            if (j.title && j.title.includes('Süre Uzatımı')) {
-                if (currentStep === 3 && (!sData.completed && !sData.aoDone)) {
-                    aoTasks.push(j);
-                } else if (currentStep === 4 && (!sData.completed && !sData.gdDone)) {
-                    gdTasks.push(j);
-                }
-            }
-        });
-
-        if (todayAndOverdue.length === 0 && upcomingNext7Days.length === 0 && aoTasks.length === 0 && gdTasks.length === 0) {
-            console.log("📭 No critical deadlines or pending AO/GD tasks found. Skipping email to save quota.");
+        if (digest.isEmpty) {
+            console.log("📭 No deadlines, AO/GD tasks or prelicence stages. Skipping email to save quota.");
             return;
         }
 
-        // --- 3. Generate Email ---
-        const renderRow = (o) => `
-            <tr>
-                <td style="padding:10px; border-bottom:1px solid #eee;"><strong>${o.projectName}</strong></td>
-                <td style="padding:10px; border-bottom:1px solid #eee;">${o.obligationType}</td>
-                <td style="padding:10px; border-bottom:1px solid #eee; color:${o.days <= 0 ? '#ef4444' : '#f59e0b'};">
-                    <strong>${o.days === 0 ? 'BUGÜN' : (o.days < 0 ? Math.abs(o.days) + ' gün geçti' : o.days + ' gün kaldı')}</strong>
-                </td>
-            </tr>`;
-
-        const html = `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; color: #1f2937;">
-                <h2 style="color: #6366f1; border-bottom: 2px solid #f3f4f6; padding-bottom: 12px;">📅 Günlük Özet Hatırlatıcı</h2>
-                
-                ${aoTasks.length > 0 ? `
-                    <div style="background: #eef2ff; border-left: 4px solid #6366f1; padding: 12px 16px; border-radius: 8px; margin-top: 16px;">
-                        <h3 style="color: #4338ca; margin: 0 0 8px 0; font-size: 15px;">✏️ Atacan Okumuş - Hazırlanacak Yazılar (AO)</h3>
-                        <ul style="margin: 0; padding-left: 18px; color: #374151; font-size: 13px;">
-                            ${aoTasks.map(j => `<li style="margin-bottom: 4px;"><strong>${j.project}</strong> — ${j.title} (Başvuru Yazısı Hazırlığı)</li>`).join('')}
-                        </ul>
-                    </div>
-                ` : ''}
-
-                ${gdTasks.length > 0 ? `
-                    <div style="background: #fdf2f8; border-left: 4px solid #ec4899; padding: 12px 16px; border-radius: 8px; margin-top: 16px;">
-                        <h3 style="color: #be185d; margin: 0 0 8px 0; font-size: 15px;">🔍 Gamze Durum - Kontrol Edilecek Yazılar (GD)</h3>
-                        <ul style="margin: 0; padding-left: 18px; color: #374151; font-size: 13px;">
-                            ${gdTasks.map(j => `<li style="margin-bottom: 4px;"><strong>${j.project}</strong> — ${j.title} (Yazı Kontrolü & Onay)</li>`).join('')}
-                        </ul>
-                    </div>
-                ` : ''}
-
-                ${todayAndOverdue.length > 0 ? `
-                    <h3 style="color: #ef4444; margin-top: 24px;">🚨 Bugün ve Gecikmiş Yükümlülükler</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        ${todayAndOverdue.map(renderRow).join('')}
-                    </table>
-                ` : ''}
-
-                ${upcomingNext7Days.length > 0 ? `
-                    <h3 style="color: #f59e0b; margin-top: 24px;">🗓️ Önümüzdeki 7 Gün Yükümlülükler</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        ${upcomingNext7Days.map(renderRow).join('')}
-                    </table>
-                ` : ''}
-
-                <div style="margin-top: 32px; padding: 16px; background: #f9fafb; border-radius: 8px; font-size: 14px; text-align: center;">
-                    Bu mail e-posta kotanızı korumak için toplu olarak gönderilmiştir.<br>
-                    <a href="https://sure-takip.web.app" style="color: #6366f1; text-decoration: none; font-weight: bold;">Platforma Git ➝</a>
-                </div>
-            </div>
-        `;
-
-        // --- 4. Send Email ---
-        const totalItemsCount = todayAndOverdue.length + upcomingNext7Days.length + aoTasks.length + gdTasks.length;
+        // --- 3. Send Email ---
+        const { todayAndOverdue, upcomingNext7Days, aoTasks, gdTasks, prelicenceItems } = digest;
         const info = await resend.emails.send({
             from: FROM_EMAIL,
             to: TARGET_EMAIL,
-            subject: `📅 Günlük Özet: ${totalItemsCount} Madde Bekliyor`,
-            html: html
+            subject: digest.subject,
+            html: digest.html
         });
 
-        console.log(`🎉 Consolidated Daily Email Sent! Items: ${totalItemsCount}`, info);
+        console.log(`🎉 Consolidated Daily Email Sent!`, info);
 
         // --- 5. Same digest as a push, off the same computed lists ---
         try {
@@ -455,7 +587,8 @@ exports.checkDeadlines = onSchedule({
                 todayAndOverdue,
                 upcoming: upcomingNext7Days,
                 aoTasks,
-                gdTasks
+                gdTasks,
+                prelicenceItems
             });
         } catch (pushErr) {
             // A push failure must never cost us the e-mail, which already sent.
@@ -665,62 +798,26 @@ exports.testEmail = onRequest({
             });
 
         } else if (type === 'real' || type === 'report') {
-            // Real Data Mode
-            const dataRef = db.doc("daVinciData/master");
-            const snapshot = await dataRef.get();
-            let obligations = [];
-            if (snapshot.exists) {
-                const data = snapshot.data();
-                obligations = data.obligations || [];
+            // Real data, and deliberately the EXACT same builder the 08:00
+            // scheduled send uses. This branch used to have its own layout
+            // ("Günlük Analiz Raporu": nearest 10 obligations, no 7-day window,
+            // no prelicence block), so the test button never previewed what
+            // would actually be delivered.
+            const snapshot = await db.doc("daVinciData/master").get();
+            if (!snapshot.exists) {
+                res.status(404).json({ error: "daVinciData/master bulunamadi." });
+                return;
             }
 
-            // ... existing report logic ...
-            const activeObligations = obligations.filter(o => o.status !== 'completed' && parseDate(o.deadline));
-            activeObligations.sort((a, b) => parseDate(a.deadline) - parseDate(b.deadline));
-            const upcoming = activeObligations.filter(o => getDaysUntil(o.deadline) >= 0).slice(0, 10);
-
-            const renderRow = (o) => {
-                const days = getDaysUntil(o.deadline);
-                const color = days <= 3 ? '#ef4444' : days <= 7 ? '#f59e0b' : '#34d399';
-                const notes = o.notes || '-';
-                return `<tr>
-                    <td style="padding:12px;border-bottom:1px solid #e2e8f0;color:#000000;">${o.projectName}</td>
-                    <td style="padding:12px;border-bottom:1px solid #e2e8f0;color:#000000;">${o.obligationType}</td>
-                    <td style="padding:12px;border-bottom:1px solid #e2e8f0;color:#000000;">${formatDate(o.deadline)}</td>
-                    <td style="color:${color};padding:12px;border-bottom:1px solid #e2e8f0;font-weight:bold;">${days} gün</td>
-                    <td style="padding:12px;border-bottom:1px solid #e2e8f0;color:#000000;">${notes}</td>
-                </tr>`;
-            };
-
-            const html = `<!DOCTYPE html><html><head><style>
-                body{font-family:'Segoe UI',Arial;background:#ffffff;color:#000000;padding:20px}
-                .container{max-width:900px;margin:0 auto;background:#f8fafc;border-radius:12px;padding:32px;border:1px solid #e2e8f0}
-                table{width:100%;border-collapse:collapse;margin-top:24px}
-                th{text-align:left;padding:12px;background:#f1f5f9;color:#6366f1;border-bottom:2px solid #e2e8f0}
-                h1{color:#6366f1}
-            </style></head><body><div class="container">
-                <h1>🔍 Günlük Analiz Raporu</h1>
-                <p style="color:#64748b;">Toplam: ${obligations.length}, Aktif: ${activeObligations.length}</p>
-                <h3>📅 Yaklaşan (İlk 10)</h3>
-                <table>
-                    <tr>
-                        <th>Proje</th>
-                        <th>Konu</th>
-                        <th>Tarih</th>
-                        <th>Süre</th>
-                        <th>Notlar</th>
-                    </tr>
-                    ${upcoming.map(renderRow).join('')}
-                </table>
-            </div></body></html>`;
-
+            const digest = buildDailyDigest(snapshot.data());
             const sendResult = await resend.emails.send({
                 from: FROM_EMAIL,
                 to: TARGET_EMAIL,
-                subject: `🔍 Günlük Analiz Raporu - ${formatDate(new Date())}`,
-                html: html
+                subject: `[TEST] ${digest.subject}`,
+                html: digest.html
             });
-            res.json({ success: true, message: "Real report sent" });
+            console.log("📨 TEST daily digest sent:", digest.counts);
+            res.json({ success: true, message: "Real report sent", counts: digest.counts, result: sendResult });
 
         } else {
             // Default

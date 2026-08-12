@@ -10,6 +10,51 @@
     padding-bottom: 24px !important;
 }
 
+/* Banner for prelicence extensions hidden from this list because they haven't
+   started yet - without it a much shorter list looks like data went missing. */
+.dormant-prelicence-notice {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: rgba(96, 165, 250, 0.08);
+    border: 1px dashed rgba(96, 165, 250, 0.4);
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.dormant-prelicence-notice>span {
+    font-size: 22px;
+    flex-shrink: 0;
+}
+
+.dormant-prelicence-notice>div {
+    flex: 1;
+    min-width: 0;
+}
+
+.dormant-prelicence-notice strong {
+    color: var(--text-primary);
+}
+
+.dormant-prelicence-notice .btn {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    font-size: 13px;
+}
+
+@media (max-width: 768px) {
+    .dormant-prelicence-notice {
+        flex-wrap: wrap;
+    }
+
+    .dormant-prelicence-notice .btn {
+        width: 100%;
+    }
+}
+
 /* Job Card Design - Horizontal Glassmorphism Layout */
 .job-card {
     background: rgba(30, 41, 59, 0.45) !important;

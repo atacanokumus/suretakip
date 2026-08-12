@@ -433,7 +433,7 @@ exports.onMasterDataChanged = onDocumentWritten(
  * Mirrors the weekday morning e-mail as a push. Called from checkDeadlines so
  * both channels fire off exactly the same computed lists.
  */
-async function sendDigestPush(data, { todayAndOverdue, upcoming, aoTasks, gdTasks }) {
+async function sendDigestPush(data, { todayAndOverdue, upcoming, aoTasks, gdTasks, prelicenceItems = [] }) {
     const settings = await getSettings();
     if (!settings.dailyDigest) {
         console.log("🔕 Gunluk ozet push'u ayarlardan kapali.");
@@ -445,6 +445,8 @@ async function sendDigestPush(data, { todayAndOverdue, upcoming, aoTasks, gdTask
     if (upcoming.length) parts.push(`${upcoming.length} bu hafta`);
     const pending = aoTasks.length + gdTasks.length;
     if (pending) parts.push(`${pending} bekleyen yazı`);
+    // Listed separately from obligations, matching the e-mail's two blocks.
+    if (prelicenceItems.length) parts.push(`${prelicenceItems.length} önlisans aşaması`);
     if (!parts.length) return;
 
     await sendToAllDevices(

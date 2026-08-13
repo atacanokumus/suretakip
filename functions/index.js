@@ -9,6 +9,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const { Resend } = require("resend");
 const TeamsAIHelper = require("./teams_ai_helper");
+const { WORKFLOW_STAGE_LABELS } = require("./workflow_labels");
 
 // Initialize Firebase Admin
 initializeApp();
@@ -285,6 +286,59 @@ const PRELICENCE_STAGES = [
     { key: "step11", field: "date", label: "9-11. Derç Edilme" }
 ];
 
+/**
+ * Every amendment currently in progress, with the stage it sits on.
+ *
+ * Deliberately has no date window: unlike the other two blocks this is a
+ * "where does everything stand right now" list, not a deadline warning.
+ *
+ * Membership mirrors the Tadiller & Süreç Takibi page exactly - unstarted
+ * prelicence matrix rows are excluded, because those are future plans rather
+ * than live work and would otherwise add ~30 rows of noise.
+ */
+function collectActiveJobs(data) {
+    const jobs = data.jobs || [];
+    const companyByProject = new Map(
+        (data.projects || []).map((p) => [p.name, p.company || ""])
+    );
+
+    return jobs
+        .filter((j) => {
+            if (!j || j.status === "completed") return false;
+            // Started prelicence extensions count; untouched ones don't.
+            if (isPrelicenceMatrixJob(j)) {
+                const steps = j.steps || {};
+                return Object.keys(steps).some((k) => steps[k] && steps[k].completed);
+            }
+            return true;
+        })
+        .map((j) => {
+            const title = j.title || "";
+            const labels = WORKFLOW_STAGE_LABELS[title] || [];
+            const step = j.currentStep || 1;
+            const label = labels[step - 1];
+            return {
+                company: companyByProject.get(j.project) || "—",
+                project: j.project || "—",
+                // Extensions carry the specific licence article in subTitle
+                // (e.g. "T15 TESİS TAMAMLAMA"), which is what distinguishes
+                // two extensions on the same project.
+                type: isPrelicenceMatrixJob(j) && j.subTitle ? `${title} (${j.subTitle})` : title,
+                stage: label ? `${step}. ${label}` : `Aşama ${step}`,
+                totalStages: labels.length || null
+            };
+        })
+        .sort((a, b) => {
+            // Projects with no company on file sort last rather than leading
+            // the table with a column of dashes.
+            const aUnknown = a.company === "—";
+            const bUnknown = b.company === "—";
+            if (aUnknown !== bUnknown) return aUnknown ? 1 : -1;
+            return a.company.localeCompare(b.company, "tr") ||
+                a.project.localeCompare(b.project, "tr");
+        });
+}
+
 /** Rows that come from the prelicence matrix (same test as js/jobs.js). */
 function isPrelicenceMatrixJob(job) {
     if (!job) return false;
@@ -381,6 +435,8 @@ function buildDailyDigest(data) {
     });
 
     const prelicenceItems = collectPrelicenceStageItems(jobs);
+    // No date filter: this block reports current status, not deadlines.
+    const activeJobs = collectActiveJobs(data);
 
     const isEmpty = todayAndOverdue.length === 0 && upcomingNext7Days.length === 0 &&
         aoTasks.length === 0 && gdTasks.length === 0 && prelicenceItems.length === 0;
@@ -391,6 +447,16 @@ function buildDailyDigest(data) {
             <td style="padding:10px; border-bottom:1px solid #eee;">${o.obligationType}</td>
             <td style="padding:10px; border-bottom:1px solid #eee; color:${o.days <= 0 ? '#ef4444' : '#f59e0b'};">
                 <strong>${o.days === 0 ? 'BUGÜN' : (o.days < 0 ? Math.abs(o.days) + ' gün geçti' : o.days + ' gün kaldı')}</strong>
+            </td>
+        </tr>`;
+
+    const renderActiveJobRow = (j) => `
+        <tr>
+            <td style="padding:10px; border-bottom:1px solid #eee; font-size:13px; color:#6b7280;">${j.company}</td>
+            <td style="padding:10px; border-bottom:1px solid #eee;"><strong>${j.project}</strong></td>
+            <td style="padding:10px; border-bottom:1px solid #eee; font-size:13px;">${j.type}</td>
+            <td style="padding:10px; border-bottom:1px solid #eee; color:#8b5cf6; font-size:13px; font-weight:600;">
+                ${j.stage}${j.totalStages ? ` <span style="color:#9ca3af; font-weight:400;">/ ${j.totalStages}</span>` : ''}
             </td>
         </tr>`;
 
@@ -447,7 +513,28 @@ function buildDailyDigest(data) {
                 </p>
             ` : ''}
 
-            <!-- BLOCK 2: prelicence extension stages, judged separately -->
+            <!-- BLOCK 2: status of every live amendment, no date window -->
+            <div style="margin-top: 32px; padding-top: 24px; border-top: 3px solid #e5e7eb;">
+                <h3 style="color: #8b5cf6; margin: 0 0 4px 0;">⚡ Aktif Tadiller ve Bulundukları Aşamalar (${activeJobs.length})</h3>
+                <p style="color: #6b7280; font-size: 12px; margin: 0 0 12px 0;">
+                    Devam eden tüm tadil süreçleri ve son durumları. Tarih kısıtı yoktur.
+                </p>
+                ${activeJobs.length > 0 ? `
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Şirket</th>
+                            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Proje</th>
+                            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Tadil Çeşidi</th>
+                            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Bulunduğu Aşama</th>
+                        </tr>
+                        ${activeJobs.map(renderActiveJobRow).join('')}
+                    </table>
+                ` : `
+                    <p style="color:#6b7280; font-size:13px; margin:0;">Devam eden aktif tadil bulunmuyor.</p>
+                `}
+            </div>
+
+            <!-- BLOCK 3: prelicence extension stages, judged separately -->
             <div style="margin-top: 32px; padding-top: 24px; border-top: 3px solid #e5e7eb;">
                 <h3 style="color: #0ea5e9; margin: 0 0 4px 0;">🔄 Önümüzdeki 7 Gün — Önlisans Süre Uzatımı İş Kalemleri (${prelicenceItems.length})</h3>
                 <p style="color: #6b7280; font-size: 12px; margin: 0 0 12px 0;">
@@ -472,9 +559,9 @@ function buildDailyDigest(data) {
     `;
 
     const obligationCount = todayAndOverdue.length + upcomingNext7Days.length + aoTasks.length + gdTasks.length;
-    // Counted separately on purpose: obligations and prelicence stages are two
-    // different things and are never summed into one number.
-    const subject = `📅 Günlük Özet: ${obligationCount} yükümlülük · ${prelicenceItems.length} önlisans aşaması`;
+    // The three blocks are counted separately on purpose and never summed:
+    // they answer different questions (deadlines, current status, extensions).
+    const subject = `📅 Günlük Özet: ${obligationCount} yükümlülük · ${activeJobs.length} aktif tadil · ${prelicenceItems.length} önlisans aşaması`;
 
     return {
         subject,
@@ -485,12 +572,14 @@ function buildDailyDigest(data) {
             upcoming7: upcomingNext7Days.length,
             ao: aoTasks.length,
             gd: gdTasks.length,
+            activeJobs: activeJobs.length,
             prelicence: prelicenceItems.length
         },
         todayAndOverdue,
         upcomingNext7Days,
         aoTasks,
         gdTasks,
+        activeJobs,
         prelicenceItems
     };
 }

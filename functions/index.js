@@ -561,7 +561,7 @@ function buildDailyDigest(data) {
     const obligationCount = todayAndOverdue.length + upcomingNext7Days.length + aoTasks.length + gdTasks.length;
     // The three blocks are counted separately on purpose and never summed:
     // they answer different questions (deadlines, current status, extensions).
-    const subject = `📅 Günlük Özet: ${obligationCount} yükümlülük · ${activeJobs.length} aktif tadil · ${prelicenceItems.length} önlisans aşaması`;
+    const subject = `📅 Günlük Özet: ${obligationCount} yükümlülük · ${activeJobs.length} aktif tadil · ${prelicenceItems.length} ÖSU İş Kalemi`;
 
     return {
         subject,

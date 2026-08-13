@@ -446,7 +446,7 @@ async function sendDigestPush(data, { todayAndOverdue, upcoming, aoTasks, gdTask
     const pending = aoTasks.length + gdTasks.length;
     if (pending) parts.push(`${pending} bekleyen yazı`);
     // Listed separately from obligations, matching the e-mail's two blocks.
-    if (prelicenceItems.length) parts.push(`${prelicenceItems.length} önlisans aşaması`);
+    if (prelicenceItems.length) parts.push(`${prelicenceItems.length} ÖSU İş Kalemi`);
     if (!parts.length) return;
 
     await sendToAllDevices(

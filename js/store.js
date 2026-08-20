@@ -9,6 +9,13 @@ export const Store = {
     obligations: [],
     jobs: [], // New collection for Job Tracking
     projects: [], // Phase 3: Centralized Project Definitions { id, name, company, parent, expert: { name, phone } }
+    teaApplications: [], // TÜBİTAK RAPSİM TEA başvuruları { id, projectName, monthYear, label, mfilesLink, notes }
+    teaFeeSettings: {
+        lastMwRate: 5800, newMwRate: 11600, vatRate: 0.20,
+        recipientName: 'Tübitak Bilgem',
+        bankBranch: 'Türkiye Cumhuriyeti Ziraat Bankası A.Ş. Gebze Kurumsal Şube',
+        iban: 'TR96 0001 0020 8534 7551 9667 26'
+    }, // TEA başvuru bedeli hesaplayıcısının birim fiyatları ve ödeme bilgileri (düzenlenebilir)
     users: [], // List of user profiles { email, displayName, title, uid }
     // Tadil iş akışı tanımları: { [title]: [{ type, short, long }, ...] }.
     // Editable via the workflow builder; seeded once from DEFAULT_WORKFLOWS in
@@ -32,6 +39,16 @@ export const Store = {
 
     setProjects(newProjects) {
         this.projects = newProjects;
+        this.lastUpdate = new Date().toISOString();
+    },
+
+    setTeaApplications(newTeaApplications) {
+        this.teaApplications = newTeaApplications || [];
+        this.lastUpdate = new Date().toISOString();
+    },
+
+    setTeaFeeSettings(newSettings) {
+        this.teaFeeSettings = { ...this.teaFeeSettings, ...newSettings };
         this.lastUpdate = new Date().toISOString();
     },
 

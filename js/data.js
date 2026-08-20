@@ -9,6 +9,7 @@ import {
 import { showToast } from './ui.js';
 import { EMBEDDED_DATA } from '../embeddedData.js';
 import { DEFAULT_WORKFLOWS } from './default_workflows.js';
+import { TEA_SEED_DATA } from './tea_seed_data.js';
 
 import { db, auth } from './firebase-config.js';
 import {
@@ -92,6 +93,13 @@ export async function syncToFirestore(customTimestamp) {
             obligations: Store.obligations,
             jobs: Store.jobs || [],
             projects: Store.projects || [],
+            teaApplications: Store.teaApplications || [],
+            teaFeeSettings: Store.teaFeeSettings || {
+                lastMwRate: 5800, newMwRate: 11600, vatRate: 0.20,
+                recipientName: 'Tübitak Bilgem',
+                bankBranch: 'Türkiye Cumhuriyeti Ziraat Bankası A.Ş. Gebze Kurumsal Şube',
+                iban: 'TR96 0001 0020 8534 7551 9667 26'
+            },
             workflows: Store.workflows || {},
             // Users are stored in a separate collection
             lastUpdate: ts,
@@ -167,6 +175,18 @@ export function initFirestoreSync() {
                     safeSetStorage('epdk_workflows', data.workflows);
                 }
 
+                // 5. Sync TEA Applications (TÜBİTAK RAPSİM)
+                if (data.teaApplications) {
+                    Store.setTeaApplications(data.teaApplications);
+                    safeSetStorage('epdk_teaApplications', data.teaApplications);
+                }
+
+                // 6. Sync TEA Fee Calculator unit prices
+                if (data.teaFeeSettings) {
+                    Store.setTeaFeeSettings(data.teaFeeSettings);
+                    safeSetStorage('epdk_teaFeeSettings', data.teaFeeSettings);
+                }
+
                 localStorage.setItem('epdk_lastUpdate', data.lastUpdate);
                 window.dispatchEvent(new CustomEvent('data-refreshed'));
             }
@@ -233,6 +253,57 @@ export async function loadData() {
                     syncToFirestore().catch(err => logError('İş akışı tohumlama hatası', err));
                 }
 
+                // Load TEA Applications. If this Firestore document predates the
+                // TEA Başvuruları feature, there's no "teaApplications" field yet -
+                // seed it once from the historical Excel import and persist, so
+                // every subsequent load reads the same shared copy.
+                if (data.teaApplications && data.teaApplications.length > 0) {
+                    Store.setTeaApplications(data.teaApplications);
+                    safeSetStorage('epdk_teaApplications', data.teaApplications);
+
+                    // One-time backfill: some teammates already loaded the app
+                    // after teaApplications was first seeded but before the
+                    // "result" (olumlu/olumsuz) field existed, so their copy of
+                    // the historical records is missing it. Patch the correct
+                    // result back in by matching each record's seed id against
+                    // TEA_SEED_DATA, and persist so everyone gets the fix
+                    // without needing a fresh re-seed.
+                    let backfilled = false;
+                    const patched = Store.teaApplications.map(t => {
+                        if (t.result) return t;
+                        const seedIdx = t.id && t.id.startsWith('tea_seed_') ? parseInt(t.id.slice('tea_seed_'.length), 10) - 1 : -1;
+                        const seedMatch = seedIdx >= 0 ? TEA_SEED_DATA[seedIdx] : null;
+                        backfilled = true;
+                        return { ...t, result: (seedMatch && seedMatch.result) || 'pending' };
+                    });
+                    if (backfilled) {
+                        Store.setTeaApplications(patched);
+                        safeSetStorage('epdk_teaApplications', patched);
+                        syncToFirestore().catch(err => logError('TEA sonuç alanı düzeltme hatası', err));
+                    }
+                } else if (!data.teaApplications) {
+                    const seeded = TEA_SEED_DATA.map((item, idx) => ({
+                        id: `tea_seed_${idx + 1}`,
+                        projectName: item.projectName,
+                        monthYear: item.monthYear,
+                        label: item.label,
+                        result: item.result || 'pending',
+                        mfilesLink: '',
+                        notes: '',
+                        createdAt: new Date().toISOString(),
+                        createdBy: null
+                    }));
+                    Store.setTeaApplications(seeded);
+                    safeSetStorage('epdk_teaApplications', seeded);
+                    syncToFirestore().catch(err => logError('TEA başvuruları tohumlama hatası', err));
+                }
+
+                // Load TEA Fee Calculator unit prices, if already customized.
+                if (data.teaFeeSettings) {
+                    Store.setTeaFeeSettings(data.teaFeeSettings);
+                    safeSetStorage('epdk_teaFeeSettings', data.teaFeeSettings);
+                }
+
                 initFirestoreSync();
                 // Also fetch users
                 await fetchUsers();
@@ -283,6 +354,18 @@ export async function loadData() {
             Store.setWorkflows(savedWorkflows);
         } else {
             Store.setWorkflows({ ...DEFAULT_WORKFLOWS });
+        }
+
+        // Load TEA Applications
+        const savedTeaApplications = safeGetStorage('epdk_teaApplications');
+        if (savedTeaApplications && Array.isArray(savedTeaApplications)) {
+            Store.setTeaApplications(savedTeaApplications);
+        }
+
+        // Load TEA Fee Calculator unit prices
+        const savedTeaFeeSettings = safeGetStorage('epdk_teaFeeSettings');
+        if (savedTeaFeeSettings) {
+            Store.setTeaFeeSettings(savedTeaFeeSettings);
         }
 
         if (Store.obligations.length > 0 && auth.currentUser) initFirestoreSync();
@@ -351,6 +434,8 @@ export function saveData(syncWithCloud = true) {
     if (success) {
         safeSetStorage('epdk_jobs', Store.jobs); // Also save jobs
         safeSetStorage('epdk_projects', Store.projects); // And projects
+        safeSetStorage('epdk_teaApplications', Store.teaApplications); // And TEA applications
+        safeSetStorage('epdk_teaFeeSettings', Store.teaFeeSettings); // And TEA fee calculator unit prices
         const timestamp = new Date().toISOString();
         localStorage.setItem('epdk_lastUpdate', timestamp);
 
@@ -384,6 +469,7 @@ export function clearAllData() {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem('epdk_jobs');
     localStorage.removeItem('epdk_projects');
+    localStorage.removeItem('epdk_teaApplications');
     localStorage.removeItem('epdk_lastUpdate');
 }
 

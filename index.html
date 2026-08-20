@@ -123,6 +123,10 @@
                     <span class="nav-icon">⌛</span>
                     <span>Önlisans Süre Uzatımları</span>
                 </a>
+                <a href="#" class="nav-item" data-page="tea-applications">
+                    <span class="nav-icon">🍵</span>
+                    <span>TEA Başvuruları</span>
+                </a>
                 <a href="#" class="nav-item" data-page="obligations">
                     <span class="nav-icon">📋</span>
                     <span>Yükümlülükler</span>
@@ -460,6 +464,89 @@
                     <div class="matrix-table-card" style="background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: 16px; padding: 16px; overflow-x: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
                         <div id="extMatrixContainer">
                             <!-- Excel Matrix Table injected via JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TEA Başvuruları Matrix Page -->
+                <div class="page" id="tea-applications">
+                    <div class="filters-bar" style="margin-bottom: 20px;">
+                        <div class="filter-group">
+                            <label>Arama:</label>
+                            <input type="text" id="teaMatrixSearchInput" class="modern-input" placeholder="Proje veya başvuru ara..." style="padding: 6px 12px; font-size: 12px; width: 220px;">
+                        </div>
+                        <div class="filter-group ml-auto">
+                            <button class="btn btn-primary" id="teaAddBtn">➕ Yeni TEA Başvurusu Ekle</button>
+                        </div>
+                    </div>
+
+                    <div class="tea-layout-grid">
+                        <!-- Left: Ay-Yıl / Başvuru Matrix -->
+                        <div class="tea-matrix-card">
+                            <div id="teaMatrixContainer">
+                                <!-- TEA Matrix injected via JS -->
+                            </div>
+                        </div>
+
+                        <!-- Right: İstatistikler -->
+                        <div class="tea-stats-panel">
+                            <div class="tea-mini-stats">
+                                <div class="tea-mini-stat">
+                                    <span class="tea-mini-stat-value" id="teaStatTotal">0</span>
+                                    <span class="tea-mini-stat-label">Toplam Başvuru</span>
+                                    <span class="tea-mini-stat-note">(Haziran 2024'ten itibaren)</span>
+                                </div>
+                                <div class="tea-mini-stat tea-mini-stat-clickable" id="teaStatPositiveCard" title="Sadece olumlu başvuruları göster">
+                                    <span class="tea-mini-stat-value tea-value-positive" id="teaStatPositive">0</span>
+                                    <span class="tea-mini-stat-label">Olumlu</span>
+                                </div>
+                                <div class="tea-mini-stat tea-mini-stat-clickable" id="teaStatNegativeCard" title="Sadece olumsuz başvuruları göster">
+                                    <span class="tea-mini-stat-value tea-value-negative" id="teaStatNegative">0</span>
+                                    <span class="tea-mini-stat-label">Olumsuz</span>
+                                </div>
+                            </div>
+
+                            <div class="tea-chart-block">
+                                <div class="tea-chart-block-header">
+                                    <h4>🏢 Şirketlere Göre Dağılım</h4>
+                                    <div class="tea-filter-status" id="teaFilterStatus" style="display: none;">
+                                        <span id="teaFilterLabel"></span>
+                                        <button type="button" id="teaClearFilterBtn" title="Filtreyi temizle">✕ Temizle</button>
+                                    </div>
+                                </div>
+                                <div class="tea-chart-container"><canvas id="teaCompanyChart"></canvas></div>
+                            </div>
+
+                            <!-- TEA Fee Calculator -->
+                            <div class="tea-chart-block">
+                                <div class="tea-chart-block-header">
+                                    <h4>🧮 TEA Başvuru Bedeli Hesaplayıcı</h4>
+                                    <button type="button" id="teaFeeSettingsBtn" class="tea-icon-btn" title="Birim fiyatları düzenle">⚙️</button>
+                                </div>
+                                <div class="form-group">
+                                    <label for="teaCalcProjectSelect">Proje</label>
+                                    <select id="teaCalcProjectSelect" class="glass-input">
+                                        <option value="">Proje Seçiniz...</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="teaCalcLastMw">Son Başvuru Mekanik Gücü (MW)</label>
+                                    <input type="number" id="teaCalcLastMw" class="form-input" step="0.01" min="0" placeholder="İlk başvuruysa boş bırakın">
+                                </div>
+                                <div class="form-group">
+                                    <label for="teaCalcNewMw">Yapılacak Başvurunun Mekanik Gücü (MW)</label>
+                                    <input type="number" id="teaCalcNewMw" class="form-input" step="0.01" min="0" placeholder="Örn: 15">
+                                </div>
+
+                                <div class="tea-calc-result" id="teaCalcResult" style="display: none;">
+                                    <div class="tea-calc-amount-box">
+                                        <span>TEA Başvuru Bedeli (KDV Dahil)</span>
+                                        <strong id="teaCalcAmount">0 ₺</strong>
+                                    </div>
+                                    <div class="tea-calc-email-preview" id="teaCalcEmailPreview" contenteditable="true"></div>
+                                    <button type="button" class="btn btn-secondary tea-calc-copy-btn" id="teaCalcCopyBtn">📋 Maili Kopyala</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1144,6 +1231,111 @@
 
                     <div class="form-actions">
                         <button type="button" class="btn btn-secondary" id="cancelAddObligation">İptal</button>
+                        <button type="submit" class="btn btn-primary">💾 Kaydet</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- TEA Fee Calculator Settings Modal -->
+    <div class="modal-overlay" id="teaFeeSettingsModal">
+        <div class="modal-content modal-form">
+            <div class="modal-header">
+                <h3>⚙️ TEA Bedeli Birim Fiyatları</h3>
+                <button class="modal-close" id="teaFeeSettingsModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="teaFeeSettingsForm">
+                    <div class="form-group">
+                        <label for="teaSettingLastRate">Son Başvuru için MW Başına Tutar (₺)</label>
+                        <input type="number" id="teaSettingLastRate" class="form-input" step="1" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="teaSettingNewRate">Yapılacak Başvuru için MW Başına Tutar (₺)</label>
+                        <input type="number" id="teaSettingNewRate" class="form-input" step="1" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="teaSettingVatRate">KDV Oranı (%)</label>
+                        <input type="number" id="teaSettingVatRate" class="form-input" step="1" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="teaSettingRecipientName">Gönderilen Kişi</label>
+                        <input type="text" id="teaSettingRecipientName" class="form-input" placeholder="Örn: Tübitak Bilgem" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="teaSettingBankBranch">Şube</label>
+                        <input type="text" id="teaSettingBankBranch" class="form-input" placeholder="Örn: ... Bankası A.Ş. ... Şube" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="teaSettingIban">IBAN</label>
+                        <input type="text" id="teaSettingIban" class="form-input" placeholder="TR.. .... .... .... .... .... .." required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="teaFeeSettingsCancel">İptal</button>
+                        <button type="submit" class="btn btn-primary">💾 Kaydet</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit TEA Application Modal -->
+    <div class="modal-overlay" id="addTeaApplicationModal">
+        <div class="modal-content modal-form" id="addTeaApplicationModalContent">
+            <div class="modal-header">
+                <h3 id="addTeaApplicationModalTitle">➕ Yeni TEA Başvurusu Ekle</h3>
+                <button class="modal-close" id="addTeaApplicationModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="addTeaApplicationForm">
+                    <input type="hidden" id="teaEditingId" value="">
+
+                    <div class="form-group">
+                        <label for="teaProjectSelect">🏭 Proje Adı <span class="required">*</span></label>
+                        <select id="teaProjectSelect" class="glass-input" required>
+                            <option value="">Proje Seçiniz...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="teaMonthSelect">Ay <span class="required">*</span></label>
+                            <select id="teaMonthSelect" class="glass-input" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="teaYearInput">Yıl <span class="required">*</span></label>
+                            <input type="number" id="teaYearInput" class="form-input" min="2020" max="2050" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="teaLabelInput">Başvuru Etiketi <span class="required">*</span></label>
+                        <input type="text" id="teaLabelInput" class="form-input" placeholder="Örn: Ilgardere RES 20" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="teaResultSelect">Sonuç</label>
+                        <select id="teaResultSelect" class="glass-input">
+                            <option value="pending">⏳ Beklemede</option>
+                            <option value="positive">✅ Olumlu</option>
+                            <option value="negative">❌ Olumsuz</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="teaMfilesLink">M-Files Bağlantı Linki</label>
+                        <input type="url" id="teaMfilesLink" class="form-input" placeholder="https://...">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="teaNotesInput">Notlar</label>
+                        <textarea id="teaNotesInput" class="form-textarea" rows="2" placeholder="Ek notlar..."></textarea>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-danger" id="deleteTeaApplicationBtn" style="display: none; margin-right: auto;">🗑️ Sil</button>
+                        <button type="button" class="btn btn-secondary" id="cancelAddTeaApplication">İptal</button>
                         <button type="submit" class="btn btn-primary">💾 Kaydet</button>
                     </div>
                 </form>

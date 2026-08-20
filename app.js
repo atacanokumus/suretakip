@@ -38,6 +38,7 @@ import {
 import { initEmojiPicker } from './js/emoji.js';
 import { initPush, syncWidgetSnapshot } from './js/push.js';
 import { initWorkflowManager, renderWorkflowTypesList } from './js/workflow_builder.js';
+import { renderTeaApplicationsMatrix, initTeaEventHandlers, getTeaApplicationsForProject, getMonthYearLabel } from './js/tea.js';
 
 // ==========================================
 // Initialization
@@ -327,6 +328,7 @@ async function authorizedInit() {
         refreshAllViews();
         setupEventHandlers();
         initJobsEventHandlers(); // Initialize Job Event Handlers
+        initTeaEventHandlers(); // Initialize TEA Applications Event Handlers
 
 
         // Background/Async tasks
@@ -390,6 +392,7 @@ const PAGE_RENDERERS = {
     jobs: () => updateJobsView(), // calls refreshJobFilters() internally
     'prelicence-extensions': () => window.renderPrelicenceExtensionsMatrix?.(),
     projects: () => updateProjectsGrid(),
+    'tea-applications': () => renderTeaApplicationsMatrix(),
     analytics: () => renderAnalyticsPage(),
     settings: () => renderWorkflowTypesList()
 };
@@ -1121,6 +1124,8 @@ function updateObligationDeadline(id, newDate) {
     }
 }
 
+const TEA_RESULT_LABELS = { positive: 'Olumlu', negative: 'Olumsuz', pending: 'Beklemede' };
+
 function showProjectModal(projectName, obligations) {
     const modal = document.getElementById('modalOverlay');
     const title = document.getElementById('modalTitle');
@@ -1128,6 +1133,7 @@ function showProjectModal(projectName, obligations) {
 
     // Also fetch jobs for this project
     const jobs = Store.jobs.filter(j => j.project === projectName);
+    const teaApps = getTeaApplicationsForProject(projectName);
 
     // Filtering: Show only future obligations (or today)
     const today = new Date();
@@ -1207,6 +1213,24 @@ function showProjectModal(projectName, obligations) {
                                 </div>
                             </div>
                         `).join('') : '<p class="empty-text">Bu projeye atanmış iş bulunmuyor.</p>'}
+                    </div>
+                </div>
+
+                <!-- TEA Applications Section -->
+                <div class="project-section">
+                    <h3 class="section-header">
+                        <span>🧪</span> TEA Başvuruları (${teaApps.length})
+                    </h3>
+                    <div class="project-list-container">
+                        ${teaApps.length > 0 ? teaApps.map(t => `
+                            <div class="project-item-card tea-result-${t.result || 'pending'}" onclick="${t.mfilesLink ? `window.open('${escapeHtml(t.mfilesLink)}', '_blank', 'noopener')` : `window.openTeaApplicationModal('${t.id}')`}">
+                                <div class="item-header">
+                                    <span class="type-badge">${escapeHtml(getMonthYearLabel(t.monthYear))}</span>
+                                    <span class="date-badge">${t.mfilesLink ? '🔗' : '🧪'} ${TEA_RESULT_LABELS[t.result || 'pending']}</span>
+                                </div>
+                                <p class="item-desc">${escapeHtml(t.label)}</p>
+                            </div>
+                        `).join('') : '<p class="empty-text">Bu projeye ait TEA başvurusu bulunmuyor.</p>'}
                     </div>
                 </div>
             </div>

@@ -1509,9 +1509,27 @@ body {
 .month-bar-fill {
     width: 100%;
     background: linear-gradient(to top, #4f46e5 0%, #8b5cf6 50%, #ec4899 100%);
+    background-size: 100% 200%;
     border-radius: 4px 4px 0 0;
     transition: height 0.8s ease;
     position: relative;
+    animation: monthBarShine 4s infinite linear;
+    will-change: background-position;
+}
+
+.month-bar-fill.peak {
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+    animation: monthBarShine 2s infinite linear, barPulse 3s infinite ease-in-out;
+}
+
+@keyframes monthBarShine {
+    0% {
+        background-position: 0 100%;
+    }
+
+    100% {
+        background-position: 0 -100%;
+    }
 }
 
 .month-bar-value {

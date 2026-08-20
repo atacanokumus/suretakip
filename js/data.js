@@ -198,6 +198,33 @@ export function initFirestoreSync() {
 // Data Migration Logic
 // ==========================================
 
+/**
+ * One-time patch: "Önlisans Süre Uzatımı" and "Tesis Tamamlama Süre Uzatımı"
+ * used to have an "EPDK_BASVURU_HAZIRLIK" (Başvuru Hazırlık) step right after
+ * GD Kontrol - replaced with a "ZK_KONTROL" (ZK Kontrol) step at the same
+ * position. Store.workflows is Firestore-backed and was already seeded
+ * before this change shipped, so editing DEFAULT_WORKFLOWS alone wouldn't
+ * reach it - this patches the live copy in place and persists, the same way
+ * the TEA "result" field backfill below does. Same array position -> no
+ * job.steps remapping needed (keyed by position, not type).
+ */
+function migrateBasvuruHazirlikToZkKontrol() {
+    const titles = ['Önlisans Süre Uzatımı', 'Tesis Tamamlama Süre Uzatımı'];
+    let migrated = false;
+    titles.forEach(title => {
+        const steps = Store.workflows[title];
+        if (!steps) return;
+        const idx = steps.findIndex(s => s.type === 'EPDK_BASVURU_HAZIRLIK');
+        if (idx === -1) return;
+        steps[idx] = { type: 'ZK_KONTROL', short: 'ZK Kontrol', long: `${idx + 1}. ZK Kontrolü` };
+        migrated = true;
+    });
+    if (migrated) {
+        safeSetStorage('epdk_workflows', Store.workflows);
+        syncToFirestore().catch(err => logError('ZK Kontrol iş akışı geçişi hatası', err));
+    }
+}
+
 export async function loadData() {
     // 1. First try Firestore (Source of Truth for the Team)
     if (auth.currentUser) {
@@ -252,6 +279,7 @@ export async function loadData() {
                     safeSetStorage('epdk_workflows', Store.workflows);
                     syncToFirestore().catch(err => logError('İş akışı tohumlama hatası', err));
                 }
+                migrateBasvuruHazirlikToZkKontrol();
 
                 // Load TEA Applications. If this Firestore document predates the
                 // TEA Başvuruları feature, there's no "teaApplications" field yet -
@@ -355,6 +383,7 @@ export async function loadData() {
         } else {
             Store.setWorkflows({ ...DEFAULT_WORKFLOWS });
         }
+        migrateBasvuruHazirlikToZkKontrol();
 
         // Load TEA Applications
         const savedTeaApplications = safeGetStorage('epdk_teaApplications');

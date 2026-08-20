@@ -72,6 +72,8 @@ export function getInitialStepData(type, isCompleted) {
             return { completed: isCompleted, gdDone: isCompleted, date: '' };
         case 'EPDK_BASVURU_HAZIRLIK':
             return { completed: isCompleted, hazir: isCompleted, date: '' };
+        case 'ZK_KONTROL':
+            return { completed: isCompleted, zkDone: isCompleted, date: '' };
         case 'EPDK_BASVURU_YAPILMASI':
             return { completed: isCompleted, basvuruYapildi: isCompleted, date: '', number: '', hasRevision: false, revisionDate: '', revisionNotes: '' };
         case 'KDB_GORUS_CIKIS':
@@ -586,6 +588,8 @@ function getLiveStatusText(job) {
             return sData.completed || sData.gdDone ? `Aşama ${stepNum}: GD ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}Kontrol Etti ✅` : `Aşama ${stepNum}: GD (Gamze Durum) Kontrol Ediyor 🔍`;
         case 'EPDK_BASVURU_HAZIRLIK':
             return sData.completed || sData.hazir ? `Aşama ${stepNum}: EPDK Başvurusuna Hazır ✅` : `Aşama ${stepNum}: EPDK Başvurusuna hazır olması bekleniyor ⏳`;
+        case 'ZK_KONTROL':
+            return sData.completed || sData.zkDone ? `Aşama ${stepNum}: ZK ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}Kontrol Etti ✅` : `Aşama ${stepNum}: ZK Kontrol Ediyor 🔍`;
         case 'EPDK_BASVURU_YAPILMASI':
             {
                 let text = sData.completed || sData.basvuruYapildi ? `Aşama ${stepNum}: EPDK'ya ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}başvuru yapıldı 📬` : `Aşama ${stepNum}: EPDK'ya başvuru yapılması bekleniyor 📬`;
@@ -924,6 +928,11 @@ function generateProcessSummaryHtml(job) {
             case 'EPDK_BASVURU_HAZIRLIK':
                 if (sData.completed || sData.hazir || sData.date) {
                     lineText = `EPDK Başvurusuna <strong>${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}</strong>hazır hale getirildi.`;
+                }
+                break;
+            case 'ZK_KONTROL':
+                if (sData.completed || sData.zkDone || sData.date) {
+                    lineText = `ZK <strong>${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}</strong>kontrol etti.`;
                 }
                 break;
             case 'EPDK_BASVURU_YAPILMASI':
@@ -2289,6 +2298,19 @@ function renderStepFields(job, stepNum) {
                     </div>
                 </div>
             `;
+        case 'ZK_KONTROL':
+            return `
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>ZK Kontrol Tarihi</label>
+                        <input type="date" id="date-${stepNum}" value="${sData.date || ''}" class="modern-input">
+                    </div>
+                    <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-top:24px;">
+                        <input type="checkbox" id="zkDone-${stepNum}" ${sData.zkDone || sData.completed ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+                        <label for="zkDone-${stepNum}" style="font-weight:bold; color:#10b981; cursor:pointer; font-size:12px; margin-bottom:0;">ZK Kontrol Etti</label>
+                    </div>
+                </div>
+            `;
         case 'EPDK_BASVURU_YAPILMASI':
             return `
                 <div class="form-row">
@@ -2936,6 +2958,17 @@ function saveStepData(jobId, stepNum) {
                 const hazir = document.getElementById(`hazir-${stepNum}`).checked || !!dateVal;
                 steps[`step${stepNum}`] = { completed: hazir, hazir, date: dateVal };
                 if (hazir) {
+                    if (currentStep === stepNum) currentStep = stepNum + 1;
+                }
+            }
+            break;
+
+        case 'ZK_KONTROL':
+            {
+                const dateVal = document.getElementById(`date-${stepNum}`).value;
+                const zkDone = document.getElementById(`zkDone-${stepNum}`).checked || !!dateVal;
+                steps[`step${stepNum}`] = { completed: zkDone, zkDone, date: dateVal };
+                if (zkDone) {
                     if (currentStep === stepNum) currentStep = stepNum + 1;
                 }
             }

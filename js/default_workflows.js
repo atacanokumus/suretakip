@@ -71,7 +71,7 @@ export const DEFAULT_WORKFLOWS = {
         { type: "OZET_BIRIM_DONUSU", short: "Birim Görüşleri", long: "2. Diğer Birimler Görüş Dönüşü (İzinler & Teknik)" },
         { type: "AO_HAZIRLIK", short: "AO Hazırlık", long: "3. AO (Atacan Okumuş) Hazırlığı" },
         { type: "GD_KONTROL", short: "GD Kontrol", long: "4. GD (Gamze Durum) Kontrolü" },
-        { type: "EPDK_BASVURU_HAZIRLIK", short: "Başvuru Hazırlık", long: "5. EPDK Başvurusuna Hazırlık" },
+        { type: "ZK_KONTROL", short: "ZK Kontrol", long: "5. ZK Kontrolü" },
         { type: "EPDK_BASVURU_YAPILMASI", short: "EPDK Başvuru", long: "6. EPDK'ya Başvuru Yapılması" },
         { type: "KDB_GORUS_CIKIS", short: "KDB Görüş Çıkış", long: "7. KDB Kurum Görüşüne Çıkılması" },
         { type: "KDB_GORUS_DONUS", short: "KDB Görüş Dönüş", long: "8. KDB Kurum Görüşünün Gelmesi" },
@@ -99,7 +99,7 @@ export const DEFAULT_WORKFLOWS = {
         { type: "OZET_BIRIM_DONUSU", short: "Birim Görüşleri", long: "2. Diğer Birimler Görüş Dönüşü (İzinler & Teknik)" },
         { type: "AO_HAZIRLIK", short: "AO Hazırlık", long: "3. AO (Atacan Okumuş) Hazırlığı" },
         { type: "GD_KONTROL", short: "GD Kontrol", long: "4. GD (Gamze Durum) Kontrolü" },
-        { type: "EPDK_BASVURU_HAZIRLIK", short: "Başvuru Hazırlık", long: "5. EPDK Başvurusuna Hazırlık" },
+        { type: "ZK_KONTROL", short: "ZK Kontrol", long: "5. ZK Kontrolü" },
         { type: "EPDK_BASVURU_YAPILMASI", short: "EPDK Başvuru", long: "6. EPDK'ya Başvuru Yapılması" },
         // KDB Görüş Çıkış / KDB Görüş Dönüş kaldırıldı (2026-08-12) - bu iş akışı
         // için artık uygulanmıyor. Kalan adımlar (eski 9-13) burada 7-11 olarak

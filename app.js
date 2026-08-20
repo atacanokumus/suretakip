@@ -37,7 +37,7 @@ import {
 } from './js/utils.js';
 import { initEmojiPicker } from './js/emoji.js';
 import { initPush, syncWidgetSnapshot } from './js/push.js';
-import { initWorkflowManager } from './js/workflow_builder.js';
+import { initWorkflowManager, renderWorkflowTypesList } from './js/workflow_builder.js';
 
 // ==========================================
 // Initialization
@@ -391,7 +391,7 @@ const PAGE_RENDERERS = {
     'prelicence-extensions': () => window.renderPrelicenceExtensionsMatrix?.(),
     projects: () => updateProjectsGrid(),
     analytics: () => renderAnalyticsPage(),
-    settings: () => { }
+    settings: () => renderWorkflowTypesList()
 };
 
 const dirtyPages = new Set();

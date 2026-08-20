@@ -920,12 +920,61 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Card: Tadil İş Akışı Yönetimi -->
+                        <div class="card" id="workflowManagerCard">
+                            <div class="card-header">
+                                <h2>🧩 Tadil İş Akışı Yönetimi</h2>
+                            </div>
+                            <div class="card-body">
+                                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 18px;">
+                                    Tadil türlerinin aşamalarını buradan düzenleyin ya da yeni bir tadil tipi
+                                    oluşturun. Zaten ilerlemiş kayıtların verisi otomatik olarak yeni sıraya taşınır.
+                                </p>
+                                <div id="workflowTypesList"></div>
+                                <button class="btn btn-primary" id="newWorkflowTypeBtn" style="margin-top: 16px;">
+                                    ➕ Yeni Tadil Tipi
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div> <!-- closes settings -->
     </div> <!-- closes pages-container -->
     </main> <!-- closes main-content -->
     </div> <!-- closes app-container -->
+
+    <!-- Workflow Builder: drag pieces from the right into an ordered list on
+         the left to compose a tadil workflow. See js/workflow_builder.js. -->
+    <div class="modal-overlay" id="workflowBuilderOverlay">
+        <div class="wf-builder-shell">
+            <div class="wf-builder-header">
+                <input type="text" id="wfBuilderTitle" class="modern-input"
+                    placeholder="Tadil Tipi Adı (örn: ÇED Süre Uzatımı)">
+                <div class="wf-builder-actions">
+                    <button type="button" class="btn btn-secondary" id="wfBuilderCancel">İptal</button>
+                    <button type="button" class="btn btn-primary" id="wfBuilderSave">💾 Kaydet</button>
+                </div>
+            </div>
+            <div class="wf-builder-body">
+                <div class="wf-builder-panel">
+                    <h3>Bu Tadilde Olacak Adımlar</h3>
+                    <p class="wf-builder-panel-hint">Sıra yukarıdan aşağıya doğrudur.</p>
+                    <div class="wf-builder-list" id="wfBuilderWorkflowList"></div>
+                </div>
+                <div class="wf-builder-panel">
+                    <h3>Mevcut İş Akışı Kalemleri</h3>
+                    <p class="wf-builder-panel-hint">Sürükleyip sola bırakın (ya da çift tıklayın).</p>
+                    <div class="wf-builder-list" id="wfBuilderCatalogList"></div>
+                    <div class="wf-builder-new-piece">
+                        <input type="text" id="wfBuilderNewPieceInput" class="modern-input"
+                            placeholder="Yeni parça adı yazın...">
+                        <button type="button" class="btn btn-secondary" id="wfBuilderAddPiece">+ Ekle</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Toast Notification -->
     <div class="toast" id="toast">
@@ -1361,7 +1410,7 @@
     </div>
 
 
-    <script type="module" src="app.js?v=4"></script>
+    <script type="module" src="app.js?v=5"></script>
     <!-- Inline Drill-down Back Button (Dynamic) -->
     <div id="drilldownControls" class="drilldown-controls hidden">
         <button id="btnBackToSummary" class="btn-back">

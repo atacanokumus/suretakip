@@ -637,3 +637,33 @@ html.ios-shell .ext-matrix-scroll {
         font-size: 14px;
     }
 }
+
+/* ==========================================
+   4. Workflow Builder - desktop only
+   ------------------------------------------
+   Native HTML5 drag-and-drop doesn't fire from touch gestures, so on a phone
+   the whole builder would silently not work. The Settings card stays visible
+   (job counts per type are still useful to see), but editing is disabled with
+   an explanation instead of presenting a control that does nothing when
+   tapped.
+   ========================================== */
+
+@media (max-width: 768px) {
+    #newWorkflowTypeBtn,
+    .wf-type-edit,
+    .wf-type-delete {
+        display: none !important;
+    }
+
+    #workflowManagerCard::after {
+        content: '🖥️ İş akışı düzenleme yalnızca masaüstünde kullanılabilir.';
+        display: block;
+        margin-top: 12px;
+        padding: 10px 14px;
+        border-radius: 10px;
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px dashed rgba(245, 158, 11, 0.4);
+        color: var(--warning);
+        font-size: 12px;
+    }
+}

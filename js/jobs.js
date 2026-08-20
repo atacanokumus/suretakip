@@ -11,160 +11,10 @@ import { initEmojiPicker } from './emoji.js';
 // Initialization & Migration
 // ==========================================
 
-const WORKFLOWS = {
-    "Kurulu Güç / Ünite Tadili": [
-        { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
-        { type: "BASVURU", short: "Başvuru", long: "2. Tadil Başvurusunun Yapılması" },
-        { type: "KURUM_GORUS_TEIAS_EIGM", short: "TEİAŞ/EİGM Görüşü", long: "3. TEİAŞ ve EİGM Kurum Görüşleri" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Olur/Müzekkere", long: "4. Daire Başkanlığı Oluru / Müzekkere Yazımı" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Olur/Gündem", long: "5. Olur İmzalanması / Müzekkerenin Gündeme Alınması" },
-        { type: "YUKUMLULUK_TANIMLAMA", short: "Yükümlülük Tanımlama", long: "6. Yükümlülük Tanımlanması" },
-        { type: "YUKUMLULUK_TAMAMLAMA", short: "Yükümlülük Tamamlama", long: "7. Yükümlülüklerin Tamamlanması" },
-        { type: "DERC_EDILME", short: "Tadil Derç", long: "8. Tadilin Önlisans/Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "9. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "10. Belgenin Dağıtımı" }
-    ],
-    "Bağlantı Noktası Tadili": [
-        { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
-        { type: "BASVURU", short: "Başvuru", long: "2. Tadil Başvurusunun Yapılması" },
-        { type: "KURUM_GORUS_TEIAS", short: "TEİAŞ Görüşü", long: "3. TEİAŞ Kurum Görüşü" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "4. Müzekkere Yazılması" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "5. Müzekkerenin Gündeme Alınması" },
-        { type: "DERC_EDILME", short: "Tadil Derç", long: "6. Tadilin Önlisans/Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "7. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "8. Belgenin Dağıtımı" }
-    ],
-    "Depolama Ünitesi Tadili": [
-        { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
-        { type: "BASVURU", short: "Başvuru", long: "2. Tadil Başvurusunun Yapılması" },
-        { type: "KURUM_GORUS_KDB", short: "KDB Görüşü", long: "3. KDB Kurum Görüşü" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Olur Hazırlama", long: "4. Daire Başkanlığı Oluru Hazırlanması" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Olur İmzalanması", long: "5. Olur İmzalanması" },
-        { type: "DERC_EDILME", short: "Tadil Derç", long: "6. Tadilin Önlisans/Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "7. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "8. Belgenin Dağıtımı" }
-    ],
-    "Muhatap Yetkilisi Tanımlama": [
-        { type: "EVRAK_EPDK_SUNULMASI", short: "EPDK'ya Sunum", long: "1. Evrağın EPDK’ya Sunulması" },
-        { type: "MUHATAP_YETKILISI_TANIMLANMASI", short: "Yetkili Tanımlama", long: "2. Muhatap Yetkilisi Tanımlanması" }
-    ],
-    "Ortaklık / Yönetici Değişikliği": [
-        { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
-        { type: "BASVURU", short: "Başvuru", long: "2. Tadil Başvurusunun Yapılması" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "3. Müzekkere Yazılması" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "4. Müzekkerenin Gündeme Alınması" },
-        { type: "DERC_EDILME", short: "Tadil Derç", long: "5. Tadilin Önlisans/Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "6. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "7. Belgenin Dağıtımı" }
-    ],
-    "Önlisans Başvurusu": [
-        { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
-        { type: "BASVURU", short: "Başvuru", long: "2. Tadil Başvurusunun Yapılması" },
-        { type: "KURUM_GORUS_TEIAS_EIGM", short: "TEİAŞ/EİGM Görüşü", long: "3. TEİAŞ / EİGM Kurum Görüşleri" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "4. Müzekkere Yazılması" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "5. Müzekkerenin Gündeme Alınması" },
-        { type: "YUKUMLULUK_TANIMLAMA", short: "Yükümlülük Tanımlama", long: "6. Yükümlülük Tanımlanması" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "7. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "8. Belgenin Dağıtımı" },
-        { type: "YUKUMLULUK_TAMAMLAMA", short: "Yükümlülük Tamamlama", long: "9. Yükümlülüklerin Tamamlanması" }
-    ],
-    "Önlisans Süre Uzatımı": [
-        { type: "OZET_OZET_ISTEME", short: "Özet İsteme", long: "1. Özetin Diğer Birimlerden İstenmesi" },
-        { type: "OZET_BIRIM_DONUSU", short: "Birim Görüşleri", long: "2. Diğer Birimler Görüş Dönüşü (İzinler & Teknik)" },
-        { type: "AO_HAZIRLIK", short: "AO Hazırlık", long: "3. AO (Atacan Okumuş) Hazırlığı" },
-        { type: "GD_KONTROL", short: "GD Kontrol", long: "4. GD (Gamze Durum) Kontrolü" },
-        { type: "EPDK_BASVURU_HAZIRLIK", short: "Başvuru Hazırlık", long: "5. EPDK Başvurusuna Hazırlık" },
-        { type: "EPDK_BASVURU_YAPILMASI", short: "EPDK Başvuru", long: "6. EPDK'ya Başvuru Yapılması" },
-        { type: "KDB_GORUS_CIKIS", short: "KDB Görüş Çıkış", long: "7. KDB Kurum Görüşüne Çıkılması" },
-        { type: "KDB_GORUS_DONUS", short: "KDB Görüş Dönüş", long: "8. KDB Kurum Görüşünün Gelmesi" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "9. Müzekkere Hazırlanması" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "10. Müzekkerenin Gündeme Alınması" },
-        { type: "DERC_EDILME", short: "Derç Edilme", long: "11. Süre Uzatımının Ön/Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "12. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "13. Belgenin Dağıtımı" }
-    ],
-    "Saha Koordinat Tadili": [
-        { type: "BILGI_NOTU_TALEBI", short: "Bilgi Notu", long: "1. Bilgi Notu Talebi" },
-        { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "2. Tadil Bedeli Talebi" },
-        { type: "BASVURU", short: "Başvuru", long: "3. Tadil Başvurusunun Yapılması" },
-        { type: "KURUM_GORUS_TEIAS_EIGM", short: "TEİAŞ/EİGM Görüşü", long: "4. TEİAŞ / EİGM Kurum Görüşleri" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "5. Müzekkere Yazımı" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "6. Müzekkerenin Gündeme Alınması" },
-        { type: "YUKUMLULUK_TANIMLAMA", short: "Yükümlülük Tanımlama", long: "7. Yükümlülük Tanımlanması" },
-        { type: "YUKUMLULUK_TAMAMLAMA", short: "Yükümlülük Tamamlama", long: "8. Yükümlülüklerin Tamamlanması" },
-        { type: "DERC_EDILME", short: "Tadil Derç", long: "9. Tadilin Önlisans/Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "10. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "11. Belgenin Dağıtımı" }
-    ],
-    "Tesis Tamamlama Süre Uzatımı": [
-        { type: "OZET_OZET_ISTEME", short: "Özet İsteme", long: "1. Özetin Diğer Birimlerden İstenmesi" },
-        { type: "OZET_BIRIM_DONUSU", short: "Birim Görüşleri", long: "2. Diğer Birimler Görüş Dönüşü (İzinler & Teknik)" },
-        { type: "AO_HAZIRLIK", short: "AO Hazırlık", long: "3. AO (Atacan Okumuş) Hazırlığı" },
-        { type: "GD_KONTROL", short: "GD Kontrol", long: "4. GD (Gamze Durum) Kontrolü" },
-        { type: "EPDK_BASVURU_HAZIRLIK", short: "Başvuru Hazırlık", long: "5. EPDK Başvurusuna Hazırlık" },
-        { type: "EPDK_BASVURU_YAPILMASI", short: "EPDK Başvuru", long: "6. EPDK'ya Başvuru Yapılması" },
-        // KDB Görüş Çıkış / KDB Görüş Dönüş kaldırıldı (2026-08-12) - bu iş akışı
-        // için artık uygulanmıyor. Kalan adımlar (eski 9-13) burada 7-11 olarak
-        // yeniden numaralandı; ensureTadilSteps içindeki geçiş bloğu, zaten
-        // ilerlemiş kayıtların step verisini buna göre kaydırıyor.
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "7. Müzekkere Hazırlanması" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "8. Müzekkerenin Gündeme Alınması" },
-        { type: "DERC_EDILME", short: "Derç Edilme", long: "9. Süre Uzatımının Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "10. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "11. Belgenin Dağıtımı" }
-    ],
-    "Ünite Koordinat Tadili": [
-        { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
-        { type: "BASVURU", short: "Başvuru", long: "2. Tadil Başvurusunun Yapılması" },
-        { type: "KURUM_GORUS_TEIAS_EIGM", short: "TEİAŞ/EİGM Görüşü", long: "3. TEİAŞ ve EİGM Kurum Görüşleri" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Olur Hazırlama", long: "4. Daire Başkanlığı Oluru Hazırlanması" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Olur İmzalanması", long: "5. Olur İmzalanması" },
-        { type: "DERC_EDILME", short: "Tadil Derç", long: "6. Tadilin Önlisans/Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "7. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "8. Belgenin Dağıtımı" }
-    ],
-    "Üretim Lisansı Başvurusu": [
-        { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
-        { type: "BASVURU", short: "Başvuru", long: "2. Tadil Başvurusunun Yapılması" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "3. Müzekkere Yazımı" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "4. Müzekkerenin Gündeme Alınması" },
-        { type: "DERC_EDILME", short: "Lisans Derç", long: "5. Tadilin Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "6. Belgenin Teslim Alınması" },
-        { type: "TEMINAT_IADESI", short: "Teminat İadesi", long: "7. Teminat İadesinin İstenmesi" },
-        { type: "DAGITIM", short: "Dağıtım", long: "8. Belgenin Dağıtımı" }
-    ],
-    "Hibrit Başvurusu": [
-        { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
-        { type: "BASVURU", short: "Başvuru", long: "2. Tadil Başvurusunun Yapılması" },
-        { type: "KURUM_GORUS_TEIAS_EIGM", short: "TEİAŞ/EİGM Görüşü", long: "3. TEİAŞ / EİGM Kurum Görüşleri" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "4. Müzekkere Yazımı" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "5. Müzekkerenin Gündeme Alınması" },
-        { type: "YUKUMLULUK_TANIMLAMA", short: "Yükümlülük Tanımlama", long: "6. Yükümlülük Tanımlanması" },
-        { type: "YUKUMLULUK_TAMAMLAMA", short: "Yükümlülük Tamamlama", long: "7. Yükümlülüklerin Tamamlanması" },
-        { type: "DERC_EDILME", short: "Tadil Derç", long: "8. Tadilin Önlisans/Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "9. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "10. Belgenin Dağıtımı" }
-    ],
-    "İnvertör Tadili": [
-        { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
-        { type: "BASVURU", short: "Başvuru", long: "2. Tadil Başvurusunun Yapılması" },
-        { type: "KURUM_GORUS_TEIAS_EIGM", short: "TEİAŞ/EİGM Görüşü", long: "3. TEİAŞ / EİGM Kurum Görüşleri" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Olur Hazırlama", long: "4. Daire Başkanlığı Oluru Hazırlanması" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Olur İmzalanması", long: "5. Olur İmzalanması" },
-        { type: "DERC_EDILME", short: "Tadil Derç", long: "6. Tadilin Önlisans/Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "7. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "8. Belgenin Dağıtımı" }
-    ],
-    "Yıllık Elektrik Enerjisi Üretimi Miktarı Tadili": [
-        { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
-        { type: "BASVURU", short: "Başvuru", long: "2. Tadil Başvurusunun Yapılması" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Olur Hazırlama", long: "3. Daire Başkanlığı Oluru Hazırlanması" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Olur İmzalanması", long: "4. Olur İmzalanması" },
-        { type: "DERC_EDILME", short: "Tadil Derç", long: "5. Tadilin Önlisans/Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "6. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "7. Belgenin Dağıtımı" }
-    ]
-};
+import { DEFAULT_WORKFLOWS } from './default_workflows.js';
+export { DEFAULT_WORKFLOWS };
+
+
 
 const FALLBACK_STEPS = [
     { type: "BASVURU", short: "Başvuru Bilgisi", long: "1. Tadil Başvurusu Yapılması" },
@@ -175,7 +25,10 @@ const FALLBACK_STEPS = [
 export function getWorkflowSteps(job) {
     if (!job || !job.title) return FALLBACK_STEPS;
     const title = job.title.trim();
-    const steps = WORKFLOWS[title] || FALLBACK_STEPS;
+    // Store.workflows (Firestore-backed, editable via the workflow builder)
+    // takes priority; DEFAULT_WORKFLOWS only matters before the one-time seed
+    // in js/data.js has run, or if a title was never customized.
+    const steps = (Store.workflows && Store.workflows[title]) || DEFAULT_WORKFLOWS[title] || FALLBACK_STEPS;
     if (job.revisionCount && job.revisionCount > 0) {
         return steps.map(step => {
             if (step.type === 'BASVURU') {
@@ -367,6 +220,158 @@ function ensureTadilSteps(job) {
     }
 
     return job;
+}
+
+// ==========================================
+// Workflow Builder (Ayarlar > İş Akışı Yönetimi)
+// ------------------------------------------
+// Lets a workflow's step composition be edited from the UI instead of by
+// editing this file. The one hard problem: job.steps is keyed by POSITION
+// (step1, step2, ...), not by step identity, so any edit that adds, removes
+// or reorders steps must carry every existing job's already-entered data to
+// its new position - otherwise "GD Kontrol" data could silently become
+// mislabeled as "EPDK Başvuru" for every in-progress job of that type the
+// moment the definition changes. migrateJobsForWorkflowChange is the fix,
+// generalized from the hand-written migration used earlier for removing the
+// KDB steps from "Tesis Tamamlama Süre Uzatımı".
+// ==========================================
+
+/** Turkish label -> stable ASCII step-type id (KDB Görüş Çıkış -> KDB_GORUS_CIKIS). */
+function slugifyStepType(label) {
+    const trMap = { 'ç': 'c', 'Ç': 'C', 'ğ': 'g', 'Ğ': 'G', 'ı': 'i', 'İ': 'I', 'ö': 'o', 'Ö': 'O', 'ş': 's', 'Ş': 'S', 'ü': 'u', 'Ü': 'U' };
+    const ascii = (label || '').replace(/[çÇğĞıİöÖşŞüÜ]/g, ch => trMap[ch] || ch);
+    const slug = ascii.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    return slug || 'ADIM';
+}
+
+/** Every distinct step type already known (default + customized workflows), for the builder's palette. */
+export function getStepPieceCatalog() {
+    const seen = new Map();
+    const merged = { ...DEFAULT_WORKFLOWS, ...(Store.workflows || {}) };
+    Object.values(merged).forEach(steps => {
+        (steps || []).forEach(s => {
+            if (s && s.type && !seen.has(s.type)) seen.set(s.type, s.short);
+        });
+    });
+    return Array.from(seen, ([type, short]) => ({ type, short }));
+}
+
+/**
+ * A type id guaranteed not to collide with any step type used anywhere, for
+ * a piece the user is typing fresh in the builder.
+ */
+export function makeUniqueStepType(label) {
+    const taken = new Set(getStepPieceCatalog().map(p => p.type));
+    const base = slugifyStepType(label);
+    let candidate = base;
+    let n = 2;
+    while (taken.has(candidate)) candidate = `${base}_${n++}`;
+    return candidate;
+}
+
+/**
+ * Re-maps every job titled `title`'s step data from oldStepsConf's positions
+ * to newStepsConf's positions, matching by stable `type` - not by index. A
+ * step whose type was removed loses its data (there's nowhere left to put
+ * it); a step whose type is new starts blank. currentStep is recomputed as
+ * "first not-yet-completed step" under the NEW composition, so a job doesn't
+ * end up parked on a step that no longer exists.
+ *
+ * @returns {number} jobs migrated, for a confirmation message
+ */
+export function migrateJobsForWorkflowChange(title, oldStepsConf, newStepsConf) {
+    let migratedCount = 0;
+    (Store.jobs || []).forEach(job => {
+        if (job.title !== title) return;
+        const oldSteps = job.steps || {};
+        const newSteps = {};
+        newStepsConf.forEach((stepDef, idx) => {
+            const oldIdx = oldStepsConf.findIndex(s => s.type === stepDef.type);
+            newSteps[`step${idx + 1}`] = (oldIdx !== -1 && oldSteps[`step${oldIdx + 1}`])
+                ? oldSteps[`step${oldIdx + 1}`]
+                : getInitialStepData(stepDef.type, false);
+        });
+        job.steps = newSteps;
+        // Deliberately not deriveCurrentStep(job): that re-reads
+        // Store.workflows[title] by title, and at the moment this runs
+        // (inside saveWorkflowDefinition, before Store.setWorkflows commits
+        // the new config) it would still see the OLD step count - job.steps
+        // has newStepsConf.length keys, so "first not-completed" using the
+        // old, longer count silently falls off the end. Compute it directly
+        // against the config we already have instead.
+        let firstIncomplete = newStepsConf.length;
+        for (let k = 0; k < newStepsConf.length; k++) {
+            if (!newSteps[`step${k + 1}`]?.completed) { firstIncomplete = k + 1; break; }
+        }
+        job.currentStep = firstIncomplete;
+        Store.updateJob(job.id, { steps: job.steps, currentStep: job.currentStep });
+        migratedCount++;
+    });
+    return migratedCount;
+}
+
+/**
+ * Creates a new workflow type, or saves edits (step composition and/or a
+ * rename) to an existing one. Always migrates existing jobs so in-progress
+ * work is never silently mislabeled or dropped.
+ *
+ * @param {string} title - final title (after any rename)
+ * @param {Array<{type: string, short: string}>} pieces - ordered, unnumbered
+ * @param {string|null} renameFrom - the title being edited, if any; null for a brand-new type
+ */
+export function saveWorkflowDefinition(title, pieces, renameFrom = null) {
+    const cleanTitle = (title || '').trim();
+    if (!cleanTitle) return { ok: false, error: 'İş akışı adı boş olamaz.' };
+    if (!pieces || pieces.length === 0) return { ok: false, error: 'En az bir adım eklemelisiniz.' };
+
+    const isRename = !!renameFrom && renameFrom !== cleanTitle;
+    const existing = { ...DEFAULT_WORKFLOWS, ...(Store.workflows || {}) };
+    if (cleanTitle !== renameFrom && existing[cleanTitle]) {
+        return { ok: false, error: `"${cleanTitle}" adında bir iş akışı zaten var.` };
+    }
+
+    const newStepsConf = pieces.map((p, idx) => ({
+        type: p.type,
+        short: p.short,
+        long: `${idx + 1}. ${p.short}`
+    }));
+
+    // Commit the new definition to Store.workflows BEFORE migrating jobs:
+    // migrateJobsForWorkflowChange no longer depends on this ordering (it
+    // computes currentStep from newStepsConf directly rather than re-reading
+    // Store.workflows by title), but other code paths touched indirectly
+    // during migration - or added later - may still call getWorkflowSteps()
+    // for this title, and should see the new shape, not the one being
+    // replaced.
+    const workflows = { ...(Store.workflows || {}) };
+    if (isRename) delete workflows[renameFrom];
+    workflows[cleanTitle] = newStepsConf;
+    Store.setWorkflows(workflows);
+
+    let migratedCount = 0;
+    const oldStepsConf = renameFrom ? (existing[renameFrom] || []) : [];
+    if (oldStepsConf.length > 0) {
+        if (isRename) {
+            Store.jobs.forEach(job => { if (job.title === renameFrom) job.title = cleanTitle; });
+        }
+        migratedCount = migrateJobsForWorkflowChange(cleanTitle, oldStepsConf, newStepsConf);
+    }
+    saveData();
+
+    return { ok: true, migratedCount };
+}
+
+/** Refuses to delete a type that's still in use, rather than orphaning jobs. */
+export function deleteWorkflowDefinition(title) {
+    const inUseCount = (Store.jobs || []).filter(j => j.title === title).length;
+    if (inUseCount > 0) {
+        return { ok: false, error: `Bu tipte ${inUseCount} tadil kaydı var. Önce bu kayıtları tamamlayın veya silin.` };
+    }
+    const workflows = { ...(Store.workflows || {}) };
+    delete workflows[title];
+    Store.setWorkflows(workflows);
+    saveData();
+    return { ok: true };
 }
 
 // ==========================================
@@ -2395,7 +2400,24 @@ function renderStepFields(job, stepNum) {
                 </div>
             `;
         default:
-            return '';
+            // Custom steps created via the workflow builder have no dedicated
+            // case here - they get this generic completed/date/note form
+            // instead of an empty panel. saveStepData's default case reads
+            // these same three field ids back.
+            return `
+                <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                    <input type="checkbox" id="completed-${stepNum}" ${sData.completed ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+                    <label for="completed-${stepNum}" style="font-weight:bold; color:var(--accent-light); margin-bottom:0; cursor:pointer;">${escapeHtml(stepConf.short)} Tamamlandı</label>
+                </div>
+                <div class="form-group">
+                    <label>Tarih</label>
+                    <input type="date" id="date-${stepNum}" value="${sData.date || ''}" class="modern-input">
+                </div>
+                <div class="form-group">
+                    <label>Not (opsiyonel)</label>
+                    <input type="text" id="note-${stepNum}" value="${escapeHtml(sData.note || '')}" class="modern-input" placeholder="Ek açıklama">
+                </div>
+            `;
     }
 }
 
@@ -3265,6 +3287,34 @@ function saveStepData(jobId, stepNum) {
                 status = 'completed';
                 job.completedAt = new Date();
                 showToast('Tadil süreci başarıyla tamamlandı! 🎉', 'success');
+            }
+            break;
+
+        default:
+            // Matches renderStepFields's default panel (custom steps from the
+            // workflow builder): a plain completed/date/note step. Mirrors
+            // DAGITIM/YUKUMLULUK_TAMAMLAMA's "last step in the workflow closes
+            // the job" pattern rather than the simpler mid-workflow cases,
+            // since a custom step can land at any position including last.
+            {
+                const completedEl = document.getElementById(`completed-${stepNum}`);
+                const isCompleted = completedEl ? completedEl.checked : false;
+                const dateVal = document.getElementById(`date-${stepNum}`)?.value || '';
+                const noteVal = document.getElementById(`note-${stepNum}`)?.value.trim() || '';
+
+                steps[`step${stepNum}`] = { completed: isCompleted, date: dateVal, note: noteVal };
+
+                if (isCompleted) {
+                    if (stepNum === stepsConf.length) {
+                        status = 'completed';
+                        job.completedAt = new Date();
+                        showToast('Tüm tadil ve iş akışı aşamaları başarıyla tamamlandı! 🎉', 'success');
+                    } else if (currentStep === stepNum) {
+                        currentStep = stepNum + 1;
+                    }
+                } else if (currentStep > stepNum) {
+                    currentStep = stepNum;
+                }
             }
             break;
     }

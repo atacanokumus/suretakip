@@ -37,6 +37,7 @@ import {
 } from './js/utils.js';
 import { initEmojiPicker } from './js/emoji.js';
 import { initPush, syncWidgetSnapshot } from './js/push.js';
+import { initWorkflowManager } from './js/workflow_builder.js';
 
 // ==========================================
 // Initialization
@@ -69,6 +70,7 @@ function initApp() {
         initModals();
         initMobileMenu();
         initPush();
+        initWorkflowManager();
     } catch (e) {
         console.error('UI Basic Init Error:', e);
     }

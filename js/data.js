@@ -8,6 +8,7 @@ import {
 } from './utils.js';
 import { showToast } from './ui.js';
 import { EMBEDDED_DATA } from '../embeddedData.js';
+import { DEFAULT_WORKFLOWS } from './default_workflows.js';
 
 import { db, auth } from './firebase-config.js';
 import {
@@ -91,6 +92,7 @@ export async function syncToFirestore(customTimestamp) {
             obligations: Store.obligations,
             jobs: Store.jobs || [],
             projects: Store.projects || [],
+            workflows: Store.workflows || {},
             // Users are stored in a separate collection
             lastUpdate: ts,
             updatedBy: auth.currentUser.email
@@ -159,6 +161,12 @@ export function initFirestoreSync() {
                     safeSetStorage('epdk_projects', data.projects);
                 }
 
+                // 4. Sync Workflow Definitions (editable via the workflow builder)
+                if (data.workflows) {
+                    Store.setWorkflows(data.workflows);
+                    safeSetStorage('epdk_workflows', data.workflows);
+                }
+
                 localStorage.setItem('epdk_lastUpdate', data.lastUpdate);
                 window.dispatchEvent(new CustomEvent('data-refreshed'));
             }
@@ -211,6 +219,20 @@ export async function loadData() {
                     safeSetStorage('epdk_projects', data.projects);
                 }
 
+                // Load Workflow Definitions. If this Firestore document
+                // predates the workflow builder, there's no "workflows" field
+                // yet - seed it once from the built-in defaults and persist,
+                // so every subsequent load (and every teammate) reads the same
+                // editable copy instead of re-seeding independently.
+                if (data.workflows && Object.keys(data.workflows).length > 0) {
+                    Store.setWorkflows(data.workflows);
+                    safeSetStorage('epdk_workflows', data.workflows);
+                } else {
+                    Store.setWorkflows({ ...DEFAULT_WORKFLOWS });
+                    safeSetStorage('epdk_workflows', Store.workflows);
+                    syncToFirestore().catch(err => logError('İş akışı tohumlama hatası', err));
+                }
+
                 initFirestoreSync();
                 // Also fetch users
                 await fetchUsers();
@@ -253,6 +275,14 @@ export async function loadData() {
         const savedProjects = safeGetStorage('epdk_projects');
         if (savedProjects && Array.isArray(savedProjects)) {
             Store.setProjects(savedProjects);
+        }
+
+        // Load Workflow Definitions
+        const savedWorkflows = safeGetStorage('epdk_workflows');
+        if (savedWorkflows && Object.keys(savedWorkflows).length > 0) {
+            Store.setWorkflows(savedWorkflows);
+        } else {
+            Store.setWorkflows({ ...DEFAULT_WORKFLOWS });
         }
 
         if (Store.obligations.length > 0 && auth.currentUser) initFirestoreSync();

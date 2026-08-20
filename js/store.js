@@ -10,6 +10,10 @@ export const Store = {
     jobs: [], // New collection for Job Tracking
     projects: [], // Phase 3: Centralized Project Definitions { id, name, company, parent, expert: { name, phone } }
     users: [], // List of user profiles { email, displayName, title, uid }
+    // Tadil iş akışı tanımları: { [title]: [{ type, short, long }, ...] }.
+    // Editable via the workflow builder; seeded once from DEFAULT_WORKFLOWS in
+    // js/jobs.js if Firestore has no "workflows" field yet (see js/data.js).
+    workflows: {},
     lastUpdate: null,
 
     /**
@@ -33,6 +37,11 @@ export const Store = {
 
     setUsers(newUsers) {
         this.users = newUsers;
+        this.lastUpdate = new Date().toISOString();
+    },
+
+    setWorkflows(newWorkflows) {
+        this.workflows = newWorkflows || {};
         this.lastUpdate = new Date().toISOString();
     },
 

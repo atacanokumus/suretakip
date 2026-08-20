@@ -103,13 +103,15 @@ const WORKFLOWS = {
         { type: "GD_KONTROL", short: "GD Kontrol", long: "4. GD (Gamze Durum) Kontrolü" },
         { type: "EPDK_BASVURU_HAZIRLIK", short: "Başvuru Hazırlık", long: "5. EPDK Başvurusuna Hazırlık" },
         { type: "EPDK_BASVURU_YAPILMASI", short: "EPDK Başvuru", long: "6. EPDK'ya Başvuru Yapılması" },
-        { type: "KDB_GORUS_CIKIS", short: "KDB Görüş Çıkış", long: "7. KDB Kurum Görüşüne Çıkılması" },
-        { type: "KDB_GORUS_DONUS", short: "KDB Görüş Dönüş", long: "8. KDB Kurum Görüşünün Gelmesi" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "9. Müzekkere Hazırlanması" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "10. Müzekkerenin Gündeme Alınması" },
-        { type: "DERC_EDILME", short: "Derç Edilme", long: "11. Süre Uzatımının Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "12. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "13. Belgenin Dağıtımı" }
+        // KDB Görüş Çıkış / KDB Görüş Dönüş kaldırıldı (2026-08-12) - bu iş akışı
+        // için artık uygulanmıyor. Kalan adımlar (eski 9-13) burada 7-11 olarak
+        // yeniden numaralandı; ensureTadilSteps içindeki geçiş bloğu, zaten
+        // ilerlemiş kayıtların step verisini buna göre kaydırıyor.
+        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "7. Müzekkere Hazırlanması" },
+        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "8. Müzekkerenin Gündeme Alınması" },
+        { type: "DERC_EDILME", short: "Derç Edilme", long: "9. Süre Uzatımının Lisansa Derç Edilmesi" },
+        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "10. Belgenin Teslim Alınması" },
+        { type: "DAGITIM", short: "Dağıtım", long: "11. Belgenin Dağıtımı" }
     ],
     "Ünite Koordinat Tadili": [
         { type: "TADIL_BEDELI", short: "Tadil Bedeli", long: "1. Tadil Bedeli Talebi" },
@@ -273,6 +275,35 @@ function ensureTadilSteps(job) {
             step10: oldSteps.step9 || {}
         };
         job.currentStep = job.status === 'completed' ? 10 : (job.currentStep || 1) + 1;
+        Store.updateJob(job.id, { steps: job.steps, currentStep: job.currentStep });
+        return job;
+    }
+
+    // Migrate old 13-step "Tesis Tamamlama Süre Uzatımı" (with KDB Görüş
+    // Çıkış/Dönüş at 7-8) to the current 11-step version. Trigger: step12/13
+    // only ever existed under the old shape - ensureTadilSteps's own initializer
+    // fills every step up to getWorkflowSteps(job).length, so a brand-new job
+    // created after this change never gets those keys at all. Without this,
+    // the generic "wrong step count -> wipe to blank" reconciliation further
+    // down would discard progress on every existing job of this type instead
+    // of shifting it.
+    if (job.title === 'Tesis Tamamlama Süre Uzatımı' && job.steps && (job.steps.step12 || job.steps.step13)) {
+        const oldSteps = job.steps;
+        job.steps = {
+            step1: oldSteps.step1 || {},
+            step2: oldSteps.step2 || {},
+            step3: oldSteps.step3 || {},
+            step4: oldSteps.step4 || {},
+            step5: oldSteps.step5 || {},
+            step6: oldSteps.step6 || {},
+            // old step7 (KDB Görüş Çıkış) / step8 (KDB Görüş Dönüş) dropped
+            step7: oldSteps.step9 || {},   // Müzekkere
+            step8: oldSteps.step10 || {},  // Gündem
+            step9: oldSteps.step11 || {},  // Derç Edilme
+            step10: oldSteps.step12 || {}, // Belge Teslim
+            step11: oldSteps.step13 || {}  // Dağıtım
+        };
+        job.currentStep = deriveCurrentStep(job);
         Store.updateJob(job.id, { steps: job.steps, currentStep: job.currentStep });
         return job;
     }

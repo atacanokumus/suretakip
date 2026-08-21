@@ -25,6 +25,19 @@ const STORAGE_KEY = 'epdk_obligations';
 const MAX_STORAGE_SIZE_MB = 5;
 let unsubscribeFirestore = null;
 
+export const DEFAULT_TEA_FEE_SETTINGS = {
+    lastMwRate: 5800, newMwRate: 11600, vatRate: 0.20,
+    recipientName: 'Tübitak Bilgem',
+    bankBranch: 'Türkiye Cumhuriyeti Ziraat Bankası A.Ş. Gebze Kurumsal Şube',
+    iban: 'TR96 0001 0020 8534 7551 9667 26'
+};
+
+// Set once this client has read the TEA collections back from Firestore (or
+// legitimately established that there are none). Until then syncToFirestore
+// leaves those fields untouched rather than overwriting them with an empty
+// Store - see the guard in syncToFirestore.
+let teaLoaded = false;
+
 // ==========================================
 // Safe Storage Operations
 // ==========================================
@@ -89,22 +102,31 @@ export async function syncToFirestore(customTimestamp) {
     try {
         const dataRef = doc(db, "daVinciData", "master");
         const ts = customTimestamp || new Date().toISOString();
-        await setDoc(dataRef, {
+        const payload = {
             obligations: Store.obligations,
             jobs: Store.jobs || [],
             projects: Store.projects || [],
-            teaApplications: Store.teaApplications || [],
-            teaFeeSettings: Store.teaFeeSettings || {
-                lastMwRate: 5800, newMwRate: 11600, vatRate: 0.20,
-                recipientName: 'Tübitak Bilgem',
-                bankBranch: 'Türkiye Cumhuriyeti Ziraat Bankası A.Ş. Gebze Kurumsal Şube',
-                iban: 'TR96 0001 0020 8534 7551 9667 26'
-            },
             workflows: Store.workflows || {},
             // Users are stored in a separate collection
             lastUpdate: ts,
             updatedBy: auth.currentUser.email
-        });
+        };
+
+        // Only send the TEA collections once this client has actually read them
+        // back from Firestore. Without this guard a client that saved something
+        // else (an obligation, a job) before its TEA load finished would push an
+        // empty array over everyone's records - which is exactly how the 80
+        // linked TEA applications were wiped on 2026-08-20.
+        if (teaLoaded) {
+            payload.teaApplications = Store.teaApplications || [];
+            payload.teaFeeSettings = Store.teaFeeSettings || DEFAULT_TEA_FEE_SETTINGS;
+        }
+
+        // merge:true so a field this build doesn't know about is left alone
+        // instead of being deleted. A plain setDoc replaces the whole document,
+        // so any teammate still running an older build would silently drop
+        // fields added after their build - the root cause of the same incident.
+        await setDoc(dataRef, payload, { merge: true });
         if (!customTimestamp) {
             localStorage.setItem('epdk_lastUpdate', ts);
         }
@@ -179,6 +201,7 @@ export function initFirestoreSync() {
                 if (data.teaApplications) {
                     Store.setTeaApplications(data.teaApplications);
                     safeSetStorage('epdk_teaApplications', data.teaApplications);
+                    teaLoaded = true;
                 }
 
                 // 6. Sync TEA Fee Calculator unit prices
@@ -309,7 +332,13 @@ export async function loadData() {
                         safeSetStorage('epdk_teaApplications', patched);
                         syncToFirestore().catch(err => logError('TEA sonuç alanı düzeltme hatası', err));
                     }
-                } else if (!data.teaApplications) {
+                } else if (!data.teaSeededAt) {
+                    // No records and this document has never been seeded: import
+                    // the historical Excel data once. Keyed off teaSeededAt (not
+                    // off the array being missing) so that an empty array is
+                    // still handled - an empty array used to match neither this
+                    // branch nor the one above, leaving the page permanently
+                    // blank with no way to recover.
                     const seeded = TEA_SEED_DATA.map((item, idx) => ({
                         id: `tea_seed_${idx + 1}`,
                         projectName: item.projectName,
@@ -323,8 +352,17 @@ export async function loadData() {
                     }));
                     Store.setTeaApplications(seeded);
                     safeSetStorage('epdk_teaApplications', seeded);
+                    teaLoaded = true;
+                    setDoc(doc(db, "daVinciData", "master"), { teaSeededAt: new Date().toISOString() }, { merge: true })
+                        .catch(err => logError('TEA tohumlama işareti yazılamadı', err));
                     syncToFirestore().catch(err => logError('TEA başvuruları tohumlama hatası', err));
+                } else {
+                    // Seeded before and genuinely empty (everything deleted by
+                    // hand) - respect that instead of resurrecting the records.
+                    Store.setTeaApplications([]);
+                    safeSetStorage('epdk_teaApplications', []);
                 }
+                teaLoaded = true;
 
                 // Load TEA Fee Calculator unit prices, if already customized.
                 if (data.teaFeeSettings) {
@@ -389,6 +427,7 @@ export async function loadData() {
         const savedTeaApplications = safeGetStorage('epdk_teaApplications');
         if (savedTeaApplications && Array.isArray(savedTeaApplications)) {
             Store.setTeaApplications(savedTeaApplications);
+            teaLoaded = true;
         }
 
         // Load TEA Fee Calculator unit prices

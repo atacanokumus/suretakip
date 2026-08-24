@@ -386,6 +386,15 @@
                                 <option value="completed">Tamamlananlar</option>
                             </select>
                         </div>
+                        <div class="filter-group">
+                            <label>Sıralama:</label>
+                            <select id="jobSortFilter"
+                                title="Akıllı sıralama: önce aksiyon bizde olan tadiller, her grupta en uzun süredir bekleyen aşama en üstte.">
+                                <option value="smart" selected>🧠 Akıllı Sıralama</option>
+                                <option value="newest">🔽 Yeniden Eskiye</option>
+                                <option value="oldest">🔼 Eskiden Yeniye</option>
+                            </select>
+                        </div>
                         <div class="filter-group ml-auto">
                             <button class="btn btn-primary" id="jobsPageAddBtn">➕ Yeni Tadil Başvurusu</button>
                         </div>
@@ -1022,6 +1031,32 @@
                                 <button class="btn btn-primary" id="newWorkflowTypeBtn" style="margin-top: 16px;">
                                     ➕ Yeni Tadil Tipi
                                 </button>
+                            </div>
+                        </div>
+
+                        <!-- Card: Aşama Sorumluluk & Zorluk Ayarları -->
+                        <div class="card" id="stepMetaCard">
+                            <div class="card-header">
+                                <h2>🎯 Aşama Sorumluluk & Zorluk Ayarları</h2>
+                            </div>
+                            <div class="card-body">
+                                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 6px;">
+                                    Her iş kaleminin topu kimde: <strong>🙋 Biz</strong> (lisans birimi aksiyon alacak)
+                                    ya da <strong>⏳ Dış</strong> (kurum/birim dönüşü bekleniyor). Tadiller sayfasındaki
+                                    <strong>akıllı sıralama</strong> bu atamayı kullanır.
+                                </p>
+                                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 18px;">
+                                    Zorluk puanı Scrum planlama pokerindeki gibidir (1 en kolay, 13 en zor) ve tadil
+                                    kartlarındaki <strong>ilerleme yüzdesini</strong> ağırlıklandırır. Buradaki değerler
+                                    tüm iş akışları için geçerlidir; tek bir tadil tipinde farklı olmasını isterseniz
+                                    iş akışı düzenleyicisinden o adıma özel değer verebilirsiniz.
+                                </p>
+                                <div class="step-meta-toolbar">
+                                    <input type="text" id="stepMetaSearch" class="modern-input"
+                                        placeholder="🔍 Aşama ara...">
+                                    <span id="stepMetaSummary" class="step-meta-summary"></span>
+                                </div>
+                                <div id="stepMetaList"></div>
                             </div>
                         </div>
                     </div>

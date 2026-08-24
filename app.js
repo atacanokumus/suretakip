@@ -37,7 +37,7 @@ import {
 } from './js/utils.js';
 import { initEmojiPicker } from './js/emoji.js';
 import { initPush, syncWidgetSnapshot } from './js/push.js';
-import { initWorkflowManager, renderWorkflowTypesList } from './js/workflow_builder.js';
+import { initWorkflowManager, renderWorkflowTypesList, renderStepMetaSettings } from './js/workflow_builder.js';
 import { renderTeaApplicationsMatrix, initTeaEventHandlers, getTeaApplicationsForProject, getMonthYearLabel } from './js/tea.js';
 
 // ==========================================
@@ -394,7 +394,7 @@ const PAGE_RENDERERS = {
     projects: () => updateProjectsGrid(),
     'tea-applications': () => renderTeaApplicationsMatrix(),
     analytics: () => renderAnalyticsPage(),
-    settings: () => renderWorkflowTypesList()
+    settings: () => { renderWorkflowTypesList(); renderStepMetaSettings(); }
 };
 
 const dirtyPages = new Set();

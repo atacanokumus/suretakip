@@ -5985,3 +5985,320 @@ tr.row-completed {
         overflow-y: auto;
     }
 }
+
+/* ==========================================================================
+   Aşama sorumluluk (biz / dış) + Scrum zorluk ayarları
+   ========================================================================== */
+
+.step-meta-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.step-meta-toolbar #stepMetaSearch {
+    flex: 1;
+    min-width: 180px;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.step-meta-summary {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.step-meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-glass);
+    border-left: 3px solid transparent;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.step-meta-row.ours {
+    border-left-color: var(--accent-primary, #6366f1);
+}
+
+.step-meta-row.external {
+    border-left-color: #f59e0b;
+}
+
+.step-meta-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+.step-meta-info strong {
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.step-meta-info span {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.step-meta-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.step-meta-owner-toggle {
+    display: flex;
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.step-meta-owner-toggle .owner-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 11px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+}
+
+.step-meta-owner-toggle .owner-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.step-meta-owner-toggle .owner-btn.active {
+    background: var(--accent-gradient);
+    color: #fff;
+}
+
+.step-meta-difficulty {
+    padding: 7px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.step-meta-reset {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--border-glass);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.step-meta-reset:disabled {
+    opacity: 0.25;
+    cursor: default;
+}
+
+.step-meta-reset:not(:disabled):hover {
+    color: var(--text-primary);
+    border-color: var(--accent-primary);
+}
+
+/* --- Aşama meta rozetleri (tadil detay modalindeki akordiyon başlıkları) --- */
+
+.step-meta-badge {
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 20px;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+
+.step-meta-badge.owner-ours {
+    background: rgba(99, 102, 241, 0.15);
+    color: #a5b4fc;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.step-meta-badge.owner-external {
+    background: rgba(245, 158, 11, 0.12);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.28);
+}
+
+.step-meta-badge.difficulty {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+    border: 1px solid var(--border-glass);
+}
+
+/* --- İş akışı düzenleyicisindeki adım bazlı ayarlar --- */
+
+.wf-piece-workflow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    cursor: default;
+}
+
+.wf-piece-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: grab;
+}
+
+.wf-piece-main:active {
+    cursor: grabbing;
+}
+
+.wf-piece-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-glass);
+}
+
+.wf-piece-meta label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.wf-piece-meta select {
+    padding: 4px 6px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-glass);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 11px;
+    cursor: pointer;
+    max-width: 150px;
+}
+
+.wf-piece-meta-effective {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.wf-piece-catalog-meta {
+    flex-shrink: 0;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-glass);
+    border-radius: 20px;
+    padding: 2px 7px;
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   Tadiller listesi: akıllı sıralama açıklaması + kart sorumluluk rozeti
+   ========================================================================== */
+
+/* Sıralama filtresi eklenince filtre çubuğu iki satıra taşabiliyor; ekleme
+   butonu her hâlükârda satırın sağ ucunda kalsın (mobile.css bunu dar
+   ekranlarda sıfırlıyor). */
+.filters-bar .filter-group.ml-auto {
+    margin-left: auto;
+    justify-content: flex-end;
+}
+
+.jobs-sort-legend {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+    background: rgba(99, 102, 241, 0.06);
+    border: 1px solid rgba(99, 102, 241, 0.18);
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.jobs-sort-legend strong {
+    color: var(--text-primary);
+}
+
+.jobs-sort-legend .legend-dot {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.jobs-sort-legend .legend-dot.ours {
+    color: #a5b4fc;
+}
+
+.jobs-sort-legend .legend-dot.external {
+    color: #fbbf24;
+}
+
+.job-owner-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.job-owner-chip.ours {
+    background: rgba(99, 102, 241, 0.14);
+    color: #a5b4fc;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.job-owner-chip.external {
+    background: rgba(245, 158, 11, 0.1);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+@media (max-width: 768px) {
+    .step-meta-row {
+        align-items: flex-start;
+    }
+
+    .step-meta-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .job-owner-chip {
+        white-space: normal;
+    }
+}

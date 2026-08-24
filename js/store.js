@@ -21,6 +21,10 @@ export const Store = {
     // Editable via the workflow builder; seeded once from DEFAULT_WORKFLOWS in
     // js/jobs.js if Firestore has no "workflows" field yet (see js/data.js).
     workflows: {},
+    // Aşama tipi -> { owner: 'us'|'external', difficulty: 1|2|3|5|8|13 }.
+    // Ayarlar sayfasındaki "Aşama Sorumluluk & Zorluk" kartından düzenlenir;
+    // burada değeri olmayan bir tip js/step_meta.js içindeki varsayılana düşer.
+    stepMeta: {},
     lastUpdate: null,
 
     /**
@@ -59,6 +63,11 @@ export const Store = {
 
     setWorkflows(newWorkflows) {
         this.workflows = newWorkflows || {};
+        this.lastUpdate = new Date().toISOString();
+    },
+
+    setStepMeta(newStepMeta) {
+        this.stepMeta = newStepMeta || {};
         this.lastUpdate = new Date().toISOString();
     },
 

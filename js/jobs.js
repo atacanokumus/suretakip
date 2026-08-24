@@ -6,6 +6,11 @@ import {
 } from './ui.js';
 import { auth } from './firebase-config.js';
 import { initEmojiPicker } from './emoji.js';
+import {
+    OWNER_US, OWNER_EXTERNAL, DIFFICULTY_LABELS, resolveStepMeta,
+    getOwnerIcon, getOwnerLabel, getWeightedProgress, getCurrentStageDate,
+    getStageWaitingDays
+} from './step_meta.js';
 
 // ==========================================
 // Initialization & Migration
@@ -332,11 +337,19 @@ export function saveWorkflowDefinition(title, pieces, renameFrom = null) {
         return { ok: false, error: `"${cleanTitle}" adında bir iş akışı zaten var.` };
     }
 
-    const newStepsConf = pieces.map((p, idx) => ({
-        type: p.type,
-        short: p.short,
-        long: `${idx + 1}. ${p.short}`
-    }));
+    // owner / difficulty are per-workflow overrides of the global step-type
+    // settings (js/step_meta.js). Only written when the builder actually set
+    // one, so an untouched step keeps inheriting the global value.
+    const newStepsConf = pieces.map((p, idx) => {
+        const conf = {
+            type: p.type,
+            short: p.short,
+            long: `${idx + 1}. ${p.short}`
+        };
+        if (p.owner === OWNER_US || p.owner === OWNER_EXTERNAL) conf.owner = p.owner;
+        if (p.difficulty) conf.difficulty = Number(p.difficulty);
+        return conf;
+    });
 
     // Commit the new definition to Store.workflows BEFORE migrating jobs:
     // migrateJobsForWorkflowChange no longer depends on this ordering (it
@@ -420,6 +433,113 @@ export function isDormantPrelicenceJob(job) {
     return isPrelicenceMatrixJob(job) && !hasPrelicenceWorkflowStarted(job);
 }
 
+// ==========================================
+// Listeleme sırası
+// ==========================================
+
+/** Tadiller sayfasındaki sıralama seçenekleri. */
+export const JOB_SORT_MODES = {
+    SMART: 'smart',
+    NEWEST: 'newest',
+    OLDEST: 'oldest'
+};
+
+/** Sayfa her açıldığında akıllı sıralama ile gelir. */
+export const DEFAULT_JOB_SORT = JOB_SORT_MODES.SMART;
+
+/**
+ * Tadilin şu an beklediği aşamanın meta verisi (sorumluluk + zorluk).
+ *
+ * Tamamlanmış tadillerde bekleyen aşama yoktur; null döner.
+ */
+export function getCurrentStepMeta(job) {
+    if (!job || job.status === 'completed') return null;
+    const stepsConf = getWorkflowSteps(job);
+    if (!stepsConf.length) return null;
+    const idx = Math.min(Math.max(1, job.currentStep || 1), stepsConf.length) - 1;
+    return { ...resolveStepMeta(stepsConf[idx]), stepNum: idx + 1, conf: stepsConf[idx] };
+}
+
+/**
+ * Seçilen yönteme göre kart sırası.
+ *
+ * Üç yöntemde de tamamlanmış tadiller listenin sonunda kalır - "Tümü" filtresi
+ * seçiliyken biten işlerin devam edenleri aşağı itmemesi için.
+ *
+ *  - newest: son hareket tarihi yeniden eskiye
+ *  - oldest: son hareket tarihi eskiden yeniye
+ *  - smart : önce aksiyon bizde olan tadiller, sonra dış taraftan dönüş
+ *            bekleyenler; her grubun içinde mevcut aşaması en uzun süredir
+ *            bekleyen (en eski tarihli) en üstte.
+ */
+export function sortJobsForView(jobs, mode = DEFAULT_JOB_SORT) {
+    const time = (d) => (d ? d.getTime() : null);
+    const lastMove = (job) => time(toDateOrNull(getJobActualLastUpdateDate(job)));
+
+    const byCompletion = (a, b) => {
+        const aC = a.status === 'completed';
+        const bC = b.status === 'completed';
+        if (aC !== bC) return aC ? 1 : -1;
+        return 0;
+    };
+    const byName = (a, b) => (a.project || '').localeCompare(b.project || '', 'tr');
+
+    if (mode === JOB_SORT_MODES.NEWEST || mode === JOB_SORT_MODES.OLDEST) {
+        const dir = mode === JOB_SORT_MODES.OLDEST ? 1 : -1;
+        return [...jobs].sort((a, b) => {
+            const byC = byCompletion(a, b);
+            if (byC !== 0) return byC;
+            // Tarihi hiç olmayan kayıt her iki yönde de en sonda kalsın.
+            const da = lastMove(a);
+            const db = lastMove(b);
+            if (da === null && db === null) return byName(a, b);
+            if (da === null) return 1;
+            if (db === null) return -1;
+            if (da !== db) return (da - db) * dir;
+            return byName(a, b);
+        });
+    }
+
+    // Akıllı sıralama
+    return [...jobs].sort((a, b) => {
+        const byC = byCompletion(a, b);
+        if (byC !== 0) return byC;
+
+        // Biten işlerin kendi aralarında en son biten en üstte.
+        if (a.status === 'completed') {
+            const da = lastMove(a) ?? 0;
+            const db = lastMove(b) ?? 0;
+            return db - da || byName(a, b);
+        }
+
+        const metaA = getCurrentStepMeta(a);
+        const metaB = getCurrentStepMeta(b);
+        const rank = (m) => (m && m.owner === OWNER_EXTERNAL ? 1 : 0);
+        const rankDiff = rank(metaA) - rank(metaB);
+        if (rankDiff !== 0) return rankDiff;
+
+        const sa = time(getCurrentStageDate(a));
+        const sb = time(getCurrentStageDate(b));
+        if (sa === null && sb === null) return byName(a, b);
+        if (sa === null) return 1;
+        if (sb === null) return -1;
+        if (sa !== sb) return sa - sb; // en eski aşama en üstte
+        return byName(a, b);
+    });
+}
+
+function toDateOrNull(value) {
+    if (!value) return null;
+    const d = value instanceof Date ? value : new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+function getSelectedJobSortMode() {
+    const el = document.getElementById('jobSortFilter');
+    const val = el?.value;
+    return Object.values(JOB_SORT_MODES).includes(val) ? val : DEFAULT_JOB_SORT;
+}
+
 export function updateJobsView() {
     const listContainer = document.getElementById('jobsList');
     if (!listContainer) return;
@@ -473,19 +593,29 @@ export function updateJobsView() {
         filteredJobs = filteredJobs.filter(j => j.status === 'completed');
     }
 
-    // Sort by active status first, then by updated date
-    filteredJobs.sort((a, b) => {
-        const aCompleted = a.status === 'completed';
-        const bCompleted = b.status === 'completed';
-        if (aCompleted && !bCompleted) return 1;
-        if (!aCompleted && bCompleted) return -1;
-        const dateA = new Date(getJobActualLastUpdateDate(a) || 0);
-        const dateB = new Date(getJobActualLastUpdateDate(b) || 0);
-        return dateB - dateA;
-    });
+    // Sıralama yöntemi (varsayılan: akıllı sıralama)
+    const sortMode = getSelectedJobSortMode();
+    filteredJobs = sortJobsForView(filteredJobs, sortMode);
 
     listContainer.innerHTML = '';
     updateJobStats();
+
+    // Akıllı sıralamada listenin neden bu sırada olduğunu bir satırda söyle -
+    // aksi halde "tarihe göre sıralı değil" gibi görünüyor.
+    if (sortMode === JOB_SORT_MODES.SMART && filteredJobs.some(j => j.status !== 'completed')) {
+        const legend = document.createElement('div');
+        legend.className = 'jobs-sort-legend';
+        legend.innerHTML = `
+            <span>🧠</span>
+            <div>
+                <strong>Akıllı sıralama açık.</strong>
+                Önce <span class="legend-dot ours">🙋 aksiyon bizde</span> olan tadiller, sonra
+                <span class="legend-dot external">⏳ dış taraftan dönüş beklenenler</span> listeleniyor.
+                Her grubun içinde mevcut aşamasında en uzun süredir bekleyen en üstte.
+            </div>
+        `;
+        listContainer.appendChild(legend);
+    }
 
     // Say where the hidden rows went, so an unexpectedly short list doesn't
     // read as missing data.
@@ -1034,12 +1164,18 @@ function createJobCard(job) {
     const stepsConf = getWorkflowSteps(job);
     const stepCount = stepsConf.length;
 
-    // Calculate completed steps count
+    // İlerleme yüzdesi adım sayısına değil, aşamaların Scrum zorluk puanlarına
+    // göre hesaplanıyor: 1 puanlık "tadil bedeli" ile 13 puanlık "başvuru
+    // hazırlama" aynı dilimi temsil etmesin diye.
+    const progress = getWeightedProgress(job, stepsConf);
+    const progressPercent = progress.percent;
     let completedStepsCount = 0;
     for (let i = 1; i <= stepCount; i++) {
         if (job.steps[`step${i}`]?.completed) completedStepsCount++;
     }
-    const progressPercent = Math.round((completedStepsCount / stepCount) * 100);
+    const progressTooltip = progress.total > 0
+        ? `Scrum ağırlıklı ilerleme: ${progress.done}/${progress.total} puan · ${completedStepsCount}/${stepCount} aşama`
+        : `${completedStepsCount}/${stepCount} aşama`;
 
     // Metro Line Rail Progress Percentage
     let progressRailPercent = 0;
@@ -1138,6 +1274,27 @@ function createJobCard(job) {
         appDateHtml = `<div class="job-date-row" style="color:var(--text-muted);" title="Başvuru henüz yapılmadı">📝 <strong>Başvuru:</strong> Yapılmadı</div>`;
     }
 
+    // Akıllı sıralamanın neden bu sırayı kurduğu karttan okunabilsin: topun
+    // kimde olduğu ve mevcut aşamada ne kadar beklendiği.
+    const currentMeta = getCurrentStepMeta(job);
+    let ownerChipHtml = '';
+    if (currentMeta) {
+        const isOurs = currentMeta.owner === OWNER_US;
+        const waitDays = getStageWaitingDays(job);
+        const waitText = waitDays === null
+            ? ''
+            : (waitDays === 0 ? ' · bugün' : ` · ${waitDays} gündür bu aşamada`);
+        const chipText = isOurs ? 'Aksiyon bizde' : 'Dış taraftan dönüş bekleniyor';
+        const diffLabel = DIFFICULTY_LABELS[currentMeta.difficulty] || 'Orta';
+        const chipTitle = `${getOwnerLabel(currentMeta.owner)} · Zorluk: ${diffLabel} (${currentMeta.difficulty} puan)`;
+        ownerChipHtml = `
+            <div class="job-owner-chip ${isOurs ? 'ours' : 'external'}" title="${escapeHtml(chipTitle)}">
+                <span>${getOwnerIcon(currentMeta.owner)}</span>
+                <span>${escapeHtml(chipText + waitText)}</span>
+            </div>
+        `;
+    }
+
     const lastUpdateDateStr = getJobActualLastUpdateDate(job);
     const lastUpdateDaysAgoText = getDaysPassedText(lastUpdateDateStr);
     const lastUpdateDateFormatted = lastUpdateDateStr ? new Date(lastUpdateDateStr).toLocaleDateString('tr-TR') : '-';
@@ -1168,12 +1325,13 @@ function createJobCard(job) {
                 <div class="next-station-desc">
                     ➡️ ${escapeHtml(getNextStepText(job))}
                 </div>
+                ${ownerChipHtml}
             </div>
         </div>
 
         <!-- Column 3: Progress & Date Metrics -->
         <div class="job-meta-col">
-            <div class="progress-box-mini">
+            <div class="progress-box-mini" title="${escapeHtml(progressTooltip)}">
                 <div class="progress-val-circle">%${progressPercent}</div>
                 <span class="progress-label-mini">İlerleme</span>
             </div>
@@ -1298,7 +1456,7 @@ export function initJobsEventHandlers() {
         });
     }
 
-    ['jobProjectFilter', 'jobExpertFilter', 'jobTypeFilter', 'jobStatusFilter'].forEach(id => {
+    ['jobProjectFilter', 'jobExpertFilter', 'jobTypeFilter', 'jobStatusFilter', 'jobSortFilter'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener('change', updateJobsView);
     });
@@ -1634,12 +1792,26 @@ function renderAccordionStep(job, stepNum) {
 
     const stepName = getStepTitle(job, stepNum);
 
+    // Aşamanın sorumluluğu ve Scrum zorluk puanı - iş akışı ayarlarından gelir.
+    const stepConf = getWorkflowSteps(job)[stepNum - 1];
+    const meta = resolveStepMeta(stepConf);
+    const metaTitle = `${getOwnerLabel(meta.owner)} · Zorluk: ${DIFFICULTY_LABELS[meta.difficulty] || 'Orta'}`;
+    const metaBadgesHtml = `
+        <span class="step-meta-badge owner-${meta.owner === OWNER_US ? 'ours' : 'external'}" title="${escapeHtml(metaTitle)}">
+            ${getOwnerIcon(meta.owner)} ${meta.owner === OWNER_US ? 'Biz' : 'Dış'}
+        </span>
+        <span class="step-meta-badge difficulty" title="${escapeHtml(metaTitle)}">
+            ⚡ ${meta.difficulty} puan
+        </span>
+    `;
+
     return `
         <div class="step-accordion-item ${stateClass}" id="stepItem-${stepNum}">
             <div class="step-accordion-header step-header-clickable" data-step="${stepNum}">
                 <div class="header-left">
                     <span class="step-number-badge">${stepNum}</span>
                     <span class="step-name-text">${escapeHtml(stepName)}</span>
+                    ${metaBadgesHtml}
                 </div>
                 <span class="step-status-badge">${badgeText}</span>
             </div>

@@ -107,6 +107,7 @@ export async function syncToFirestore(customTimestamp) {
             jobs: Store.jobs || [],
             projects: Store.projects || [],
             workflows: Store.workflows || {},
+            stepMeta: Store.stepMeta || {},
             // Users are stored in a separate collection
             lastUpdate: ts,
             updatedBy: auth.currentUser.email
@@ -195,6 +196,12 @@ export function initFirestoreSync() {
                 if (data.workflows) {
                     Store.setWorkflows(data.workflows);
                     safeSetStorage('epdk_workflows', data.workflows);
+                }
+
+                // 4b. Sync step responsibility / difficulty assignments
+                if (data.stepMeta) {
+                    Store.setStepMeta(data.stepMeta);
+                    safeSetStorage('epdk_stepMeta', data.stepMeta);
                 }
 
                 // 5. Sync TEA Applications (TÜBİTAK RAPSİM)
@@ -303,6 +310,15 @@ export async function loadData() {
                     syncToFirestore().catch(err => logError('İş akışı tohumlama hatası', err));
                 }
                 migrateBasvuruHazirlikToZkKontrol();
+
+                // Load step responsibility / difficulty assignments. Absent on
+                // documents written before this feature - js/step_meta.js then
+                // falls back to STEP_META_DEFAULTS per step type, so an empty
+                // map is a perfectly valid state (nothing to seed).
+                if (data.stepMeta) {
+                    Store.setStepMeta(data.stepMeta);
+                    safeSetStorage('epdk_stepMeta', data.stepMeta);
+                }
 
                 // Load TEA Applications. If this Firestore document predates the
                 // TEA Başvuruları feature, there's no "teaApplications" field yet -
@@ -423,6 +439,12 @@ export async function loadData() {
         }
         migrateBasvuruHazirlikToZkKontrol();
 
+        // Load step responsibility / difficulty assignments
+        const savedStepMeta = safeGetStorage('epdk_stepMeta');
+        if (savedStepMeta && typeof savedStepMeta === 'object') {
+            Store.setStepMeta(savedStepMeta);
+        }
+
         // Load TEA Applications
         const savedTeaApplications = safeGetStorage('epdk_teaApplications');
         if (savedTeaApplications && Array.isArray(savedTeaApplications)) {
@@ -504,6 +526,8 @@ export function saveData(syncWithCloud = true) {
         safeSetStorage('epdk_projects', Store.projects); // And projects
         safeSetStorage('epdk_teaApplications', Store.teaApplications); // And TEA applications
         safeSetStorage('epdk_teaFeeSettings', Store.teaFeeSettings); // And TEA fee calculator unit prices
+        safeSetStorage('epdk_workflows', Store.workflows); // Workflow definitions
+        safeSetStorage('epdk_stepMeta', Store.stepMeta); // Step responsibility / difficulty
         const timestamp = new Date().toISOString();
         localStorage.setItem('epdk_lastUpdate', timestamp);
 

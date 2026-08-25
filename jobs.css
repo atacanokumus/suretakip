@@ -132,6 +132,14 @@
     align-items: center;
 }
 
+/* A job whose current workflow includes a parallel step group (e.g. TEİAŞ/
+   EİGM görüşleri) needs more vertical room: the group renders as two rows
+   of stations instead of one, forking off the main line and merging back. */
+.metro-line-wrapper.has-parallel {
+    height: 118px;
+    margin-top: 26px;
+}
+
 .metro-rail-bg {
     position: absolute;
     left: 0;
@@ -314,6 +322,80 @@
     color: #ffd166;
     font-weight: 700;
     font-size: 10px;
+}
+
+/* ==========================================================================
+   Paralel adım kümesi: hat iki kola ayrılıp (TEİAŞ/EİGM görüşleri gibi)
+   sonra tekrar tek hatta birleşiyor. .row-top/.row-bottom, .metro-station'ın
+   düşey merkez konumunu (top:50%) o kolun yüksekliğine taşır; ROW_Y_PERCENT
+   sabiti (js/jobs.js, createJobCard) buradaki 28%/72% değerleriyle eşleşmeli.
+   ========================================================================== */
+
+.metro-station.row-top {
+    top: 28%;
+}
+
+.metro-station.row-bottom {
+    top: 72%;
+}
+
+.metro-station.row-top .metro-station-label.label-top {
+    bottom: 20px;
+}
+
+.metro-station.row-top.active .metro-station-label.label-top {
+    bottom: 32px;
+}
+
+.metro-station.row-bottom .metro-station-label.label-bottom {
+    top: 20px;
+}
+
+/* Alt kolun treni de kendi durağının altına insin, üst koldakiyle çakışmasın. */
+.metro-station.row-bottom .metro-train-icon {
+    bottom: auto;
+    top: 18px;
+}
+
+@keyframes trainBobDown {
+    0%, 100% { transform: translate(-50%, 0); }
+    50% { transform: translate(-50%, 5px); }
+}
+
+.metro-station.row-bottom .metro-train-icon {
+    animation-name: trainBobDown;
+}
+
+/* Her kolun kendi düz çizgisi - ana hattın çatallandığı aralıkta, o kolun
+   iki durağı arasında (js/jobs.js metro-lane-bg/-progress). */
+.metro-lane-bg {
+    position: absolute;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    transform: translateY(-50%);
+    z-index: 1;
+}
+
+.metro-lane-progress {
+    position: absolute;
+    height: 5px;
+    background: linear-gradient(90deg, #10b981, #34d399);
+    border-radius: 3px;
+    transform: translateY(-50%);
+    z-index: 2;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.45);
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Çatal/birleşme eğrisi - ana hattan kollara ayrılıp tekrar birleşen bağlantı. */
+.metro-fork-svg {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    overflow: visible;
 }
 
 /* Next Station textual layout styling */

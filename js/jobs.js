@@ -66,6 +66,43 @@ const PARALLEL_STEP_GROUPS = {
     teias_eigm_gorusleri: ['TEIAS_GORUS_CIKIS', 'TEIAS_GORUS_DONUS', 'EIGM_GORUS_CIKIS', 'EIGM_GORUS_DONUS']
 };
 
+/**
+ * Salt görsel: bir kümenin üyeleri tadiller listesindeki metro hattında kaç
+ * "kol"a (satır) ayrılıp, her kolda kaç istasyon (sütun) olacak. Kilitleme/
+ * tamamlanma mantığı (yukarıdaki PARALLEL_STEP_GROUPS) bundan habersiz ve
+ * tamamen ayrı çalışıyor - bu sadece hattın nasıl çizileceğini belirliyor.
+ */
+const PARALLEL_GROUP_TRACKS = {
+    teias_eigm_gorusleri: [
+        ['TEIAS_GORUS_CIKIS', 'TEIAS_GORUS_DONUS'],
+        ['EIGM_GORUS_CIKIS', 'EIGM_GORUS_DONUS']
+    ]
+};
+
+// Bir kümenin sütunları düz sıradaki tek bir aşamanın yerini paylaştığı için
+// yatay boşluk dar - "TEİAŞ Görüşüne Çıkılması" gibi uzun etiketler yan yana
+// binişir. Metro hattında sadece bu kısaltılmış hal gösteriliyor; ipucu,
+// akordiyon başlığı ve her yerdeki tam ad (stepConf.short/long) değişmedi.
+const PARALLEL_LINE_LABELS = {
+    TEIAS_GORUS_CIKIS: 'TEİAŞ Çıkış',
+    TEIAS_GORUS_DONUS: 'TEİAŞ Alındı',
+    EIGM_GORUS_CIKIS: 'EİGM Çıkış',
+    EIGM_GORUS_DONUS: 'EİGM Alındı'
+};
+
+/** Bir tipin görsel hat üzerindeki { row, col } konumu, kümeye ait değilse null. */
+function getTrackPosition(type) {
+    const groupId = getParallelGroupIdForType(type);
+    if (!groupId) return null;
+    const tracks = PARALLEL_GROUP_TRACKS[groupId];
+    if (!tracks) return null;
+    for (let row = 0; row < tracks.length; row++) {
+        const col = tracks[row].indexOf(type);
+        if (col !== -1) return { groupId, row, col, rowCount: tracks.length, colCount: tracks[row].length };
+    }
+    return null;
+}
+
 function getParallelGroupIdForType(type) {
     for (const [groupId, types] of Object.entries(PARALLEL_STEP_GROUPS)) {
         if (types.includes(type)) return groupId;
@@ -1338,29 +1375,111 @@ function createJobCard(job) {
         ? `Scrum ağırlıklı ilerleme: ${progress.done}/${progress.total} puan · ${completedStepsCount}/${stepCount} aşama`
         : `${completedStepsCount}/${stepCount} aşama`;
 
+    // Hat düzeni: paralel bir küme (TEİAŞ/EİGM görüşleri) artık düz sırada
+    // dört ayrı nokta değil, hattın iki kola ayrılıp sonra tekrar birleştiği
+    // bir çatal olarak çiziliyor. "Slot" = hat üzerindeki yatay konum; bir
+    // kümenin dört üyesi (iki kol × iki durak) sadece iki slot kaplıyor,
+    // çünkü aynı sütundaki iki kol (çıkış/alınması) yan yana değil üst üste
+    // oturuyor. Kilitleme/tamamlanma mantığı bundan tamamen habersiz - bu
+    // salt görsel bir yeniden konumlandırma.
+    const slotIndexForStep = {};
+    const rowForStep = {};
+    const renderedGroups = [];
+    let slotCounter = 0;
+    {
+        let i = 1;
+        while (i <= stepCount) {
+            const bounds = getParallelGroupBounds(stepsConf, i);
+            if (bounds && bounds.minPos === i) {
+                const trackInfo = PARALLEL_GROUP_TRACKS[bounds.groupId] || [[stepsConf[i - 1].type]];
+                const colCount = Math.max(1, ...trackInfo.map(r => r.length));
+                const minSlot = slotCounter;
+                for (let p = bounds.minPos; p <= bounds.maxPos; p++) {
+                    const pos = getTrackPosition(stepsConf[p - 1].type);
+                    slotIndexForStep[p] = pos ? slotCounter + pos.col : slotCounter;
+                    rowForStep[p] = pos ? pos.row : null;
+                }
+                slotCounter += colCount;
+                renderedGroups.push({
+                    groupId: bounds.groupId, minPos: bounds.minPos, maxPos: bounds.maxPos,
+                    rowCount: trackInfo.length, colCount, minSlot, maxSlot: slotCounter - 1
+                });
+                i = bounds.maxPos + 1;
+                continue;
+            }
+            slotIndexForStep[i] = slotCounter;
+            rowForStep[i] = null;
+            slotCounter += 1;
+            i += 1;
+        }
+    }
+    const totalSlots = slotCounter;
+    const percentForSlot = (slot) => totalSlots > 1 ? (slot / (totalSlots - 1)) * 100 : 0;
+    const percentForStep = (stepNum) => percentForSlot(slotIndexForStep[stepNum] ?? 0);
+
     // Metro Line Rail Progress Percentage
     let progressRailPercent = 0;
     if (isCompleted) {
         progressRailPercent = 100;
-    } else if (stepCount > 1) {
-        progressRailPercent = ((job.currentStep - 1) / (stepCount - 1)) * 100;
+    } else if (totalSlots > 1) {
+        progressRailPercent = percentForStep(job.currentStep);
     }
 
-    // Calculate active segment highlight
+    // Calculate active segment highlight. Skipped when currentStep is a
+    // parallel group's entry point: the main rail is already gapped there
+    // (replaced by the group's own fork + lane bars), so a pulse drawn at
+    // the wrapper's center would float disconnected from both rows.
     let activeSegmentHtml = '';
-    if (!isCompleted && job.currentStep > 1 && stepCount > 1) {
-        const prevPercent = ((job.currentStep - 2) / (stepCount - 1)) * 100;
-        const segmentWidth = (1 / (stepCount - 1)) * 100;
+    const enteringGroup = (() => {
+        const b = getParallelGroupBounds(stepsConf, job.currentStep);
+        return b && b.minPos === job.currentStep;
+    })();
+    if (!isCompleted && job.currentStep > 1 && totalSlots > 1 && !enteringGroup) {
+        const prevPercent = percentForStep(job.currentStep - 1);
+        const currPercent = percentForStep(job.currentStep);
         activeSegmentHtml = `
-            <div class="metro-rail-active-segment" style="left: ${prevPercent}%; width: ${segmentWidth}%;">
+            <div class="metro-rail-active-segment" style="left: ${prevPercent}%; width: ${currPercent - prevPercent}%;">
                 <div class="metro-rail-pulse-line"></div>
             </div>
         `;
     }
 
+    // Her kümenin, düz hattan hangi aralıkta (önceki durak -> sonraki durak)
+    // ayrılacağı - ana hat bu aralıkta kesilip yerine kümenin kendi çatal/
+    // birleşme görseli çiziliyor.
+    renderedGroups.forEach(g => {
+        const beforeStep = g.minPos - 1;
+        const afterStep = g.maxPos + 1;
+        g.gapStartPercent = beforeStep >= 1 ? percentForStep(beforeStep) : 0;
+        g.gapEndPercent = afterStep <= stepCount ? percentForStep(afterStep) : 100;
+    });
+
+    // Ana hattı (arka plan + yeşil ilerleme), kümelerin kapladığı aralıklar
+    // hariç, kalan parçalara bölerek çiz.
+    let railBgHtml = '';
+    let railProgressHtml = '';
+    {
+        const railSegments = [];
+        let cursor = 0;
+        renderedGroups.slice().sort((a, b) => a.gapStartPercent - b.gapStartPercent).forEach(g => {
+            if (g.gapStartPercent > cursor) railSegments.push([cursor, g.gapStartPercent]);
+            cursor = Math.max(cursor, g.gapEndPercent);
+        });
+        if (cursor < 100) railSegments.push([cursor, 100]);
+        railSegments.forEach(([segStart, segEnd]) => {
+            railBgHtml += `<div class="metro-rail-bg" style="left:${segStart}%; width:${segEnd - segStart}%; right:auto;"></div>`;
+            const fillEnd = Math.max(segStart, Math.min(segEnd, progressRailPercent));
+            if (fillEnd > segStart) {
+                railProgressHtml += `<div class="metro-rail-progress" style="left:${segStart}%; width:${fillEnd - segStart}%; right:auto;"></div>`;
+            }
+        });
+    }
+
     // Metro Stepper HTML & Interval Badges
     let metroStationsHtml = '';
     let intervalBadgesHtml = '';
+    let parallelGroupsHtml = '';
+    const ROW_Y_PERCENT = [28, 72]; // .row-top / .row-bottom CSS'iyle eşleşmeli
 
     for (let i = 1; i <= stepCount; i++) {
         const stepDone = isCompleted || job.steps[`step${i}`]?.completed || (i < job.currentStep);
@@ -1377,10 +1496,14 @@ function createJobCard(job) {
         if (stepDone) stateClass = 'completed';
         if (stepActive) stateClass = 'active';
 
-        const labelPosClass = (i % 2 !== 0) ? 'label-top' : 'label-bottom';
-        const positionPercent = stepCount > 1 ? ((i - 1) / (stepCount - 1)) * 100 : 0;
+        const row = rowForStep[i];
+        const rowClass = row === 0 ? 'row-top' : (row === 1 ? 'row-bottom' : '');
+        if (row !== null) stateClass += ' ' + rowClass;
+        const labelPosClass = row !== null ? (row === 0 ? 'label-top' : 'label-bottom') : ((i % 2 !== 0) ? 'label-top' : 'label-bottom');
+        const positionPercent = percentForStep(i);
         const tooltipText = getStepTooltipText(job, i);
-        
+        const lineLabel = (row !== null && PARALLEL_LINE_LABELS[stepsConf[i - 1].type]) || getStepShortTitle(job, i);
+
         metroStationsHtml += `
             <div class="metro-station ${stateClass}" style="left: ${positionPercent}%;">
                 <span class="metro-station-dot" title="${escapeHtml(tooltipText)}">
@@ -1388,7 +1511,7 @@ function createJobCard(job) {
                     <span class="metro-station-number">${i}</span>
                 </span>
                 <span class="metro-station-label ${labelPosClass}" title="${escapeHtml(tooltipText)}">
-                    ${escapeHtml(getStepShortTitle(job, i))}
+                    ${escapeHtml(lineLabel)}
                 </span>
             </div>
         `;
@@ -1409,7 +1532,7 @@ function createJobCard(job) {
                     d1.setHours(0,0,0,0);
                     d2.setHours(0,0,0,0);
                     const diffDays = Math.max(0, Math.floor((d2 - d1) / (1000 * 60 * 60 * 24)));
-                    const nextPosPercent = stepCount > 1 ? (i / (stepCount - 1)) * 100 : 0;
+                    const nextPosPercent = percentForStep(i + 1);
                     const midPercent = (positionPercent + nextPosPercent) / 2;
                     intervalBadgesHtml += `
                         <div class="metro-interval-badge" style="left: ${midPercent}%;" title="${i}. ve ${i+1}. aşamalar arası ${diffDays} gün geçti">
@@ -1420,6 +1543,46 @@ function createJobCard(job) {
             }
         }
     }
+
+    // Her kümenin iki kolu (satırı) için kendi düz çizgisi + çatal/birleşme eğrisi.
+    renderedGroups.forEach(g => {
+        const laneStartPercent = percentForSlot(g.minSlot);
+        const laneEndPercent = percentForSlot(g.maxSlot);
+        const rowYs = ROW_Y_PERCENT.slice(0, g.rowCount);
+
+        for (let row = 0; row < g.rowCount; row++) {
+            let rowDone = 0;
+            for (let p = g.minPos; p <= g.maxPos; p++) {
+                if (rowForStep[p] === row && (isCompleted || job.steps[`step${p}`]?.completed)) rowDone++;
+            }
+            const rowFillFraction = g.colCount > 0 ? rowDone / g.colCount : 0;
+            const rowFillPercent = laneStartPercent + (laneEndPercent - laneStartPercent) * rowFillFraction;
+            parallelGroupsHtml += `
+                <div class="metro-lane-bg" style="left:${laneStartPercent}%; width:${laneEndPercent - laneStartPercent}%; top:${rowYs[row]}%;"></div>
+                ${rowFillPercent > laneStartPercent ? `<div class="metro-lane-progress" style="left:${laneStartPercent}%; width:${rowFillPercent - laneStartPercent}%; top:${rowYs[row]}%;"></div>` : ''}
+            `;
+        }
+
+        const gapWidth = g.gapEndPercent - g.gapStartPercent;
+        if (gapWidth > 0) {
+            const toLocalX = (globalPercent) => ((globalPercent - g.gapStartPercent) / gapWidth) * 100;
+            const laneStartX = toLocalX(laneStartPercent);
+            const laneEndX = toLocalX(laneEndPercent);
+            const forkPaths = rowYs.map(y => `
+                <path d="M 0 50 C ${laneStartX / 2} 50, ${laneStartX / 2} ${y}, ${laneStartX} ${y}
+                         L ${laneEndX} ${y}
+                         C ${(laneEndX + 100) / 2} ${y}, ${(laneEndX + 100) / 2} 50, 100 50"
+                      fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="2.2" vector-effect="non-scaling-stroke" />
+            `).join('');
+            parallelGroupsHtml += `
+                <svg class="metro-fork-svg" viewBox="0 0 100 100" preserveAspectRatio="none"
+                     style="left:${g.gapStartPercent}%; width:${gapWidth}%;">
+                    ${forkPaths}
+                </svg>
+            `;
+        }
+    });
+    const hasParallelGroups = renderedGroups.length > 0;
 
     const projectData = Store.getProjectByName(job.project);
     const companyLabel = projectData ? projectData.company : 'Firma';
@@ -1482,9 +1645,10 @@ function createJobCard(job) {
 
         <!-- Column 2: Stepper & Current Status -->
         <div class="job-stepper-col">
-            <div class="metro-line-wrapper">
-                <div class="metro-rail-bg"></div>
-                <div class="metro-rail-progress" style="width: ${progressRailPercent}%;"></div>
+            <div class="metro-line-wrapper ${hasParallelGroups ? 'has-parallel' : ''}">
+                ${railBgHtml}
+                ${railProgressHtml}
+                ${parallelGroupsHtml}
                 ${activeSegmentHtml}
                 ${intervalBadgesHtml}
                 <div class="metro-stations-container">

@@ -134,15 +134,29 @@ function getParallelGroupBounds(stepsConf, stepNum) {
 /**
  * Bu aşama açılabilir mi? Normal kuralın (stepNum <= currentStep) yanında,
  * currentStep zaten bu aşamanın paralel kümesinin içindeyse de açık sayılır -
- * kümenin dört üyesi de currentStep tek bir üyede "beklerken" bile birbirinden
- * bağımsız olarak doldurulabilsin diye.
+ * kümenin iki kolu (TEİAŞ, EİGM) currentStep tek bir üyede "beklerken" bile
+ * birbirinden bağımsız ilerleyebilsin diye. Ama kolun KENDİ içinde sıra hâlâ
+ * geçerli: "alınması" kendi kolunun "çıkılması"ndan önce açılmaz - sırası
+ * gelmemiş bir aşama, kümeye girilmiş olsa bile aktif görünmemeli.
  */
 function isStepReachable(job, stepsConf, stepNum) {
     const currentStep = job.currentStep || 1;
     if (stepNum <= currentStep) return true;
     const bounds = getParallelGroupBounds(stepsConf, stepNum);
     if (!bounds) return false;
-    return currentStep >= bounds.minPos && currentStep <= bounds.maxPos;
+    if (currentStep < bounds.minPos || currentStep > bounds.maxPos) return false;
+
+    const track = getTrackPosition(stepsConf[stepNum - 1].type);
+    if (track && track.col > 0) {
+        for (let p = bounds.minPos; p <= bounds.maxPos; p++) {
+            if (p === stepNum) continue;
+            const pTrack = getTrackPosition(stepsConf[p - 1].type);
+            if (pTrack && pTrack.row === track.row && pTrack.col < track.col && !job.steps[`step${p}`]?.completed) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 export function getInitialStepData(type, isCompleted) {
@@ -1483,14 +1497,12 @@ function createJobCard(job) {
 
     for (let i = 1; i <= stepCount; i++) {
         const stepDone = isCompleted || job.steps[`step${i}`]?.completed || (i < job.currentStep);
-        // Paralel kümenin (TEİAŞ/EİGM görüşleri) her açık üyesi aynı anda
-        // "aktif" sayılır - sadece currentStep'in tam üzerindeki değil,
-        // çünkü hepsi birbirini beklemeden doldurulabilir.
+        // Paralel kümenin (TEİAŞ/EİGM görüşleri) her ULAŞILABİLİR üyesi aynı
+        // anda "aktif" sayılır - ama bir kolun "alınması"sı kendi kolunun
+        // "çıkılması"ndan önce aktif görünmez (isStepReachable bunu kolun
+        // içindeki sırayı da kontrol ederek karara bağlıyor).
         const iGroupBounds = getParallelGroupBounds(stepsConf, i);
-        const stepActive = !isCompleted && !stepDone && (
-            job.currentStep === i ||
-            (iGroupBounds && iGroupBounds.minPos === job.currentStep)
-        );
+        const stepActive = !isCompleted && !stepDone && isStepReachable(job, stepsConf, i);
 
         let stateClass = '';
         if (stepDone) stateClass = 'completed';
@@ -1568,12 +1580,30 @@ function createJobCard(job) {
             const toLocalX = (globalPercent) => ((globalPercent - g.gapStartPercent) / gapWidth) * 100;
             const laneStartX = toLocalX(laneStartPercent);
             const laneEndX = toLocalX(laneEndPercent);
-            const forkPaths = rowYs.map(y => `
-                <path d="M 0 50 C ${laneStartX / 2} 50, ${laneStartX / 2} ${y}, ${laneStartX} ${y}
-                         L ${laneEndX} ${y}
-                         C ${(laneEndX + 100) / 2} ${y}, ${(laneEndX + 100) / 2} 50, 100 50"
-                      fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="2.2" vector-effect="non-scaling-stroke" />
-            `).join('');
+            const GREEN = '#10b981';
+            const GREY = 'rgba(255,255,255,0.16)';
+            const forkPaths = rowYs.map((y, row) => {
+                // Bu kolun ilk (çıkış) ve son (alınması) durağı - çatal
+                // eğrisi, "o kısım gerçekten yürünmüş mü" sorusuna göre
+                // yeşile boyanıyor: girişteki kavis çıkış tamamlanınca,
+                // çıkıştaki kavis kol bitince (ana hattaki mantığın aynısı).
+                let firstStepNum = null, lastStepNum = null;
+                for (let p = g.minPos; p <= g.maxPos; p++) {
+                    if (rowForStep[p] !== row) continue;
+                    if (firstStepNum === null) firstStepNum = p;
+                    lastStepNum = p;
+                }
+                const inDone = isCompleted || (firstStepNum !== null && job.steps[`step${firstStepNum}`]?.completed);
+                const outDone = isCompleted || (lastStepNum !== null && job.steps[`step${lastStepNum}`]?.completed);
+                const inColor = inDone ? GREEN : GREY;
+                const outColor = outDone ? GREEN : GREY;
+                return `
+                    <path d="M 0 50 C ${laneStartX / 2} 50, ${laneStartX / 2} ${y}, ${laneStartX} ${y}"
+                          fill="none" stroke="${inColor}" stroke-width="2.4" vector-effect="non-scaling-stroke" />
+                    <path d="M ${laneEndX} ${y} C ${(laneEndX + 100) / 2} ${y}, ${(laneEndX + 100) / 2} 50, 100 50"
+                          fill="none" stroke="${outColor}" stroke-width="2.4" vector-effect="non-scaling-stroke" />
+                `;
+            }).join('');
             parallelGroupsHtml += `
                 <svg class="metro-fork-svg" viewBox="0 0 100 100" preserveAspectRatio="none"
                      style="left:${g.gapStartPercent}%; width:${gapWidth}%;">

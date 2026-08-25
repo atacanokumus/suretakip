@@ -159,6 +159,35 @@ function isStepReachable(job, stepsConf, stepNum) {
     return true;
 }
 
+/**
+ * "Şu an gerçekten bekleyen aşama" hangisi? Normalde bu doğrudan
+ * job.currentStep'tir. Ama bir paralel kümenin girişindeyken (bkz.
+ * PARALLEL_STEP_GROUPS) currentStep, küme bitene kadar kümenin SABİT ilk
+ * üyesinde bekler - oysa aynı anda birden fazla üye (farklı sorumlularla)
+ * bekliyor olabilir. "Kimin aksiyonu bekleniyor" ve "durum" metinleri, o
+ * sabit ilk üyeyi değil, gerçekten açık olan üyelerden BİZİM sorumlu
+ * olduğumuz birini (varsa) - yoksa herhangi birini - göstermeli; aksi
+ * halde biz üstümüze düşeni bitirdikten sonra bile "aksiyon bizde" yazmaya
+ * devam eder, çünkü işaretçi hâlâ o ilk (tamamlanmış) üyede duruyordur.
+ */
+function getEffectiveCurrentStepNum(job, stepsConf) {
+    const stepCount = stepsConf.length;
+    const currentStep = Math.min(Math.max(1, job.currentStep || 1), stepCount);
+    const bounds = getParallelGroupBounds(stepsConf, currentStep);
+    if (!bounds || bounds.minPos !== currentStep) return currentStep;
+
+    const pending = [];
+    for (let p = bounds.minPos; p <= bounds.maxPos; p++) {
+        if (job.steps?.[`step${p}`]?.completed) continue;
+        if (!isStepReachable(job, stepsConf, p)) continue;
+        pending.push(p);
+    }
+    if (pending.length === 0) return currentStep;
+
+    const oursStep = pending.find(p => resolveStepMeta(stepsConf[p - 1]).owner === OWNER_US);
+    return oursStep !== undefined ? oursStep : pending[0];
+}
+
 export function getInitialStepData(type, isCompleted) {
     switch (type) {
         case 'TADIL_BEDELI':
@@ -600,8 +629,8 @@ export function getCurrentStepMeta(job) {
     if (!job || job.status === 'completed') return null;
     const stepsConf = getWorkflowSteps(job);
     if (!stepsConf.length) return null;
-    const idx = Math.min(Math.max(1, job.currentStep || 1), stepsConf.length) - 1;
-    return { ...resolveStepMeta(stepsConf[idx]), stepNum: idx + 1, conf: stepsConf[idx] };
+    const stepNum = getEffectiveCurrentStepNum(job, stepsConf);
+    return { ...resolveStepMeta(stepsConf[stepNum - 1]), stepNum, conf: stepsConf[stepNum - 1] };
 }
 
 /**
@@ -818,8 +847,8 @@ function updateJobStats() {
 function getLiveStatusText(job) {
     if (job.status === 'completed') return 'Süreç Tamamlandı ✅';
 
-    const stepNum = job.currentStep || 1;
     const stepsConf = getWorkflowSteps(job);
+    const stepNum = getEffectiveCurrentStepNum(job, stepsConf);
     const stepConf = stepsConf[stepNum - 1];
     if (!stepConf) return 'Süreç Devam Ediyor...';
 
@@ -1358,10 +1387,15 @@ function getNextStepText(job) {
     const stepsConf = getWorkflowSteps(job);
     const stepCount = stepsConf.length;
     const current = job.currentStep || 1;
-    if (current >= stepCount) {
+    // Paralel kümenin girişindeyken "sıradaki" küme içindeki bir üye değil,
+    // kümenin TAMAMI bitince gelecek aşama - yoksa "şu an" metniyle
+    // (getEffectiveCurrentStepNum) aynı üyeyi tekrar göstermiş oluruz.
+    const bounds = getParallelGroupBounds(stepsConf, current);
+    const afterCurrent = (bounds && bounds.minPos === current) ? bounds.maxPos : current;
+    if (afterCurrent >= stepCount) {
         return 'Son Aşamadasınız 🏁';
     }
-    const nextStepNum = current + 1;
+    const nextStepNum = afterCurrent + 1;
     return `Sıradaki Aşama: ${nextStepNum}. ${getStepTitle(job, nextStepNum)}`;
 }
 

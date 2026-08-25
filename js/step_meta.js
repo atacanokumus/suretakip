@@ -50,6 +50,8 @@ export const STEP_META_DEFAULTS = {
     // --- Bizim yürüttüğümüz kalemler ---
     TADIL_BEDELI: { owner: OWNER_US, difficulty: 1 },
     BILGI_NOTU_TALEBI: { owner: OWNER_US, difficulty: 2 },
+    TEIAS_GORUS_CIKIS: { owner: OWNER_US, difficulty: 1 },
+    EIGM_GORUS_CIKIS: { owner: OWNER_US, difficulty: 1 },
     BASVURU: { owner: OWNER_US, difficulty: 13 },
     EPDK_BASVURU_HAZIRLIK: { owner: OWNER_US, difficulty: 8 },
     EPDK_BASVURU_YAPILMASI: { owner: OWNER_US, difficulty: 8 },
@@ -67,7 +69,13 @@ export const STEP_META_DEFAULTS = {
 
     // --- Dışarıdan dönüş beklediğimiz kalemler ---
     OZET_BIRIM_DONUSU: { owner: OWNER_EXTERNAL, difficulty: 2 },
+    // KURUM_GORUS_TEIAS_EIGM (kombine TEİAŞ+EİGM görüşü) 2026-08 itibarıyla
+    // TEIAS_GORUS_CIKIS/DONUS + EIGM_GORUS_CIKIS/DONUS olarak 4 ayrı kaleme
+    // bölündü (bkz. js/data.js migrateTeiasEigmSplit). Bu satır sadece eski,
+    // hiç migrate edilmemiş bir kayıt kalırsa diye bırakıldı - silinmedi.
     KURUM_GORUS_TEIAS_EIGM: { owner: OWNER_EXTERNAL, difficulty: 3 },
+    TEIAS_GORUS_DONUS: { owner: OWNER_EXTERNAL, difficulty: 3 },
+    EIGM_GORUS_DONUS: { owner: OWNER_EXTERNAL, difficulty: 3 },
     KURUM_GORUS_TEIAS: { owner: OWNER_EXTERNAL, difficulty: 2 },
     KURUM_GORUS_EIGM: { owner: OWNER_EXTERNAL, difficulty: 2 },
     KURUM_GORUS_KDB: { owner: OWNER_EXTERNAL, difficulty: 2 },

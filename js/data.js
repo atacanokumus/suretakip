@@ -255,6 +255,143 @@ function migrateBasvuruHazirlikToZkKontrol() {
     }
 }
 
+/**
+ * One-time patch: splits the combined "TEİAŞ ve EİGM Kurum Görüşleri" step
+ * (type KURUM_GORUS_TEIAS_EIGM) into four independent, parallel-running
+ * steps - TEİAŞ Görüşüne Çıkılması / Alınması, EİGM Görüşüne Çıkılması /
+ * Alınması - so each can carry its own Scrum zorluk puanı and "kimin işi"
+ * ataması, and so the two institutions' tracks no longer block each other.
+ *
+ * Every existing job's step data for the old combined step (dates, evrak
+ * sayıları, the TEİAŞ itiraz/taahhüt sub-flow, archived objections) is
+ * carried over onto the matching new step at the same array position -
+ * nothing is dropped, no job is deleted. Steps after the split point are
+ * shifted by +3 positions, and job.currentStep is recomputed from the new
+ * layout rather than arithmetically shifted, so it lands correctly whether
+ * the job hadn't reached the old step yet, was mid-way through it, or had
+ * already moved past it.
+ *
+ * Naturally idempotent, same as migrateBasvuruHazirlikToZkKontrol above:
+ * once a workflow's steps no longer contain the combined type, findIndex
+ * returns -1 and that title is skipped, so re-running this on every load is
+ * safe and a no-op after the first successful sync.
+ */
+function migrateTeiasEigmSplit() {
+    let migrated = false;
+
+    Object.keys(Store.workflows).forEach(title => {
+        const oldStepsConf = Store.workflows[title];
+        if (!Array.isArray(oldStepsConf)) return;
+        const idx = oldStepsConf.findIndex(s => s && s.type === 'KURUM_GORUS_TEIAS_EIGM');
+        if (idx === -1) return;
+
+        const oldStepCount = oldStepsConf.length;
+        const oldStepNum = idx + 1; // 1-based position of the combined step
+
+        // New step config: same position, four fresh objects instead of one
+        // (never mutate the old ones in place - they may be the same object
+        // references DEFAULT_WORKFLOWS uses, if this title was never edited
+        // via the workflow builder since its initial seed).
+        const newStepsConf = [];
+        oldStepsConf.forEach((s, i) => {
+            if (i === idx) {
+                newStepsConf.push(
+                    { type: 'TEIAS_GORUS_CIKIS', short: 'TEİAŞ Görüşüne Çıkılması', long: 'TEİAŞ Görüşüne Çıkılması' },
+                    { type: 'TEIAS_GORUS_DONUS', short: 'TEİAŞ Görüşünün Alınması', long: 'TEİAŞ Görüşünün Alınması' },
+                    { type: 'EIGM_GORUS_CIKIS', short: 'EİGM Görüşüne Çıkılması', long: 'EİGM Görüşüne Çıkılması' },
+                    { type: 'EIGM_GORUS_DONUS', short: 'EİGM Görüşünün Alınması', long: 'EİGM Görüşünün Alınması' }
+                );
+            } else {
+                newStepsConf.push({ ...s });
+            }
+        });
+        newStepsConf.forEach((s, i) => {
+            s.long = /^\d+\.\s*/.test(s.long) ? s.long.replace(/^\d+\.\s*/, `${i + 1}. `) : `${i + 1}. ${s.long}`;
+        });
+
+        Store.workflows[title] = newStepsConf;
+
+        // Migrate every job of this title from the old single-step data to
+        // the new four-step layout, at the same position.
+        (Store.jobs || []).forEach(job => {
+            if (job.title !== title || !job.steps) return;
+            const old = job.steps[`step${oldStepNum}`];
+            if (!old) return; // nothing to migrate for this job
+
+            const newSteps = {};
+            for (let k = 1; k <= idx; k++) {
+                if (job.steps[`step${k}`]) newSteps[`step${k}`] = job.steps[`step${k}`];
+            }
+
+            const teiasCikisDone = !!(old.teiasCikildi || old.teiasDondu || old.teiasCikisTarih || old.teiasCikisSayi);
+            newSteps[`step${oldStepNum}`] = {
+                completed: teiasCikisDone,
+                cikildi: teiasCikisDone,
+                date: old.teiasCikisTarih || '',
+                number: old.teiasCikisSayi || ''
+            };
+            newSteps[`step${oldStepNum + 1}`] = {
+                completed: !!old.teiasDondu,
+                teiasDondu: !!old.teiasDondu,
+                teiasSayi: old.teiasSayi || '',
+                teiasTarih: old.teiasTarih || '',
+                teiasBaglantiDurumu: old.teiasBaglantiDurumu || 'kabul',
+                teiasItirazEpdkTarih: old.teiasItirazEpdkTarih || '',
+                teiasItirazEpdkSayi: old.teiasItirazEpdkSayi || '',
+                teiasItirazTeiasTarih: old.teiasItirazTeiasTarih || '',
+                teiasItirazTeiasSayi: old.teiasItirazTeiasSayi || '',
+                teiasItirazCevapTarih: old.teiasItirazCevapTarih || '',
+                teiasItirazCevapSayi: old.teiasItirazCevapSayi || '',
+                teiasItirazCevapGeriDondu: false,
+                teiasObjections: old.teiasObjections || [],
+                teiasKabulTaahhutTanimla: old.teiasKabulTaahhutTanimla || false,
+                teiasKabulDeadline: old.teiasKabulDeadline || '',
+                teiasKabulDesc: old.teiasKabulDesc || '',
+                teiasKabulObgId: old.teiasKabulObgId || ''
+            };
+            const eigmCikisDone = !!(old.eigmCikildi || old.eigmDondu || old.eigmCikisTarih || old.eigmCikisSayi);
+            newSteps[`step${oldStepNum + 2}`] = {
+                completed: eigmCikisDone,
+                cikildi: eigmCikisDone,
+                date: old.eigmCikisTarih || '',
+                number: old.eigmCikisSayi || ''
+            };
+            newSteps[`step${oldStepNum + 3}`] = {
+                completed: !!old.eigmDondu,
+                geldi: !!old.eigmDondu,
+                date: old.eigmTarih || '',
+                number: old.eigmSayi || ''
+            };
+
+            for (let k = oldStepNum + 1; k <= oldStepCount; k++) {
+                if (job.steps[`step${k}`]) newSteps[`step${k + 3}`] = job.steps[`step${k}`];
+            }
+
+            const groupDone = teiasCikisDone && !!old.teiasDondu && eigmCikisDone && !!old.eigmDondu;
+            const oldCurrentStep = job.currentStep || 1;
+            let newCurrentStep;
+            if (oldCurrentStep < oldStepNum) {
+                newCurrentStep = oldCurrentStep; // hasn't reached the combined step yet
+            } else if (oldCurrentStep > oldStepNum) {
+                newCurrentStep = oldCurrentStep + 3; // had already moved past it
+            } else {
+                newCurrentStep = groupDone ? oldStepNum + 4 : oldStepNum;
+            }
+
+            job.steps = newSteps;
+            job.currentStep = newCurrentStep;
+        });
+
+        migrated = true;
+    });
+
+    if (migrated) {
+        safeSetStorage('epdk_workflows', Store.workflows);
+        safeSetStorage('epdk_jobs', Store.jobs);
+        syncToFirestore().catch(err => logError('TEİAŞ/EİGM görüşü ayrıştırma geçişi hatası', err));
+    }
+}
+
 export async function loadData() {
     // 1. First try Firestore (Source of Truth for the Team)
     if (auth.currentUser) {
@@ -310,6 +447,7 @@ export async function loadData() {
                     syncToFirestore().catch(err => logError('İş akışı tohumlama hatası', err));
                 }
                 migrateBasvuruHazirlikToZkKontrol();
+                migrateTeiasEigmSplit();
 
                 // Load step responsibility / difficulty assignments. Absent on
                 // documents written before this feature - js/step_meta.js then
@@ -438,6 +576,7 @@ export async function loadData() {
             Store.setWorkflows({ ...DEFAULT_WORKFLOWS });
         }
         migrateBasvuruHazirlikToZkKontrol();
+        migrateTeiasEigmSplit();
 
         // Load step responsibility / difficulty assignments
         const savedStepMeta = safeGetStorage('epdk_stepMeta');

@@ -49,6 +49,65 @@ export function getWorkflowSteps(job) {
     return steps;
 }
 
+// ==========================================
+// Paralel adım kümeleri
+// ==========================================
+//
+// Bir tadilin aşamaları normalde tek bir işaretçiyle (currentStep) sırayla
+// açılır: bir sonraki aşama, öncekisi tamamlanana kadar kilitlidir. TEİAŞ ve
+// EİGM görüşleri bu kuralın istisnası - ikisi de aynı anda, birbirini
+// beklemeden yürüyen bağımsız süreçler. Bu yüzden dördü de (çıkış+alınması
+// ikişer adımdan) tek bir "paralel küme" olarak işaretli: küme, önceki aşama
+// bitince birlikte kilidi açılır, hiçbiri diğerini beklemez, ve genel
+// currentStep işaretçisi ancak dördü de tamamlanınca kümenin ötesine geçer.
+
+/** Tip -> aynı anda açılıp aynı anda tamamlanması gereken küme kimliği. */
+const PARALLEL_STEP_GROUPS = {
+    teias_eigm_gorusleri: ['TEIAS_GORUS_CIKIS', 'TEIAS_GORUS_DONUS', 'EIGM_GORUS_CIKIS', 'EIGM_GORUS_DONUS']
+};
+
+function getParallelGroupIdForType(type) {
+    for (const [groupId, types] of Object.entries(PARALLEL_STEP_GROUPS)) {
+        if (types.includes(type)) return groupId;
+    }
+    return null;
+}
+
+/**
+ * stepNum'ın (1-tabanlı) ait olduğu paralel kümenin sınırları, ya da hiçbir
+ * kümeye ait değilse null.
+ */
+function getParallelGroupBounds(stepsConf, stepNum) {
+    const stepConf = stepsConf[stepNum - 1];
+    if (!stepConf) return null;
+    const groupId = getParallelGroupIdForType(stepConf.type);
+    if (!groupId) return null;
+
+    let minPos = null, maxPos = null;
+    stepsConf.forEach((s, idx) => {
+        if (getParallelGroupIdForType(s.type) === groupId) {
+            const pos = idx + 1;
+            if (minPos === null || pos < minPos) minPos = pos;
+            if (maxPos === null || pos > maxPos) maxPos = pos;
+        }
+    });
+    return minPos === null ? null : { groupId, minPos, maxPos };
+}
+
+/**
+ * Bu aşama açılabilir mi? Normal kuralın (stepNum <= currentStep) yanında,
+ * currentStep zaten bu aşamanın paralel kümesinin içindeyse de açık sayılır -
+ * kümenin dört üyesi de currentStep tek bir üyede "beklerken" bile birbirinden
+ * bağımsız olarak doldurulabilsin diye.
+ */
+function isStepReachable(job, stepsConf, stepNum) {
+    const currentStep = job.currentStep || 1;
+    if (stepNum <= currentStep) return true;
+    const bounds = getParallelGroupBounds(stepsConf, stepNum);
+    if (!bounds) return false;
+    return currentStep >= bounds.minPos && currentStep <= bounds.maxPos;
+}
+
 export function getInitialStepData(type, isCompleted) {
     switch (type) {
         case 'TADIL_BEDELI':
@@ -61,6 +120,26 @@ export function getInitialStepData(type, isCompleted) {
                 teiasDondu: isCompleted, teiasCikisSayi: '', teiasCikisTarih: '', teiasSayi: '', teiasTarih: '',
                 eigmDondu: isCompleted, eigmCikisSayi: '', eigmCikisTarih: '', eigmSayi: '', eigmTarih: ''
             };
+        // 2026-08: KURUM_GORUS_TEIAS_EIGM'in bölünmüş hali - TEİAŞ ve EİGM
+        // görüşleri artık ayrı ayrı, birbirini beklemeden (paralel) ilerleyen
+        // dört ayrı iş kalemi. Bkz. js/data.js migrateTeiasEigmSplit ve
+        // PARALLEL_STEP_GROUPS (bu dosyada, getWorkflowSteps'in altında).
+        case 'TEIAS_GORUS_CIKIS':
+            return { completed: isCompleted, cikildi: isCompleted, date: '', number: '' };
+        case 'TEIAS_GORUS_DONUS':
+            return {
+                completed: isCompleted, teiasDondu: isCompleted, teiasSayi: '', teiasTarih: '',
+                teiasBaglantiDurumu: 'kabul',
+                teiasItirazEpdkTarih: '', teiasItirazEpdkSayi: '',
+                teiasItirazTeiasTarih: '', teiasItirazTeiasSayi: '',
+                teiasItirazCevapTarih: '', teiasItirazCevapSayi: '', teiasItirazCevapGeriDondu: false,
+                teiasObjections: [],
+                teiasKabulTaahhutTanimla: false, teiasKabulDeadline: '', teiasKabulDesc: '', teiasKabulObgId: ''
+            };
+        case 'EIGM_GORUS_CIKIS':
+            return { completed: isCompleted, cikildi: isCompleted, date: '', number: '' };
+        case 'EIGM_GORUS_DONUS':
+            return { completed: isCompleted, geldi: isCompleted, date: '', number: '' };
         case 'KURUM_GORUS_TEIAS':
             return { completed: isCompleted, teiasDondu: isCompleted, teiasCikisSayi: '', teiasCikisTarih: '', teiasSayi: '', teiasTarih: '' };
         case 'KURUM_GORUS_EIGM':
@@ -306,9 +385,23 @@ export function migrateJobsForWorkflowChange(title, oldStepsConf, newStepsConf) 
         // has newStepsConf.length keys, so "first not-completed" using the
         // old, longer count silently falls off the end. Compute it directly
         // against the config we already have instead.
+        // Paralel bir küme (TEİAŞ/EİGM görüşleri) tek üye gibi değil, tek
+        // birim gibi taranır - dördü de tamamlanmadan ötesine geçilmez.
         let firstIncomplete = newStepsConf.length;
-        for (let k = 0; k < newStepsConf.length; k++) {
+        let k = 0;
+        while (k < newStepsConf.length) {
+            const bounds = getParallelGroupBounds(newStepsConf, k + 1);
+            if (bounds) {
+                let allDone = true;
+                for (let g = bounds.minPos; g <= bounds.maxPos; g++) {
+                    if (!newSteps[`step${g}`]?.completed) { allDone = false; break; }
+                }
+                if (!allDone) { firstIncomplete = bounds.minPos; break; }
+                k = bounds.maxPos;
+                continue;
+            }
             if (!newSteps[`step${k + 1}`]?.completed) { firstIncomplete = k + 1; break; }
+            k++;
         }
         job.currentStep = firstIncomplete;
         Store.updateJob(job.id, { steps: job.steps, currentStep: job.currentStep });
@@ -701,6 +794,14 @@ function getLiveStatusText(job) {
             return `Aşama ${stepNum}: EİGM Kurum Görüşü Bekleniyor 🔍`;
         case 'KURUM_GORUS_KDB':
             return `Aşama ${stepNum}: KDB Kurum Görüşü Bekleniyor 🔍`;
+        case 'TEIAS_GORUS_CIKIS':
+            return sData.completed || sData.cikildi ? `Aşama ${stepNum}: TEİAŞ Görüşüne ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}Çıkıldı ✅` : `Aşama ${stepNum}: TEİAŞ Görüşüne Çıkılması Bekleniyor 📤`;
+        case 'TEIAS_GORUS_DONUS':
+            return sData.teiasDondu ? `Aşama ${stepNum}: TEİAŞ Görüşü Alındı ✅` : `Aşama ${stepNum}: TEİAŞ Görüşü Bekleniyor ⏳`;
+        case 'EIGM_GORUS_CIKIS':
+            return sData.completed || sData.cikildi ? `Aşama ${stepNum}: EİGM Görüşüne ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}Çıkıldı ✅` : `Aşama ${stepNum}: EİGM Görüşüne Çıkılması Bekleniyor 📤`;
+        case 'EIGM_GORUS_DONUS':
+            return sData.geldi ? `Aşama ${stepNum}: EİGM Görüşü Alındı ✅` : `Aşama ${stepNum}: EİGM Görüşü Bekleniyor ⏳`;
         case 'OZET_OZET_ISTEME':
             return sData.date ? `Aşama ${stepNum}: Özet Diğer Birimlerden ${formatDate(sData.date)} tarihinde İstendi ✅` : `Aşama ${stepNum}: Özetin diğer birimlerden istenmesi bekleniyor ⏳`;
         case 'OZET_BIRIM_DONUSU':
@@ -837,6 +938,13 @@ function getStepTooltipText(job, stepNum) {
             return `${titleText}\n🔍 EİGM: ${sData.eigmDondu ? 'Cevaplandı (' + (sData.eigmSayi || 'Muaf') + ')' : (sData.eigmCikildi ? 'Görüşe Çıkıldı' : 'Bekleniyor')}`;
         case 'KURUM_GORUS_KDB':
             return `${titleText}\n🔍 KDB: ${sData.kdbDondu ? 'Cevaplandı (' + (sData.kdbSayi || 'Muaf') + ')' : (sData.kdbCikildi ? 'Görüşe Çıkıldı' : 'Bekleniyor')}`;
+        case 'TEIAS_GORUS_CIKIS':
+        case 'EIGM_GORUS_CIKIS':
+            return `${titleText}\n📤 ${(sData.cikildi || sData.date) ? 'Çıkıldı' : 'Bekleniyor'}${sData.date ? ' - ' + formatDate(sData.date) : ''}${sData.number ? ' (' + sData.number + ')' : ''}\n🔀 Paralel yürütülür`;
+        case 'TEIAS_GORUS_DONUS':
+            return `${titleText}\n⚡ TEİAŞ: ${sData.teiasDondu ? 'Cevaplandı (' + (sData.teiasSayi || 'Muaf') + ')' : 'Bekleniyor'}${sData.teiasBaglantiDurumu === 'itiraz' ? ' ⚠️ İtiraz sürecinde' : ''}\n🔀 Paralel yürütülür`;
+        case 'EIGM_GORUS_DONUS':
+            return `${titleText}\n🔍 EİGM: ${sData.geldi ? 'Cevaplandı (' + (sData.number || 'Muaf') + ')' : 'Bekleniyor'}\n🔀 Paralel yürütülür`;
         case 'OLUR_MUZEKKERE_YAZIMI':
             return `${titleText}\n📝 Evrak Sayısı: ${sData.number || '-'} | Tarih: ${sData.date ? formatDate(sData.date) : '-'}`;
         case 'OLUR_IMZALANMASI_VE_GUNDEM':
@@ -955,6 +1063,59 @@ function generateProcessSummaryHtml(job) {
                             }).join('');
                             lineText += objLines;
                         }
+                    }
+                }
+                break;
+            case 'TEIAS_GORUS_CIKIS':
+                if (sData.cikildi || sData.date) {
+                    lineText = `TEİAŞ görüşüne <strong>${sData.date ? formatDate(sData.date) + ' tarihinde' : ''}</strong> çıkıldı${sData.number ? ' (' + escapeHtml(sData.number) + ')' : ''}.`;
+                }
+                break;
+            case 'EIGM_GORUS_CIKIS':
+                if (sData.cikildi || sData.date) {
+                    lineText = `EİGM görüşüne <strong>${sData.date ? formatDate(sData.date) + ' tarihinde' : ''}</strong> çıkıldı${sData.number ? ' (' + escapeHtml(sData.number) + ')' : ''}.`;
+                }
+                break;
+            case 'EIGM_GORUS_DONUS':
+                if (sData.geldi) {
+                    lineText = `EİGM görüşü <strong>${sData.date ? formatDate(sData.date) + ' tarihinde' : ''}</strong> cevaplandı (${escapeHtml(sData.number || 'Muaf')}).`;
+                }
+                break;
+            case 'TEIAS_GORUS_DONUS':
+                {
+                    if (sData.teiasDondu) {
+                        lineText = `TEİAŞ görüşü <strong>${sData.teiasTarih ? formatDate(sData.teiasTarih) + ' tarihinde' : ''}</strong> cevaplandı (${escapeHtml(sData.teiasSayi || 'Muaf')}).`;
+                    }
+
+                    // Current connection status details
+                    const baglantiDurumu = sData.teiasBaglantiDurumu || 'kabul';
+                    if (baglantiDurumu === 'kabul') {
+                        if (sData.teiasKabulTaahhutTanimla || sData.teiasKabulObgId) {
+                            lineText += `<div style="margin-left:15px; color:#10b981; font-size:11px; margin-top:2px;">↳ 📋 Bağlantı kabul taahhüt yükümlülüğü tanımlandı (Son Gün: ${sData.teiasKabulDeadline ? formatDate(sData.teiasKabulDeadline) : '-'}).</div>`;
+                        } else if (sData.teiasDondu) {
+                            lineText += `<div style="margin-left:15px; color:#10b981; font-size:11px; margin-top:2px;">↳ ✅ Bağlantı noktası değişmedi / kabul edildi.</div>`;
+                        }
+                    } else if (baglantiDurumu === 'itiraz') {
+                        let activeObjText = `<div style="margin-left:15px; color:#f87171; font-size:11px; margin-top:2px;">↳ ⚠️ Bağlantı görüşüne itiraz edildi (Süreç Takipte).`;
+                        if (sData.teiasItirazEpdkTarih || sData.teiasItirazEpdkSayi) {
+                            activeObjText += `<br>  • EPDK Sunum: ${sData.teiasItirazEpdkSayi || '-'} (${sData.teiasItirazEpdkTarih ? formatDate(sData.teiasItirazEpdkTarih) : '-'})`;
+                        }
+                        if (sData.teiasItirazTeiasTarih || sData.teiasItirazTeiasSayi) {
+                            activeObjText += `<br>  • TEİAŞ Görüş: ${sData.teiasItirazTeiasSayi || '-'} (${sData.teiasItirazTeiasTarih ? formatDate(sData.teiasItirazTeiasTarih) : '-'})`;
+                        }
+                        if (sData.teiasItirazCevapTarih || sData.teiasItirazCevapSayi) {
+                            activeObjText += `<br>  • TEİAŞ İtiraz Cevap: ${sData.teiasItirazCevapSayi || '-'} (${sData.teiasItirazCevapTarih ? formatDate(sData.teiasItirazCevapTarih) : '-'})`;
+                        }
+                        activeObjText += `</div>`;
+                        lineText += activeObjText;
+                    }
+
+                    // Archive loops details
+                    if (sData.teiasObjections && sData.teiasObjections.length > 0) {
+                        const objLines = sData.teiasObjections.map((obj, oIdx) => {
+                            return `<div style="margin-left:15px; color:#f87171; font-size:11px; margin-top:4px;">↳ <strong>[${oIdx+1}. Arşivlenen İtiraz]:</strong> TEİAŞ görüşüne itiraz edildi. EPDK Yazısı: ${obj.teiasItirazEpdkSayi || '-'} (${obj.teiasItirazEpdkTarih ? formatDate(obj.teiasItirazEpdkTarih) : '-'}), TEİAŞ Yazısı: ${obj.teiasItirazTeiasSayi || '-'} (${obj.teiasItirazTeiasTarih ? formatDate(obj.teiasItirazTeiasTarih) : '-'}), TEİAŞ Cevabı: ${obj.teiasItirazCevapSayi || '-'} (${obj.teiasItirazCevapTarih ? formatDate(obj.teiasItirazCevapTarih) : '-'})</div>`;
+                        }).join('');
+                        lineText += objLines;
                     }
                 }
                 break;
@@ -1203,8 +1364,15 @@ function createJobCard(job) {
 
     for (let i = 1; i <= stepCount; i++) {
         const stepDone = isCompleted || job.steps[`step${i}`]?.completed || (i < job.currentStep);
-        const stepActive = !isCompleted && job.currentStep === i;
-        
+        // Paralel kümenin (TEİAŞ/EİGM görüşleri) her açık üyesi aynı anda
+        // "aktif" sayılır - sadece currentStep'in tam üzerindeki değil,
+        // çünkü hepsi birbirini beklemeden doldurulabilir.
+        const iGroupBounds = getParallelGroupBounds(stepsConf, i);
+        const stepActive = !isCompleted && !stepDone && (
+            job.currentStep === i ||
+            (iGroupBounds && iGroupBounds.minPos === job.currentStep)
+        );
+
         let stateClass = '';
         if (stepDone) stateClass = 'completed';
         if (stepActive) stateClass = 'active';
@@ -1225,8 +1393,13 @@ function createJobCard(job) {
             </div>
         `;
 
-        // Calculate interval days between step i and step i+1 if both dates exist
-        if (i < stepCount) {
+        // Calculate interval days between step i and step i+1 if both dates exist.
+        // Skipped within a parallel group (TEİAŞ/EİGM görüşleri): the two
+        // dates aren't causally related (e.g. TEİAŞ dönüşü and EİGM çıkışı),
+        // so a day-gap between them would be meaningless.
+        const nextGroupBounds = getParallelGroupBounds(stepsConf, i + 1);
+        const sameGroupAsNext = iGroupBounds && nextGroupBounds && iGroupBounds.groupId === nextGroupBounds.groupId;
+        if (i < stepCount && !sameGroupAsNext) {
             const dateI = getStepDate(job, i);
             const dateI1 = getStepDate(job, i + 1);
             if (dateI && dateI1) {
@@ -1777,8 +1950,14 @@ function renderAccordionStep(job, stepNum) {
     const stepKey = `step${stepNum}`;
     const stepData = job.steps[stepKey];
     const isCompleted = stepData?.completed;
-    const isActive = job.currentStep === stepNum && job.status !== 'completed';
-    const isLocked = stepNum > (job.currentStep || 1) && job.status !== 'completed';
+    const stepsConf = getWorkflowSteps(job);
+    // Paralel küme (TEİAŞ/EİGM görüşleri) üyeleri, currentStep tam üzerinde
+    // durmasa bile - küme içine girilmişse - açık ve aktif sayılır, çünkü
+    // birbirlerini beklemeden doldurulabilirler.
+    const groupBounds = getParallelGroupBounds(stepsConf, stepNum);
+    const reachable = isStepReachable(job, stepsConf, stepNum);
+    const isActive = !isCompleted && reachable && job.status !== 'completed';
+    const isLocked = !reachable && job.status !== 'completed';
 
     let stateClass = 'locked';
     let badgeText = '🔒 Kilitli';
@@ -1787,13 +1966,13 @@ function renderAccordionStep(job, stepNum) {
         badgeText = '✓ Tamamlandı';
     } else if (isActive) {
         stateClass = 'active expanded'; // Auto-expanded if active
-        badgeText = '⚡ Aktif';
+        badgeText = groupBounds ? '⚡ Aktif · 🔀 Paralel' : '⚡ Aktif';
     }
 
     const stepName = getStepTitle(job, stepNum);
 
     // Aşamanın sorumluluğu ve Scrum zorluk puanı - iş akışı ayarlarından gelir.
-    const stepConf = getWorkflowSteps(job)[stepNum - 1];
+    const stepConf = stepsConf[stepNum - 1];
     const meta = resolveStepMeta(stepConf);
     const metaTitle = `${getOwnerLabel(meta.owner)} · Zorluk: ${DIFFICULTY_LABELS[meta.difficulty] || 'Orta'}`;
     const metaBadgesHtml = `
@@ -2027,6 +2206,88 @@ function renderStepFields(job, stepNum) {
                     <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-top:12px; margin-bottom:0;">
                         <input type="checkbox" id="eigmDondu-${stepNum}" ${sData.eigmDondu ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
                         <label for="eigmDondu-${stepNum}" style="font-weight:bold; color:#10b981; margin-bottom:0; cursor:pointer; font-size:12px;">EİGM Görüşü Cevaplandı / Tamamlandı</label>
+                    </div>
+                </div>
+                ${renderTeiasObjectionHtml(sData, stepNum)}
+            `;
+        // 2026-08: KURUM_GORUS_TEIAS_EIGM'in bölünmüş, paralel yürüyen hali.
+        // Çıkış formları KDB_GORUS_CIKIS ile aynı iki alanlı kalıbı kullanır;
+        // TEİAŞ dönüş formu, eski KURUM_GORUS_TEIAS'ın "cevap" bölümü ve
+        // itiraz/taahhüt alt akışının birebir aynısı (bkz. renderTeiasObjectionHtml).
+        case 'TEIAS_GORUS_CIKIS':
+            return `
+                <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                    <input type="checkbox" id="teiasCikildi-${stepNum}" ${sData.cikildi ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+                    <label for="teiasCikildi-${stepNum}" style="font-weight:bold; color:var(--text-primary); margin-bottom:0; cursor:pointer; font-size:12px;">TEİAŞ Görüşüne Çıkıldı</label>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Görüşe Çıkış Tarihi</label>
+                        <input type="date" id="teiasCikisTarih-${stepNum}" value="${sData.date || ''}" class="modern-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Görüşe Çıkış Sayısı</label>
+                        <input type="text" id="teiasCikisSayi-${stepNum}" value="${escapeHtml(sData.number || '')}" class="modern-input" placeholder="Örn: 10452">
+                    </div>
+                </div>
+            `;
+        case 'EIGM_GORUS_CIKIS':
+            return `
+                <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                    <input type="checkbox" id="eigmCikildi-${stepNum}" ${sData.cikildi ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+                    <label for="eigmCikildi-${stepNum}" style="font-weight:bold; color:var(--text-primary); margin-bottom:0; cursor:pointer; font-size:12px;">EİGM Görüşüne Çıkıldı</label>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Görüşe Çıkış Tarihi</label>
+                        <input type="date" id="eigmCikisTarih-${stepNum}" value="${sData.date || ''}" class="modern-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Görüşe Çıkış Sayısı</label>
+                        <input type="text" id="eigmCikisSayi-${stepNum}" value="${escapeHtml(sData.number || '')}" class="modern-input" placeholder="Örn: E-45214">
+                    </div>
+                </div>
+            `;
+        case 'EIGM_GORUS_DONUS':
+            return `
+                <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="quickCompleteGorus('${job.id}', 'eigm', ${stepNum})" style="font-size:10px; padding:2px 6px; background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1);">Sayı/Tarih Olmadan Tamamla</button>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Cevap Tarihi</label>
+                        <input type="date" id="eigmTarih-${stepNum}" value="${sData.date || ''}" class="modern-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Cevap Sayısı</label>
+                        <input type="text" id="eigmSayi-${stepNum}" value="${escapeHtml(sData.number || '')}" class="modern-input" placeholder="Örn: 98754">
+                    </div>
+                </div>
+                <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-top:12px; margin-bottom:0;">
+                    <input type="checkbox" id="eigmDondu-${stepNum}" ${sData.geldi ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+                    <label for="eigmDondu-${stepNum}" style="font-weight:bold; color:#10b981; margin-bottom:0; cursor:pointer; font-size:12px;">EİGM Görüşü Cevaplandı / Tamamlandı</label>
+                </div>
+            `;
+        case 'TEIAS_GORUS_DONUS':
+            return `
+                <div class="gorus-box" style="border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; background:rgba(0,0,0,0.15);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <h5 style="color:var(--accent-light); margin:0; font-size:13px; font-weight:bold;">TEİAŞ Görüş Süreci</h5>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="quickCompleteGorus('${job.id}', 'teias', ${stepNum})" style="font-size:10px; padding:2px 6px; background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1);">Sayı/Tarih Olmadan Tamamla</button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Cevap Tarihi</label>
+                            <input type="date" id="teiasTarih-${stepNum}" value="${sData.teiasTarih || ''}" class="modern-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Cevap Sayısı</label>
+                            <input type="text" id="teiasSayi-${stepNum}" value="${escapeHtml(sData.teiasSayi || '')}" class="modern-input" placeholder="Örn: 24785">
+                        </div>
+                    </div>
+                    <div class="form-group checkbox-group" style="display:flex; align-items:center; gap:8px; margin-top:12px; margin-bottom:0;">
+                        <input type="checkbox" id="teiasDondu-${stepNum}" ${sData.teiasDondu ? 'checked' : ''} style="width:16px; height:16px; cursor:pointer;">
+                        <label for="teiasDondu-${stepNum}" style="font-weight:bold; color:#10b981; margin-bottom:0; cursor:pointer; font-size:12px;">TEİAŞ Görüşü Cevaplandı / Tamamlandı</label>
                     </div>
                 </div>
                 ${renderTeiasObjectionHtml(sData, stepNum)}
@@ -2882,6 +3143,179 @@ function saveStepData(jobId, stepNum) {
             }
             break;
 
+        // 2026-08: KURUM_GORUS_TEIAS_EIGM'in bölünmüş, paralel yürüyen hali.
+        // Çıkış adımları KDB_GORUS_CIKIS ile aynı kalıp (tarih/sayı varsa ya
+        // da kutu işaretliyse tamamlanmış sayılır). TEİAŞ dönüş adımı, eski
+        // KURUM_GORUS_TEIAS case'inin "cevap + itiraz/taahhüt" kısmının
+        // birebir aynısı - sadece kendi çıkış alanlarını artık kendi başına
+        // tutmuyor, onlar TEIAS_GORUS_CIKIS'te. Dördünün de currentStep'e etkisi
+        // burada değil, switch'in bittiği yerdeki paralel küme mantığıyla
+        // (bkz. aşağıdaki "Paralel adım kümeleri" bloğu) tek elden belirleniyor.
+        case 'TEIAS_GORUS_CIKIS':
+            {
+                const cikisTarih = document.getElementById(`teiasCikisTarih-${stepNum}`).value;
+                const cikisSayi = document.getElementById(`teiasCikisSayi-${stepNum}`).value.trim();
+                const cikildiChk = document.getElementById(`teiasCikildi-${stepNum}`)?.checked || false;
+                const cikildi = cikildiChk || !!cikisTarih || !!cikisSayi;
+                steps[`step${stepNum}`] = { completed: cikildi, cikildi, date: cikisTarih, number: cikisSayi };
+            }
+            break;
+
+        case 'EIGM_GORUS_CIKIS':
+            {
+                const cikisTarih = document.getElementById(`eigmCikisTarih-${stepNum}`).value;
+                const cikisSayi = document.getElementById(`eigmCikisSayi-${stepNum}`).value.trim();
+                const cikildiChk = document.getElementById(`eigmCikildi-${stepNum}`)?.checked || false;
+                const cikildi = cikildiChk || !!cikisTarih || !!cikisSayi;
+                steps[`step${stepNum}`] = { completed: cikildi, cikildi, date: cikisTarih, number: cikisSayi };
+            }
+            break;
+
+        case 'EIGM_GORUS_DONUS':
+            {
+                const cevapTarih = document.getElementById(`eigmTarih-${stepNum}`).value;
+                const cevapSayi = document.getElementById(`eigmSayi-${stepNum}`).value.trim();
+                const dondu = document.getElementById(`eigmDondu-${stepNum}`).checked || !!cevapTarih;
+                steps[`step${stepNum}`] = { completed: dondu, geldi: dondu, date: cevapTarih, number: cevapSayi };
+            }
+            break;
+
+        case 'TEIAS_GORUS_DONUS':
+            {
+                const sData = steps[`step${stepNum}`] || {};
+                let teias = document.getElementById(`teiasDondu-${stepNum}`).checked;
+                const teiasSayi = document.getElementById(`teiasSayi-${stepNum}`).value.trim();
+                const teiasTarih = document.getElementById(`teiasTarih-${stepNum}`).value;
+                if (teiasTarih) teias = true;
+
+                const teiasBaglantiDurumu = document.getElementById(`teiasBaglantiDurumu-${stepNum}`)?.value || 'kabul';
+                const teiasItirazEpdkTarih = document.getElementById(`teiasItirazEpdkTarih-${stepNum}`)?.value || '';
+                const teiasItirazEpdkSayi = document.getElementById(`teiasItirazEpdkSayi-${stepNum}`)?.value.trim() || '';
+                const teiasItirazTeiasTarih = document.getElementById(`teiasItirazTeiasTarih-${stepNum}`)?.value || '';
+                const teiasItirazTeiasSayi = document.getElementById(`teiasItirazTeiasSayi-${stepNum}`)?.value.trim() || '';
+                const teiasItirazCevapTarih = document.getElementById(`teiasItirazCevapTarih-${stepNum}`)?.value || '';
+                const teiasItirazCevapSayi = document.getElementById(`teiasItirazCevapSayi-${stepNum}`)?.value.trim() || '';
+                const teiasItirazCevapGeriDondu = document.getElementById(`teiasItirazCevapGeriDondu-${stepNum}`)?.checked || false;
+
+                const teiasKabulTaahhutTanimla = document.getElementById(`teiasKabulTaahhutTanimla-${stepNum}`)?.checked || false;
+                const teiasKabulDeadline = document.getElementById(`teiasKabulDeadline-${stepNum}`)?.value || '';
+                const teiasKabulDesc = document.getElementById(`teiasKabulDesc-${stepNum}`)?.value.trim() || 'TEİAŞ Bağlantı Kabul Taahhüdü Yükümlülüğü';
+
+                if (teiasBaglantiDurumu === 'kabul' && teiasKabulTaahhutTanimla && !teiasKabulDeadline) {
+                    showToast('Bağlantı kabul taahhüdü için son gün tarihi zorunludur.', 'warning');
+                    return;
+                }
+
+                let teiasKabulObgId = sData.teiasKabulObgId || '';
+
+                if (teiasBaglantiDurumu === 'kabul' && teiasKabulTaahhutTanimla) {
+                    if (teiasKabulObgId) {
+                        const ob = Store.obligations.find(o => o.id === teiasKabulObgId);
+                        if (ob) {
+                            ob.deadline = new Date(teiasKabulDeadline);
+                            ob.obligationDescription = teiasKabulDesc;
+                            ob.updatedAt = new Date();
+                        }
+                    } else {
+                        teiasKabulObgId = generateId();
+                        const newObg = {
+                            id: teiasKabulObgId,
+                            projectName: job.project,
+                            projectLink: '',
+                            obligationType: 'Bağlantı Anlaşması Kabul Taahhüdü',
+                            obligationDescription: teiasKabulDesc,
+                            deadline: new Date(teiasKabulDeadline),
+                            notes: 'TEİAŞ görüşü üzerine otomatik oluşturuldu.',
+                            status: 'pending',
+                            comments: [],
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        };
+                        Store.obligations.push(newObg);
+
+                        const tanimlamaIdx = stepsConf.findIndex(s => s.type === 'YUKUMLULUK_TANIMLAMA');
+                        if (tanimlamaIdx !== -1) {
+                            const tStepNum = tanimlamaIdx + 1;
+                            const tStepKey = `step${tStepNum}`;
+                            if (!steps[tStepKey]) {
+                                steps[tStepKey] = { completed: false, obligationIds: [], noObligation: false };
+                            }
+                            if (!steps[tStepKey].obligationIds) {
+                                steps[tStepKey].obligationIds = [];
+                            }
+                            if (!steps[tStepKey].obligationIds.includes(teiasKabulObgId)) {
+                                steps[tStepKey].obligationIds.push(teiasKabulObgId);
+                            }
+                            steps[tStepKey].completed = false;
+                            steps[tStepKey].noObligation = false;
+                        }
+                        showToast('Bağlantı Kabul Taahhüt Yükümlülüğü oluşturuldu.', 'success');
+                    }
+                } else if (teiasKabulObgId) {
+                    Store.obligations = Store.obligations.filter(o => o.id !== teiasKabulObgId);
+                    const tanimlamaIdx = stepsConf.findIndex(s => s.type === 'YUKUMLULUK_TANIMLAMA');
+                    if (tanimlamaIdx !== -1) {
+                        const tStepNum = tanimlamaIdx + 1;
+                        const tStepKey = `step${tStepNum}`;
+                        if (steps[tStepKey] && steps[tStepKey].obligationIds) {
+                            steps[tStepKey].obligationIds = steps[tStepKey].obligationIds.filter(id => id !== teiasKabulObgId);
+                        }
+                    }
+                    teiasKabulObgId = '';
+                    showToast('Bağlantı Kabul Taahhüt Yükümlülüğü kaldırıldı.', 'info');
+                }
+
+                let teiasObjections = sData.teiasObjections || [];
+
+                if (teiasBaglantiDurumu === 'itiraz' && teiasItirazCevapGeriDondu) {
+                    teiasObjections.push({
+                        date: new Date().toISOString(),
+                        teiasTarih, teiasSayi,
+                        teiasItirazEpdkTarih, teiasItirazEpdkSayi,
+                        teiasItirazTeiasTarih, teiasItirazTeiasSayi,
+                        teiasItirazCevapTarih, teiasItirazCevapSayi
+                    });
+
+                    steps[`step${stepNum}`] = {
+                        completed: false,
+                        teiasDondu: false,
+                        teiasSayi: '', teiasTarih: '',
+                        teiasBaglantiDurumu: 'kabul',
+                        teiasItirazEpdkTarih: '', teiasItirazEpdkSayi: '',
+                        teiasItirazTeiasTarih: '', teiasItirazTeiasSayi: '',
+                        teiasItirazCevapTarih: '', teiasItirazCevapSayi: '',
+                        teiasItirazCevapGeriDondu: false,
+                        teiasObjections,
+                        teiasKabulTaahhutTanimla: false, teiasKabulDeadline: '', teiasKabulDesc: '', teiasKabulObgId: ''
+                    };
+
+                    // İtiraz sadece TEİAŞ pistini geri sarar: önceki adım olan
+                    // "TEİAŞ Görüşüne Çıkılması" da sıfırlanır ki yeni bir
+                    // çıkış döngüsü başlatılabilsin. EİGM pisti bundan
+                    // etkilenmez - kendi aşamasında ne durumdaysa öyle kalır.
+                    const cikisIdx = stepsConf.findIndex(s => s.type === 'TEIAS_GORUS_CIKIS');
+                    if (cikisIdx !== -1) {
+                        steps[`step${cikisIdx + 1}`] = getInitialStepData('TEIAS_GORUS_CIKIS', false);
+                    }
+
+                    showToast('TEİAŞ itiraz cevabı arşivlendi ve TEİAŞ süreci yeni görüş girişi için başa döndürüldü.', 'info');
+                } else {
+                    const teiasCompleted = (teiasBaglantiDurumu === 'kabul') && teias;
+
+                    steps[`step${stepNum}`] = {
+                        completed: teiasCompleted,
+                        teiasDondu: teias, teiasSayi, teiasTarih,
+                        teiasBaglantiDurumu, teiasItirazEpdkTarih, teiasItirazEpdkSayi,
+                        teiasItirazTeiasTarih, teiasItirazTeiasSayi,
+                        teiasItirazCevapTarih, teiasItirazCevapSayi,
+                        teiasItirazCevapGeriDondu,
+                        teiasObjections,
+                        teiasKabulTaahhutTanimla, teiasKabulDeadline, teiasKabulDesc, teiasKabulObgId
+                    };
+                }
+            }
+            break;
+
         case 'KURUM_GORUS_TEIAS':
             {
                 const sData = steps[`step${stepNum}`] || {};
@@ -3524,9 +3958,32 @@ function saveStepData(jobId, stepNum) {
             break;
     }
 
+    // Paralel adım kümeleri (TEİAŞ/EİGM görüşleri) tek tek ilerlemez: hangi
+    // üyenin kaydedildiğinden bağımsız olarak, currentStep dördü de
+    // tamamlanana kadar kümenin başında bekler, tamamlanınca kümenin
+    // ötesine atlar. Yukarıdaki case bloklarının stepNum'a göre yaptığı
+    // olağan ilerletme burada gerekirse ezilir.
+    {
+        const groupBounds = getParallelGroupBounds(stepsConf, stepNum);
+        if (groupBounds) {
+            let groupDone = true;
+            for (let g = groupBounds.minPos; g <= groupBounds.maxPos; g++) {
+                if (!steps[`step${g}`]?.completed) { groupDone = false; break; }
+            }
+            currentStep = groupDone ? groupBounds.maxPos + 1 : groupBounds.minPos;
+        }
+    }
+
     // Workflow state machine: Lock all steps after the current step
     const totalSteps = stepsConf.length;
     for (let k = currentStep + 1; k <= totalSteps; k++) {
+        // A parallel group's members may legitimately be completed ahead of
+        // currentStep - it sits pinned at the group's entry until every
+        // member is done, so don't wipe a sibling that already finished.
+        const kBounds = getParallelGroupBounds(stepsConf, k);
+        if (kBounds && kBounds.minPos === currentStep) {
+            continue;
+        }
         // Skip locking of YUKUMLULUK_TAMAMLAMA if the YUKUMLULUK_TANIMLAMA step before it has noObligation = true
         const prevTanimlamaIdx = stepsConf.findIndex((s, sIdx) => s.type === 'YUKUMLULUK_TANIMLAMA' && sIdx < (k - 1));
         if (prevTanimlamaIdx !== -1) {
@@ -3976,11 +4433,29 @@ function uncompleteFutureSteps(job) {
     return changed;
 }
 
-/** Current step = first not-yet-completed step (1-based). */
+/**
+ * Current step = first not-yet-completed step (1-based). A parallel group
+ * (TEİAŞ/EİGM görüşleri) counts as one unit: skipped only once every member
+ * is done, otherwise the group's first position is returned even if a later
+ * member finished first.
+ */
 function deriveCurrentStep(job) {
-    const total = getWorkflowSteps(job).length || 13;
-    for (let k = 1; k <= total; k++) {
+    const stepsConf = getWorkflowSteps(job);
+    const total = stepsConf.length || 13;
+    let k = 1;
+    while (k <= total) {
+        const bounds = getParallelGroupBounds(stepsConf, k);
+        if (bounds) {
+            let allDone = true;
+            for (let g = bounds.minPos; g <= bounds.maxPos; g++) {
+                if (!job.steps?.[`step${g}`]?.completed) { allDone = false; break; }
+            }
+            if (!allDone) return bounds.minPos;
+            k = bounds.maxPos + 1;
+            continue;
+        }
         if (!job.steps?.[`step${k}`]?.completed) return k;
+        k++;
     }
     return total;
 }

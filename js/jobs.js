@@ -1439,16 +1439,17 @@ function createJobCard(job) {
         progressRailPercent = percentForStep(job.currentStep);
     }
 
-    // Calculate active segment highlight. Skipped when currentStep is a
-    // parallel group's entry point: the main rail is already gapped there
-    // (replaced by the group's own fork + lane bars), so a pulse drawn at
-    // the wrapper's center would float disconnected from both rows.
+    // Calculate active segment highlight. Skipped whenever either end of the
+    // transition touches a parallel group - entering it (currentStep is the
+    // group's entry) or just having left it (currentStep is right after the
+    // group, so the previous step was one of its members). The main rail is
+    // gapped across the whole group either way (replaced by its own fork +
+    // lane + merge visuals), so a straight pulse drawn at the wrapper's
+    // center would land right on top of the merge curves and look like a
+    // leftover bar cutting through them.
     let activeSegmentHtml = '';
-    const enteringGroup = (() => {
-        const b = getParallelGroupBounds(stepsConf, job.currentStep);
-        return b && b.minPos === job.currentStep;
-    })();
-    if (!isCompleted && job.currentStep > 1 && totalSlots > 1 && !enteringGroup) {
+    const touchesGroup = !!getParallelGroupBounds(stepsConf, job.currentStep - 1) || !!getParallelGroupBounds(stepsConf, job.currentStep);
+    if (!isCompleted && job.currentStep > 1 && totalSlots > 1 && !touchesGroup) {
         const prevPercent = percentForStep(job.currentStep - 1);
         const currPercent = percentForStep(job.currentStep);
         activeSegmentHtml = `

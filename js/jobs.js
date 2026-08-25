@@ -4447,7 +4447,7 @@ window.rollbackJobToStep = function(jobId, stepNum) {
 
 export const PRELICENCE_EXCEL_SEED = [
     { row: 1, project: "TURGUTTEPE RES", title: "T13-T14 TESİS TAMAMLAMA", s1Date: "2026-08-10", s2Date: "2026-08-17", aoDate: "2026-08-18", gdDate: "2026-08-21", epdkDate: "2026-08-26", expiryDate: "2026-08-26" },
-    { row: 2, project: "HARPUT EDT 2 GES", title: "ÖNLİSANS SÜRESİ", s1Date: "2026-09-21", s2Date: "2026-09-28", aoDate: "2026-09-25", gdDate: "2026-09-30", epdkDate: "2026-10-05", expiryDate: "2026-10-12" },
+    { row: 2, project: "HARPUT EDT GES", title: "ÖNLİSANS SÜRESİ", s1Date: "2026-09-21", s2Date: "2026-09-28", aoDate: "2026-09-25", gdDate: "2026-09-30", epdkDate: "2026-10-05", expiryDate: "2026-10-12" },
     { row: 3, project: "ÇATAL RES", title: "ÖNLİSANS SÜRESİ", s1Date: "2026-09-28", s2Date: "2026-10-06", aoDate: "2026-10-07", gdDate: "2026-10-12", epdkDate: "2026-10-15", expiryDate: "2026-10-18" },
     { row: 4, project: "ALAPINAR RES", title: "T2 TESİS TAMAMLAMA (T1'LE BİRLİKTE YAPALIM)", s1Date: "2026-09-28", s2Date: "2026-10-12", aoDate: "2026-10-14", gdDate: "2026-10-19", epdkDate: "2026-10-22", expiryDate: "2026-10-25" },
     { row: 5, project: "SUGA BES", title: "TESİS TAMAMLAMA", s1Date: "2026-09-28", s2Date: "2026-10-12", aoDate: "2026-10-15", gdDate: "2026-10-20", epdkDate: "2026-10-23", expiryDate: "2026-10-24" },
@@ -4724,6 +4724,16 @@ const MATRIX_STEPS = [
     { num: 11, key: 'step11', field: 'date', label: '9-11. Derç Edilme' }
 ];
 
+/** <option> list for the matrix's inline project picker, current job's project first-selected. */
+function buildMatrixProjectOptions(allProjectNames, currentProject) {
+    const names = allProjectNames.includes(currentProject) || !currentProject
+        ? allProjectNames
+        : [currentProject, ...allProjectNames];
+    return names.map(name =>
+        `<option value="${escapeHtml(name)}" ${name === currentProject ? 'selected' : ''}>${escapeHtml(name)}</option>`
+    ).join('');
+}
+
 const NARROW_VIEWPORT_QUERY = '(max-width: 768px)';
 
 function isNarrowViewport() {
@@ -4737,11 +4747,12 @@ function isNarrowViewport() {
  * updateMatrixCellDate / toggleMatrixStepCompletion actions as the desktop
  * table, stacked vertically with tappable targets. Styled by mobile.css.
  */
-function renderMatrixCard(job, idx, projectsByName) {
+function renderMatrixCard(job, idx, projectsByName, allProjectNames) {
     const pObj = projectsByName.get(job.project);
     const steps = job.steps || {};
     const isYellow = job.isYellow || [14, 17, 29, 30].includes(job.matrixRow);
     const rowNum = job.matrixRow || (idx + 1);
+    const projectOptionsHtml = buildMatrixProjectOptions(allProjectNames, job.project);
 
     const expiryVal = formatDateForInput(pObj ? (pObj.licenceExpiry || pObj.constructionDeadline) : '');
 
@@ -4774,7 +4785,8 @@ function renderMatrixCard(job, idx, projectsByName) {
     return `
         <div class="ext-matrix-card ${isYellow ? 'is-yellow' : ''}">
             <div class="ext-matrix-card__head">
-                <span class="ext-matrix-card__project">${rowNum}. ${escapeHtml(job.project)}</span>
+                <span class="ext-matrix-card__project">${rowNum}.</span>
+                <select class="ext-matrix-project-select ext-matrix-card__project" style="flex:1; font-size: 15px;" onchange="window.updateMatrixJobProject('${job.id}', this.value)">${projectOptionsHtml}</select>
                 ${stageBadge}
             </div>
             <div class="ext-matrix-card__subtitle">${escapeHtml(job.subTitle || job.title || '')}</div>
@@ -4787,6 +4799,8 @@ function renderMatrixCard(job, idx, projectsByName) {
             <div class="ext-matrix-card__actions">
                 <button type="button" class="btn btn-secondary"
                         onclick="window.openJobFromMatrix('${job.id}')">🔍 Detayları Aç</button>
+                <button type="button" class="btn btn-danger" style="margin-top: 8px;"
+                        onclick="window.deleteMatrixJob('${job.id}')">🗑️ Satırı Sil</button>
             </div>
         </div>
     `;
@@ -4813,6 +4827,7 @@ export function renderPrelicenceExtensionsMatrix() {
     // One lookup table instead of a linear Store.projects.find() per job, per
     // filter pass, per row (previously 4+ full scans for every row rendered).
     const projectsByName = new Map((Store.projects || []).map(p => [p.name, p]));
+    const allProjectNames = [...new Set((Store.projects || []).map(p => p.name))].sort((a, b) => a.localeCompare(b, 'tr'));
 
     let jobs = (Store.jobs || []).filter(j => {
         if (!j) return false;
@@ -4938,7 +4953,7 @@ export function renderPrelicenceExtensionsMatrix() {
     if (isNarrowViewport()) {
         container.innerHTML = `
             <div class="ext-matrix-cards">
-                ${jobs.map((j, idx) => renderMatrixCard(j, idx, projectsByName)).join('')}
+                ${jobs.map((j, idx) => renderMatrixCard(j, idx, projectsByName, allProjectNames)).join('')}
             </div>
         `;
         return;
@@ -4955,6 +4970,7 @@ export function renderPrelicenceExtensionsMatrix() {
             : 'border-bottom: 1px solid rgba(255,255,255,0.05);';
 
         const rowNum = j.matrixRow || (idx + 1);
+        const projectSelectHtml = `<select class="ext-matrix-project-select" style="color: ${isYellowRow ? '#fef08a' : 'var(--accent-light)'}; font-size: 11px;" onchange="window.updateMatrixJobProject('${j.id}', this.value)">${buildMatrixProjectOptions(allProjectNames, j.project)}</select>`;
 
         // Step Cells mapping to Workflow
         const s1 = steps.step1 || {};
@@ -5004,7 +5020,7 @@ export function renderPrelicenceExtensionsMatrix() {
         return `
             <tr style="${rowBg} transition: background 0.2s;" onmouseover="if(!${isYellowRow}) this.style.background='rgba(255,255,255,0.03)'" onmouseout="if(!${isYellowRow}) this.style.background='transparent'">
                 <td style="padding: 4px 6px; font-weight: bold; color: ${isYellowRow ? '#fef08a' : 'var(--text-muted)'}; font-size: 11px; text-align: center;">${rowNum}</td>
-                <td style="padding: 4px 6px; font-weight: 700; color: ${isYellowRow ? '#fef08a' : 'var(--accent-light)'}; font-size: 11px;">${escapeHtml(j.project)}</td>
+                <td style="padding: 4px 6px; font-weight: 700; font-size: 11px;">${projectSelectHtml}</td>
                 <td style="padding: 4px 6px; font-size: 10px; color: ${isYellowRow ? '#fef08a' : 'var(--text-secondary)'}; font-weight: 600;">${escapeHtml(j.subTitle || j.title)}</td>
                 <td style="padding: 4px 4px;">${s1Cell}</td>
                 <td style="padding: 4px 4px;">${s2Cell}</td>
@@ -5017,31 +5033,45 @@ export function renderPrelicenceExtensionsMatrix() {
                 <td style="padding: 4px 4px;">${expiryInput}</td>
                 <td style="padding: 4px 4px; text-align: center;">${stageBadge}</td>
                 <td style="padding: 4px 4px; text-align: center;">
-                    <button type="button" class="btn btn-xs btn-secondary" onclick="window.openJobFromMatrix('${j.id}')" style="padding: 2px 6px; font-size: 10px; border-radius: 4px;">🔍 Detay</button>
+                    <div style="display: flex; gap: 4px; justify-content: center;">
+                        <button type="button" class="btn btn-xs btn-secondary" onclick="window.openJobFromMatrix('${j.id}')" style="padding: 2px 5px; font-size: 10px; border-radius: 4px;" title="Detayları Aç">🔍</button>
+                        <button type="button" class="btn btn-xs btn-danger" onclick="window.deleteMatrixJob('${j.id}')" style="padding: 2px 5px; font-size: 10px; border-radius: 4px;" title="Satırı Sil">🗑️</button>
+                    </div>
                 </td>
             </tr>
         `;
     }).join('');
 
+    // Column headers for the resizable matrix table. Widths are the defaults;
+    // a user's drag-resized widths (persisted in localStorage) override them
+    // after render, in initMatrixColumnResize().
+    const MATRIX_COLUMNS = [
+        { label: 'SIRA', width: 35, align: 'center' },
+        { label: 'PROJE ADI', width: 125 },
+        { label: 'KONU / AÇIKLAMA', width: 145 },
+        { label: '1. ÖZET İSTEME', width: 110, align: 'center', color: '#10b981' },
+        { label: '2. BİRİM DÖNÜŞ', width: 110, align: 'center', color: '#60a5fa' },
+        { label: '3. AO HAZIRLIK', width: 110, align: 'center', color: '#818cf8' },
+        { label: '4. GD KONTROL', width: 110, align: 'center', color: '#f472b6' },
+        { label: '5. EPDK HAZIRLIK', width: 110, align: 'center', color: '#fbbf24' },
+        { label: '6. EPDK BAŞVURU', width: 110, align: 'center', color: '#f59e0b' },
+        { label: '7-8. KDB GÖRÜŞÜ', width: 110, align: 'center', color: '#a78bfa' },
+        { label: '9-11. DERÇ EDİLME', width: 110, align: 'center', color: '#34d399' },
+        { label: 'SÜRE BİTİŞ', width: 110, align: 'center', color: '#f87171' },
+        { label: 'DURUM', width: 95, align: 'center' },
+        { label: 'İŞLEM', width: 80, align: 'center' }
+    ];
+
+    const theadHtml = MATRIX_COLUMNS.map((col, i) => `
+        <th data-col="${i}" style="padding: 8px 4px; width: ${col.width}px; position: relative; ${col.align ? `text-align: ${col.align};` : ''} ${col.color ? `color: ${col.color};` : ''}">${col.label}<span class="ext-matrix-col-resizer" data-col="${i}"></span></th>
+    `).join('');
+
     container.innerHTML = `
         <div style="overflow-x: auto; width: 100%;">
-            <table class="modern-table" style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed;">
+            <table id="extMatrixTable" class="modern-table" style="border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed;">
                 <thead>
                     <tr style="border-bottom: 2px solid rgba(255,255,255,0.15); color: var(--text-muted); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; background: rgba(0,0,0,0.2);">
-                        <th style="padding: 8px 4px; width: 35px; text-align: center;">SIRA</th>
-                        <th style="padding: 8px 6px; width: 125px;">PROJE ADI</th>
-                        <th style="padding: 8px 6px; width: 145px;">KONU / AÇIKLAMA</th>
-                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #10b981;">1. ÖZET İSTEME</th>
-                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #60a5fa;">2. BİRİM DÖNÜŞ</th>
-                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #818cf8;">3. AO HAZIRLIK</th>
-                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #f472b6;">4. GD KONTROL</th>
-                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #fbbf24;">5. EPDK HAZIRLIK</th>
-                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #f59e0b;">6. EPDK BAŞVURU</th>
-                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #a78bfa;">7-8. KDB GÖRÜŞÜ</th>
-                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #34d399;">9-11. DERÇ EDİLME</th>
-                        <th style="padding: 8px 4px; width: 110px; text-align: center; color: #f87171;">SÜRE BİTİŞ</th>
-                        <th style="padding: 8px 4px; width: 95px; text-align: center;">DURUM</th>
-                        <th style="padding: 8px 4px; width: 55px; text-align: center;">İŞLEM</th>
+                        ${theadHtml}
                     </tr>
                 </thead>
                 <tbody>
@@ -5050,6 +5080,76 @@ export function renderPrelicenceExtensionsMatrix() {
             </table>
         </div>
     `;
+
+    initMatrixColumnResize(container);
+}
+
+const MATRIX_COL_WIDTHS_KEY = 'extMatrixColWidths';
+
+function loadMatrixColWidths() {
+    try {
+        return JSON.parse(localStorage.getItem(MATRIX_COL_WIDTHS_KEY) || '{}');
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveMatrixColWidth(colIdx, widthPx) {
+    try {
+        const widths = loadMatrixColWidths();
+        widths[colIdx] = widthPx;
+        localStorage.setItem(MATRIX_COL_WIDTHS_KEY, JSON.stringify(widths));
+    } catch (e) {
+        // Ignore storage failures (private browsing, quota, etc.) - widths just won't persist.
+    }
+}
+
+/**
+ * Excel-style manual column widths for the prelicence matrix table. Applies
+ * any previously saved widths, then wires up each header's drag handle to
+ * resize its column and persist the new width to localStorage.
+ */
+function initMatrixColumnResize(container) {
+    const table = container.querySelector('#extMatrixTable');
+    if (!table) return;
+
+    const savedWidths = loadMatrixColWidths();
+    const headerCells = table.querySelectorAll('thead th[data-col]');
+
+    headerCells.forEach(th => {
+        const colIdx = th.getAttribute('data-col');
+        if (savedWidths[colIdx]) th.style.width = `${savedWidths[colIdx]}px`;
+
+        const resizer = th.querySelector('.ext-matrix-col-resizer');
+        if (!resizer) return;
+
+        resizer.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const startX = e.pageX;
+            const startWidth = th.offsetWidth;
+            resizer.classList.add('is-resizing');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+
+            const onMouseMove = (moveEvt) => {
+                const newWidth = Math.max(35, startWidth + (moveEvt.pageX - startX));
+                th.style.width = `${newWidth}px`;
+            };
+            const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                resizer.classList.remove('is-resizing');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                saveMatrixColWidth(colIdx, th.offsetWidth);
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    });
 }
 
 export function initPrelicenceMatrixEvents() {
@@ -5201,6 +5301,35 @@ window.updateMatrixProjectExpiry = function(projectName, newDate) {
 
     if (saveData()) {
         showToast('Süre bitiş tarihi güncellendi! ✅', 'success');
+        window.dispatchEvent(new CustomEvent('refresh-views'));
+    }
+};
+
+window.updateMatrixJobProject = function(jobId, newProjectName) {
+    const job = Store.jobs.find(j => j.id == jobId);
+    if (!job || !newProjectName || job.project === newProjectName) return;
+
+    job.project = newProjectName;
+    job.updatedAt = new Date();
+    Store.updateJob(job.id, { project: newProjectName, updatedAt: job.updatedAt });
+
+    if (saveData()) {
+        showToast('Proje güncellendi! ✅', 'success');
+        window.dispatchEvent(new CustomEvent('refresh-views'));
+    }
+};
+
+window.deleteMatrixJob = function(jobId) {
+    const job = Store.jobs.find(j => j.id == jobId);
+    if (!job) return;
+
+    const label = job.project ? `"${job.project}" - ${job.subTitle || job.title || ''}` : 'bu satırı';
+    if (!confirm(`${label} listeden kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)) return;
+
+    Store.deleteJob(jobId);
+
+    if (saveData()) {
+        showToast('Satır silindi.', 'info');
         window.dispatchEvent(new CustomEvent('refresh-views'));
     }
 };

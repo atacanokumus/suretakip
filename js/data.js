@@ -256,6 +256,46 @@ function migrateBasvuruHazirlikToZkKontrol() {
 }
 
 /**
+ * One-time patch: "Yazışma Takibi" was hand-created via Ayarlar > Tadil İş
+ * Akışı Yönetimi using the workflow builder's generic checkbox-only step
+ * pieces, before this feature's purpose-built steps existed. Replaces it
+ * with the two dedicated steps - "Yazı Gönderme" (Gönderilen Kurum, Konu,
+ * Sayı, Tarih) and "Yazı Cevabı" (Sonuçlandırma Şekli: Kurul Kararı/Olur vs
+ * Üst Yazı, plus Sayı/Tarih). Confirmed with the user there are no real
+ * "Yazışma Takibi" tadil records yet, so any in-progress job.steps for this
+ * title are reset to the new blank shape rather than remapped - the old
+ * generic pieces have no stable type identity to remap from anyway.
+ */
+function migrateYazismaTakibiToSpecializedSteps() {
+    const title = 'Yazışma Takibi';
+    const newStepsConf = DEFAULT_WORKFLOWS[title];
+    const oldStepsConf = Store.workflows[title];
+    if (!oldStepsConf || !newStepsConf) return;
+
+    const alreadyMigrated = oldStepsConf.length === newStepsConf.length &&
+        oldStepsConf.every((s, i) => s.type === newStepsConf[i].type);
+    if (alreadyMigrated) return;
+
+    Store.workflows[title] = newStepsConf;
+
+    const initialStepData = {
+        YAZI_GONDERME: { completed: false, kurum: '', konu: '', number: '', date: '' },
+        YAZI_CEVAP: { completed: false, sonucTuru: 'kurul_karari', number: '', date: '' }
+    };
+    (Store.jobs || []).forEach(job => {
+        if (job.title !== title) return;
+        const steps = {};
+        newStepsConf.forEach((stepDef, idx) => {
+            steps[`step${idx + 1}`] = { ...initialStepData[stepDef.type] };
+        });
+        Store.updateJob(job.id, { steps, currentStep: 1 });
+    });
+
+    safeSetStorage('epdk_workflows', Store.workflows);
+    syncToFirestore().catch(err => logError('Yazışma Takibi iş akışı geçişi hatası', err));
+}
+
+/**
  * One-time patch: splits the combined "TEİAŞ ve EİGM Kurum Görüşleri" step
  * (type KURUM_GORUS_TEIAS_EIGM) into four independent, parallel-running
  * steps - TEİAŞ Görüşüne Çıkılması / Alınması, EİGM Görüşüne Çıkılması /
@@ -448,6 +488,7 @@ export async function loadData() {
                 }
                 migrateBasvuruHazirlikToZkKontrol();
                 migrateTeiasEigmSplit();
+                migrateYazismaTakibiToSpecializedSteps();
 
                 // Load step responsibility / difficulty assignments. Absent on
                 // documents written before this feature - js/step_meta.js then
@@ -577,6 +618,7 @@ export async function loadData() {
         }
         migrateBasvuruHazirlikToZkKontrol();
         migrateTeiasEigmSplit();
+        migrateYazismaTakibiToSpecializedSteps();
 
         // Load step responsibility / difficulty assignments
         const savedStepMeta = safeGetStorage('epdk_stepMeta');

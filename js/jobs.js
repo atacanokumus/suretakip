@@ -264,6 +264,10 @@ export function getInitialStepData(type, isCompleted) {
             return { completed: isCompleted, sunuldu: isCompleted, date: '', number: '' };
         case 'MUHATAP_YETKILISI_TANIMLANMASI':
             return { completed: isCompleted, date: '', detay: '' };
+        case 'YAZI_GONDERME':
+            return { completed: isCompleted, kurum: '', konu: '', number: '', date: '' };
+        case 'YAZI_CEVAP':
+            return { completed: isCompleted, sonucTuru: 'kurul_karari', number: '', date: '' };
         case 'TEMINAT_IADESI':
             return { completed: isCompleted, date: '', number: '' };
         case 'GENEL_DEGERLENDIRME':
@@ -933,6 +937,13 @@ function getLiveStatusText(job) {
             return `Aşama ${stepNum}: Evrağın EPDK’ya Sunulması Bekleniyor 📬`;
         case 'MUHATAP_YETKILISI_TANIMLANMASI':
             return `Aşama ${stepNum}: Muhatap Yetkilisi Tanımlanması Bekleniyor 👤`;
+        case 'YAZI_GONDERME':
+            return sData.completed || sData.date ? `Aşama ${stepNum}: ${escapeHtml(sData.kurum || 'İlgili Kuruma')} Yazı ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}Gönderildi ✅` : `Aşama ${stepNum}: İlgili Kuruma Yazı Gönderilmesi Bekleniyor 📤`;
+        case 'YAZI_CEVAP':
+            {
+                const sonucLabel = sData.sonucTuru === 'ust_yazi' ? 'Üst Yazı' : 'Kurul Kararı / Olur';
+                return sData.completed || sData.date ? `Aşama ${stepNum}: ${sonucLabel} ile ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}Sonuçlandırıldı ✅` : `Aşama ${stepNum}: Cevap / Sonuçlandırma Bekleniyor ⏳`;
+            }
         case 'TEMINAT_IADESI':
             return `Aşama ${stepNum}: Teminat İadesinin İstenmesi Bekleniyor 💰`;
         case 'GENEL_DEGERLENDIRME':
@@ -1049,6 +1060,10 @@ function getStepTooltipText(job, stepNum) {
             return `${titleText}\n📬 Sunum Tarihi: ${sData.date ? formatDate(sData.date) : '-'} | Sayı/Barkod: ${sData.number || '-'}`;
         case 'MUHATAP_YETKILISI_TANIMLANMASI':
             return `${titleText}\n👤 Tanımlanma Tarihi: ${sData.date ? formatDate(sData.date) : '-'} | Detay: ${sData.detay || '-'}`;
+        case 'YAZI_GONDERME':
+            return `${titleText}\n📤 Kurum: ${sData.kurum || '-'} | Konu: ${sData.konu || '-'} | Sayı: ${sData.number || '-'} | Tarih: ${sData.date ? formatDate(sData.date) : '-'}`;
+        case 'YAZI_CEVAP':
+            return `${titleText}\n📥 Sonuçlandırma: ${sData.sonucTuru === 'ust_yazi' ? 'Üst Yazı' : 'Kurul Kararı / Olur'} | Sayı: ${sData.number || '-'} | Tarih: ${sData.date ? formatDate(sData.date) : '-'}`;
         case 'TEMINAT_IADESI':
             return `${titleText}\n💰 İstek Tarihi: ${sData.date ? formatDate(sData.date) : '-'} | Evrak No: ${sData.number || '-'}`;
         default:
@@ -1304,6 +1319,17 @@ function generateProcessSummaryHtml(job) {
             case 'ZK_KONTROL':
                 if (sData.completed || sData.zkDone || sData.date) {
                     lineText = `ZK <strong>${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}</strong>kontrol etti.`;
+                }
+                break;
+            case 'YAZI_GONDERME':
+                if (sData.completed || sData.date || sData.number) {
+                    lineText = `${escapeHtml(sData.kurum || 'İlgili kuruma')} <strong>${sData.date ? formatDate(sData.date) + ' tarihinde' : ''}</strong>${sData.konu ? ' "' + escapeHtml(sData.konu) + '" konulu' : ''} yazı gönderildi${sData.number ? ' (' + escapeHtml(sData.number) + ')' : ''}.`;
+                }
+                break;
+            case 'YAZI_CEVAP':
+                if (sData.completed || sData.date || sData.number) {
+                    const sonucLabel = sData.sonucTuru === 'ust_yazi' ? 'Üst yazı' : 'Kurul kararı / Olur';
+                    lineText = `${sonucLabel} ile <strong>${sData.date ? formatDate(sData.date) + ' tarihinde' : ''}</strong> sonuçlandırıldı${sData.number ? ' (' + escapeHtml(sData.number) + ')' : ''}.`;
                 }
                 break;
             case 'EPDK_BASVURU_YAPILMASI':
@@ -1767,6 +1793,18 @@ export function initJobsEventHandlers() {
             const allProjects = (Store.projects || []).map(p => p.name).sort();
             projectSelect.innerHTML = '<option value="">Proje Seçiniz...</option>' +
                 allProjects.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+        }
+
+        // Populate Tadil Türü (workflow type) Dropdown from Store.workflows -
+        // this used to be a hardcoded <option> list in index.html, so a type
+        // added via the workflow builder (Ayarlar) never showed up here.
+        const titleSelect = document.getElementById('jobTitle');
+        if (titleSelect) {
+            const currentVal = titleSelect.value;
+            const titles = Object.keys(Store.workflows || {}).sort((a, b) => a.localeCompare(b, 'tr'));
+            titleSelect.innerHTML = '<option value="">Seçiniz...</option>' +
+                titles.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
+            if (titles.includes(currentVal)) titleSelect.value = currentVal;
         }
 
         // Populate Assignees Dropdown
@@ -2973,6 +3011,49 @@ function renderStepFields(job, stepNum) {
                     </div>
                 </div>
             `;
+        case 'YAZI_GONDERME':
+            return `
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Gönderilen Kurum</label>
+                        <input type="text" id="kurum-${stepNum}" value="${escapeHtml(sData.kurum || '')}" class="modern-input" placeholder="Örn: EPDK">
+                    </div>
+                    <div class="form-group">
+                        <label>Konu</label>
+                        <input type="text" id="konu-${stepNum}" value="${escapeHtml(sData.konu || '')}" class="modern-input" placeholder="Yazının konusu">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Sayı</label>
+                        <input type="text" id="number-${stepNum}" value="${escapeHtml(sData.number || '')}" class="modern-input" placeholder="Örn: 10452">
+                    </div>
+                    <div class="form-group">
+                        <label>Tarih</label>
+                        <input type="date" id="date-${stepNum}" value="${sData.date || ''}" class="modern-input">
+                    </div>
+                </div>
+            `;
+        case 'YAZI_CEVAP':
+            return `
+                <div class="form-group">
+                    <label>Sonuçlandırma Şekli</label>
+                    <select id="sonucTuru-${stepNum}" class="modern-select">
+                        <option value="kurul_karari" ${sData.sonucTuru !== 'ust_yazi' ? 'selected' : ''}>Kurul Kararı / Olur</option>
+                        <option value="ust_yazi" ${sData.sonucTuru === 'ust_yazi' ? 'selected' : ''}>Üst Yazı</option>
+                    </select>
+                </div>
+                <div class="form-row" style="margin-top:10px;">
+                    <div class="form-group">
+                        <label>Sayı</label>
+                        <input type="text" id="number-${stepNum}" value="${escapeHtml(sData.number || '')}" class="modern-input" placeholder="Karar/Yazı sayısı">
+                    </div>
+                    <div class="form-group">
+                        <label>Tarih</label>
+                        <input type="date" id="date-${stepNum}" value="${sData.date || ''}" class="modern-input">
+                    </div>
+                </div>
+            `;
         case 'EPDK_BASVURU_YAPILMASI':
             return `
                 <div class="form-row">
@@ -3805,6 +3886,41 @@ function saveStepData(jobId, stepNum) {
                 steps[`step${stepNum}`] = { completed: zkDone, zkDone, date: dateVal };
                 if (zkDone) {
                     if (currentStep === stepNum) currentStep = stepNum + 1;
+                }
+            }
+            break;
+
+        case 'YAZI_GONDERME':
+            {
+                const kurumVal = document.getElementById(`kurum-${stepNum}`).value.trim();
+                const konuVal = document.getElementById(`konu-${stepNum}`).value.trim();
+                const numberVal = document.getElementById(`number-${stepNum}`).value.trim();
+                const dateVal = document.getElementById(`date-${stepNum}`).value;
+                if (!kurumVal || !numberVal || !dateVal) {
+                    showToast('Gönderilen kurum, sayı ve tarih alanları zorunludur.', 'warning');
+                    return;
+                }
+                steps[`step${stepNum}`] = { completed: true, kurum: kurumVal, konu: konuVal, number: numberVal, date: dateVal };
+                if (currentStep === stepNum) currentStep = stepNum + 1;
+            }
+            break;
+
+        case 'YAZI_CEVAP':
+            {
+                const sonucTuruVal = document.getElementById(`sonucTuru-${stepNum}`).value;
+                const numberVal = document.getElementById(`number-${stepNum}`).value.trim();
+                const dateVal = document.getElementById(`date-${stepNum}`).value;
+                if (!numberVal || !dateVal) {
+                    showToast('Sayı ve tarih alanları zorunludur.', 'warning');
+                    return;
+                }
+                steps[`step${stepNum}`] = { completed: true, sonucTuru: sonucTuruVal, number: numberVal, date: dateVal };
+                if (stepNum === stepsConf.length) {
+                    status = 'completed';
+                    job.completedAt = new Date();
+                    showToast('Yazışma süreci başarıyla tamamlandı! 🎉', 'success');
+                } else if (currentStep === stepNum) {
+                    currentStep = stepNum + 1;
                 }
             }
             break;

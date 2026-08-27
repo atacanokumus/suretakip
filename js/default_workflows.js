@@ -179,5 +179,9 @@ export const DEFAULT_WORKFLOWS = {
         { type: "DERC_EDILME", short: "Tadil Derç", long: "5. Tadilin Önlisans/Lisansa Derç Edilmesi" },
         { type: "BELGE_TESLIM", short: "Belge Teslim", long: "6. Belgenin Teslim Alınması" },
         { type: "DAGITIM", short: "Dağıtım", long: "7. Belgenin Dağıtımı" }
+    ],
+    "Yazışma Takibi": [
+        { type: "YAZI_GONDERME", short: "Yazı Gönderme", long: "1. Yazının İlgili Kuruma Gönderilmesi" },
+        { type: "YAZI_CEVAP", short: "Yazı Cevabı", long: "2. Cevabın Alınması / Sonuçlandırılması" }
     ]
 };

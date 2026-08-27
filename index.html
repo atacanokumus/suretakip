@@ -1452,23 +1452,9 @@
                         <label for="jobTitle">Tadil Türü*</label>
                         <select id="jobTitle" required class="modern-select">
                             <option value="">Seçiniz...</option>
-                            <option value="Bağlantı Noktası Tadili">Bağlantı Noktası Tadili</option>
-                            <option value="Depolama Ünitesi Tadili">Depolama Ünitesi Tadili</option>
-                            <option value="Hibrit Başvurusu">Hibrit Başvurusu</option>
-                            <option value="İnvertör Tadili">İnvertör Tadili</option>
-                            <option value="Kurulu Güç / Ünite Tadili">Kurulu Güç / Ünite Tadili</option>
-                            <option value="Muhatap Yetkilisi Tanımlama">Muhatap Yetkilisi Tanımlama</option>
-                            <option value="Ortaklık / Yönetici Değişikliği">Ortaklık / Yönetici Değişikliği</option>
-                            <option value="Önlisans Başvurusu">Önlisans Başvurusu</option>
-                            <option value="Önlisans Süre Uzatımı">Önlisans Süre Uzatımı</option>
-                            <option value="Saha Koordinat Tadili">Saha Koordinat Tadili</option>
-                            <option value="Tedarik Lisansı Başvurusu">Tedarik Lisansı Başvurusu</option>
-                            <option value="Tedarik Lisansı Tadili">Tedarik Lisansı Tadili</option>
-                            <option value="Tesis Tamamlama Süre Uzatımı">Tesis Tamamlama Süre Uzatımı</option>
-                            <option value="Ünite Koordinat Tadili">Ünite Koordinat Tadili</option>
-                            <option value="Üretim Lisansı Başvurusu">Üretim Lisansı Başvurusu</option>
-                            <option value="YEKDEM Başvurusu">YEKDEM Başvurusu</option>
-                            <option value="Yıllık Elektrik Enerjisi Üretimi Miktarı Tadili">Yıllık Elektrik Enerjisi Üretimi Miktarı Tadili</option>
+                            <!-- Options are populated dynamically from Store.workflows each time
+                                 this modal opens (see openModal() in js/jobs.js), so any type
+                                 added via Ayarlar > Tadil İş Akışı Yönetimi shows up here too. -->
                         </select>
                     </div>
 

@@ -93,6 +93,97 @@ export function logError(context, error, additionalData = {}) {
 // Firestore Sync Logic
 // ==========================================
 
+// ==========================================
+// Per-record job merge (prevents cross-job clobber)
+// ==========================================
+//
+// syncToFirestore used to write `jobs: Store.jobs` wholesale with
+// setDoc(merge:true). merge:true only protects unknown TOP-LEVEL fields - it
+// replaces the whole `jobs` array. So if this browser held a stale copy of
+// job A (e.g. it never applied a teammate's edit because the onSnapshot
+// timestamp guard skipped it), saving ANY other job B would overwrite the
+// cloud's fresh job A with this browser's stale one. That is how SERMAYECİK
+// RES lost a revision on 2026-08-27. The functions/ push trigger only reads
+// the document; it cannot and did not cause this.
+//
+// Fix: before writing, read the cloud jobs and merge record-by-record, keeping
+// whichever copy has the newer updatedAt.
+
+const JOB_TOMBSTONE_KEY = 'epdk_deleted_jobs';
+const TOMBSTONE_TTL_MS = 3 * 24 * 60 * 60 * 1000; // 3 days - long enough for every client to sync a delete
+
+/** Record that this client deleted a job, so the merge below won't re-add it from the cloud. */
+export function tombstoneJob(id) {
+    try {
+        const now = Date.now();
+        const list = JSON.parse(localStorage.getItem(JOB_TOMBSTONE_KEY) || '[]')
+            .filter(e => now - e.t < TOMBSTONE_TTL_MS);
+        if (!list.some(e => String(e.id) === String(id))) list.push({ id, t: now });
+        localStorage.setItem(JOB_TOMBSTONE_KEY, JSON.stringify(list));
+    } catch (e) { /* storage blocked - the delete just isn't tombstoned */ }
+}
+
+function tombstonedJobIds() {
+    try {
+        const now = Date.now();
+        return new Set(
+            JSON.parse(localStorage.getItem(JOB_TOMBSTONE_KEY) || '[]')
+                .filter(e => now - e.t < TOMBSTONE_TTL_MS)
+                .map(e => String(e.id))
+        );
+    } catch (e) { return new Set(); }
+}
+
+/** ms since epoch for a record's updatedAt - handles Date, ISO string, Firestore Timestamp. */
+function recordTime(rec) {
+    let v = rec && (rec.updatedAt || rec.createdAt);
+    if (!v) return 0;
+    if (typeof v.toDate === 'function') v = v.toDate();
+    const t = new Date(v).getTime();
+    return isNaN(t) ? 0 : t;
+}
+
+/** Cloud job records carry Firestore Timestamps; the rest of the app expects Dates. */
+function normalizeCloudJob(j) {
+    return {
+        ...j,
+        dueDate: j.dueDate ? convertToDate(j.dueDate) : null,
+        createdAt: convertToDate(j.createdAt),
+        updatedAt: convertToDate(j.updatedAt),
+        completedAt: j.completedAt ? convertToDate(j.completedAt) : null,
+        history: (j.history || []).map(h => ({ ...h, date: convertToDate(h.date) }))
+    };
+}
+
+/**
+ * Merge this client's jobs with the cloud's, record by record:
+ *  - in both      -> keep whichever updatedAt is newer (tie: local)
+ *  - local only   -> keep (created/edited here, not yet in cloud)
+ *  - cloud only    -> keep, unless locally tombstoned (deleted here)
+ */
+function mergeJobsWithCloud(localJobs, cloudJobs) {
+    const local = Array.isArray(localJobs) ? localJobs : [];
+    const cloud = Array.isArray(cloudJobs) ? cloudJobs : [];
+    const cloudById = new Map(cloud.map(j => [String(j.id), j]));
+    const deleted = tombstonedJobIds();
+    const out = [];
+    const seen = new Set();
+
+    for (const lj of local) {
+        const key = String(lj.id);
+        seen.add(key);
+        const cj = cloudById.get(key);
+        if (!cj) { out.push(lj); continue; }
+        out.push(recordTime(cj) > recordTime(lj) ? normalizeCloudJob(cj) : lj);
+    }
+    for (const cj of cloud) {
+        const key = String(cj.id);
+        if (seen.has(key) || deleted.has(key)) continue;
+        out.push(normalizeCloudJob(cj));
+    }
+    return out;
+}
+
 /**
  * Saves current store data to Firestore
  */
@@ -101,10 +192,26 @@ export async function syncToFirestore(customTimestamp) {
 
     try {
         const dataRef = doc(db, "daVinciData", "master");
+
+        // Merge the cloud's jobs with ours per-record instead of overwriting
+        // the array wholesale - see mergeJobsWithCloud above. Without this,
+        // saving one job silently reverts every other job to this browser's
+        // (possibly stale) copy.
+        let jobsForWrite = Store.jobs || [];
+        try {
+            const cloudSnap = await getDoc(dataRef);
+            if (cloudSnap.exists()) {
+                jobsForWrite = mergeJobsWithCloud(Store.jobs, cloudSnap.data().jobs);
+                Store.jobs = jobsForWrite; // keep memory consistent with what we write
+            }
+        } catch (mergeErr) {
+            logError('Bulut iş birleştirme okuması başarısız; yerel kopya yazılıyor', mergeErr);
+        }
+
         const ts = customTimestamp || new Date().toISOString();
         const payload = {
             obligations: Store.obligations,
-            jobs: Store.jobs || [],
+            jobs: jobsForWrite,
             projects: Store.projects || [],
             workflows: Store.workflows || {},
             stepMeta: Store.stepMeta || {},

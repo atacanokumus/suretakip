@@ -1,5 +1,5 @@
 import { Store } from './store.js';
-import { saveData } from './data.js';
+import { saveData, tombstoneJob } from './data.js';
 import { generateId, formatDate, escapeHtml, getStatus, convertToDate, validateString, getJobActualLastUpdateDate } from './utils.js';
 import {
     showToast, getExpertInfoHtml
@@ -2189,6 +2189,7 @@ function showJobDetailModal(jobData) {
         if (confirm('Bu tadil sürecini tamamen silmek istediğinize emin misiniz?')) {
             const index = Store.jobs.findIndex(j => j.id == job.id);
             if (index > -1) {
+                tombstoneJob(job.id); // so the cloud-merge in syncToFirestore doesn't re-add it
                 Store.jobs.splice(index, 1);
                 saveData();
                 updateJobsView();

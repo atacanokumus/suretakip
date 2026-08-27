@@ -16,6 +16,8 @@ const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
 const { getMessaging } = require("firebase-admin/messaging");
+const { sendToTeams } = require("./teams_notify");
+const { WORKFLOW_STAGE_LABELS } = require("./workflow_labels");
 
 const REGION = "europe-west1";
 const TOKENS = "pushTokens";
@@ -156,6 +158,15 @@ async function pruneDeadTokens(tokens, responses) {
  * @param {object} [opts] { badge, snapshot, type }
  */
 async function sendToAllDevices(title, body, opts = {}) {
+    // The Teams channel gets the same feed, on the same events. Hooked here (not
+    // per call site) so every path - obligations, tadil progress, the digest,
+    // manual sends - reaches it, and it fires BEFORE the "no devices"
+    // short-circuit so a broken iOS setup doesn't also silence Teams. Never
+    // allowed to throw or block: sendToTeams swallows its own errors and is
+    // capped with a short timeout.
+    await sendToTeams(title, body)
+        .catch((e) => console.error("Teams fan-out hatasi:", e && e.message));
+
     const records = await getTokenRecords();
     if (!records.length) {
         console.log("📭 Kayitli cihaz yok, push atlandi.");
@@ -345,6 +356,28 @@ exports.listPushDevices = onRequest({ region: REGION, cors: true }, async (req, 
 // Firestore trigger: new obligations and tadil progress
 // ---------------------------------------------------------------------------
 
+/** "Başvuru (2/8)" for a known amendment type, else "Aşama 2". */
+function stageInfo(title, n) {
+    if (!n || n < 1) return "Aşama ?";
+    const labels = WORKFLOW_STAGE_LABELS[title];
+    if (!labels) return `Aşama ${n}`;
+    const name = labels[n - 1];
+    return name ? `${name} (${n}/${labels.length})` : `Aşama ${n}/${labels.length}`;
+}
+
+/** Total number of stages for an amendment type, or null if unknown. */
+function stageCount(title) {
+    const labels = WORKFLOW_STAGE_LABELS[title];
+    return labels ? labels.length : null;
+}
+
+/** "01 Eylül 2026", or null when the input isn't a usable date. */
+function fmtDate(d) {
+    const t = new Date(d);
+    if (isNaN(t.getTime())) return null;
+    return t.toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" });
+}
+
 /** Map of job id -> a signature of its workflow progress. */
 function jobProgressMap(jobs) {
     const map = new Map();
@@ -369,23 +402,49 @@ exports.onMasterDataChanged = onDocumentWritten(
         const badge = computeBadge(after);
         const snapshot = widgetSnapshot(after);
 
-        // --- New obligations ---
+        // --- Obligations: added + just-completed (both under the same toggle) ---
         if (settings.newObligation) {
-            const beforeIds = new Set((before.obligations || []).map((o) => o.id));
-            const added = (after.obligations || []).filter((o) => o && o.id && !beforeIds.has(o.id));
+            const beforeById = new Map((before.obligations || []).map((o) => [o.id, o]));
+            const added = (after.obligations || []).filter((o) => o && o.id && !beforeById.has(o.id));
+            const justDone = (after.obligations || []).filter((o) => {
+                if (!o || !o.id) return false;
+                const b = beforeById.get(o.id);
+                return b && b.status !== "completed" && o.status === "completed";
+            });
 
             if (added.length > MAX_INDIVIDUAL_NOTIFICATIONS) {
                 await sendToAllDevices(
-                    "📋 Yeni yükümlülükler eklendi",
-                    `${added.length} yeni yükümlülük tanımlandı.`,
+                    "🆕 Yeni yükümlülükler eklendi 📚",
+                    `${added.length} yeni yükümlülük tanımlandı. İş listesi büyüdü! 💪`,
                     { type: "obligation_bulk", badge, snapshot }
                 );
             } else {
                 for (const o of added) {
+                    const due = fmtDate(o.deadline);
+                    const lines = [`📁 ${o.projectName || "Proje"} — ${o.obligationType || ""}`.trim()];
+                    if (due) lines.push(`⏰ Son tarih: ${due}`);
+                    lines.push("", "Listeye bir madde daha eklendi 💪");
                     await sendToAllDevices(
-                        "📋 Yeni yükümlülük",
-                        `${o.projectName || "Proje"} — ${o.obligationType || ""}`.trim(),
+                        "🆕 Yeni yükümlülük eklendi 📌",
+                        lines.join("\n"),
                         { type: "obligation_new", badge, snapshot }
+                    );
+                }
+            }
+
+            if (justDone.length > MAX_INDIVIDUAL_NOTIFICATIONS) {
+                await sendToAllDevices(
+                    "✅ Yükümlülükler tamamlandı! 🎊",
+                    `${justDone.length} yükümlülük birden tamamlandı. Harika iş! 👏🚀`,
+                    { type: "obligation_done_bulk", badge, snapshot }
+                );
+            } else {
+                for (const o of justDone) {
+                    await sendToAllDevices(
+                        "✅ Yükümlülük tamamlandı! 🎉",
+                        `🎯 ${o.projectName || "Proje"} — ${o.obligationType || ""}`.trim() +
+                        "\n\nBir madde daha kapandı, tebrikler! 👏🌟",
+                        { type: "obligation_done", badge, snapshot }
                     );
                 }
             }
@@ -400,25 +459,48 @@ exports.onMasterDataChanged = onDocumentWritten(
                 const was = beforeJobs.get(id);
                 if (!was) return; // brand new job, not a "progress" event
                 if (now.step !== was.step || now.doneCount !== was.doneCount || now.status !== was.status) {
-                    changes.push(now);
+                    changes.push({ now, was });
                 }
             });
 
             if (changes.length > MAX_INDIVIDUAL_NOTIFICATIONS) {
                 await sendToAllDevices(
-                    "⚡ Tadillerde ilerleme",
-                    `${changes.length} tadilde aşama güncellendi.`,
+                    "⚡ Tadillerde hareket var! 🚀",
+                    `${changes.length} tadilde birden aşama güncellendi 📊`,
                     { type: "job_bulk", badge, snapshot }
                 );
             } else {
-                for (const j of changes) {
-                    const label = j.status === "completed"
-                        ? "🟢 Tadil tamamlandı"
-                        : "⚡ Tadilde ilerleme";
-                    const detail = j.status === "completed"
-                        ? `${j.project || ""} — ${j.title || ""}`.trim()
-                        : `${j.project || ""} — ${j.title || ""} (Aşama ${j.step}/13)`.trim();
-                    await sendToAllDevices(label, detail, { type: "job_progress", badge, snapshot });
+                for (const { now: j, was } of changes) {
+                    const who = `📁 ${j.project || "Proje"} — ${j.title || ""}`.trim();
+                    let title;
+                    let detail;
+
+                    if (j.status === "completed" && was.status !== "completed") {
+                        const total = stageCount(j.title);
+                        title = "🎉 Tadil tamamlandı! 🏁";
+                        detail = `🥳 ${who}\n\n` +
+                            (total ? `Tüm ${total} aşama tamam.` : "Tüm aşamalar tamam.") +
+                            " Eline sağlık! 👏🎊";
+                    } else if (j.step > was.step) {
+                        const jumped = j.step - was.step;
+                        if (jumped === 1) {
+                            title = "⚡ Tadilde ilerleme kaydedildi ✨";
+                            detail = `${who}\n\n` +
+                                `✅ Tamamlanan: ${stageInfo(j.title, was.step)}\n` +
+                                `➡️ Sırada: ${stageInfo(j.title, j.step)}`;
+                        } else {
+                            title = "⚡ Tadilde büyük ilerleme! 🚀";
+                            detail = `${who}\n\n` +
+                                `✅ ${jumped} aşama birden geçildi ` +
+                                `(${stageInfo(j.title, was.step)} → ${stageInfo(j.title, j.step)})\n` +
+                                `➡️ Sırada: ${stageInfo(j.title, j.step)}`;
+                        }
+                    } else {
+                        title = "📝 Tadilde güncelleme";
+                        detail = `${who}\n\n📍 Bulunduğu aşama: ${stageInfo(j.title, j.step)}`;
+                    }
+
+                    await sendToAllDevices(title, detail, { type: "job_progress", badge, snapshot });
                 }
             }
         }
@@ -441,17 +523,17 @@ async function sendDigestPush(data, { todayAndOverdue, upcoming, aoTasks, gdTask
     }
 
     const parts = [];
-    if (todayAndOverdue.length) parts.push(`${todayAndOverdue.length} bugün/gecikmiş`);
-    if (upcoming.length) parts.push(`${upcoming.length} bu hafta`);
+    if (todayAndOverdue.length) parts.push(`🔴 ${todayAndOverdue.length} bugün/gecikmiş`);
+    if (upcoming.length) parts.push(`🟡 ${upcoming.length} bu hafta`);
     const pending = aoTasks.length + gdTasks.length;
-    if (pending) parts.push(`${pending} bekleyen yazı`);
+    if (pending) parts.push(`✍️ ${pending} bekleyen yazı`);
     // Listed separately from obligations, matching the e-mail's two blocks.
-    if (prelicenceItems.length) parts.push(`${prelicenceItems.length} ÖSU İş Kalemi`);
+    if (prelicenceItems.length) parts.push(`🗂️ ${prelicenceItems.length} ÖSU İş Kalemi`);
     if (!parts.length) return;
 
     await sendToAllDevices(
-        "📅 Günlük Özet",
-        parts.join(" · "),
+        "🌅 Günaydın! Günün özeti hazır ☕",
+        parts.join("\n") + "\n\nHadi bakalım, verimli bir gün olsun! ✨",
         { type: "daily_digest", badge: computeBadge(data), snapshot: widgetSnapshot(data) }
     );
 }

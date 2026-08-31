@@ -977,7 +977,9 @@ function getDaysPassedText(dateVal) {
     target.setHours(0, 0, 0, 0);
     const diffTime = today - target;
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    if (diffDays <= 0) return 'bugün';
+    // Gelecek tarihe "bugün" demek yanlış - rozet gösterme.
+    if (diffDays < 0) return '';
+    if (diffDays === 0) return 'bugün';
     return `${diffDays} gün geçti`;
 }
 

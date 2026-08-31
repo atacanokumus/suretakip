@@ -62,9 +62,17 @@ function initApp() {
         }
     });
 
-    // Set current date in header
-    const dateEl = document.getElementById('currentDate');
-    if (dateEl) dateEl.textContent = formatDateLong(new Date());
+    // Set current date in header, and keep it fresh: a tab left open across
+    // midnight was still showing the date from whenever the page was loaded.
+    const paintHeaderDate = () => {
+        const dateEl = document.getElementById('currentDate');
+        if (dateEl) dateEl.textContent = formatDateLong(new Date());
+    };
+    paintHeaderDate();
+    setInterval(paintHeaderDate, 60 * 1000);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) paintHeaderDate();
+    });
 
     try {
         initNavigation();

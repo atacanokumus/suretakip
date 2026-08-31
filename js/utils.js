@@ -342,13 +342,18 @@ export function getCurrentQuarter() {
  */
 export function getJobActualLastUpdateDate(job) {
     let latestDate = null;
-    
+
+    // Kullanıcının girdiği ileri tarihli (planlanan teslim/dağıtım gibi)
+    // alanlar "son güncelleme" sayılmamalı; bugünden sonrasını yok say.
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
     function traverse(obj) {
         if (!obj) return;
         if (typeof obj === 'string') {
             if (/^\d{4}-\d{2}-\d{2}$/.test(obj)) {
                 const d = new Date(obj);
-                if (!isNaN(d.getTime())) {
+                if (!isNaN(d.getTime()) && d <= todayEnd) {
                     if (!latestDate || d > latestDate) {
                         latestDate = d;
                     }

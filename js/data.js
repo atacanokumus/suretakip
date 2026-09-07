@@ -539,6 +539,107 @@ function migrateTeiasEigmSplit() {
     }
 }
 
+/**
+ * One-time patch: "Saha Koordinat Tadili" gains a third parallel track next to
+ * the TEİAŞ and EİGM opinion tracks - a single "EPDK İtiraz Askı Süresi" step
+ * (askıya çıkış + askı bitiş tarihi in one item), inserted right after
+ * EIGM_GORUS_DONUS. Unlike the other two tracks it is one step, not two: the
+ * askı cannot close before its end date, so the step completes off the
+ * calendar rather than by hand (see syncAskiCompletion in js/jobs.js).
+ *
+ * Store.workflows is Firestore-backed and was seeded long before this change,
+ * so editing DEFAULT_WORKFLOWS alone would never reach it; worse, job.steps is
+ * keyed by POSITION, so without this every in-progress job's "Müzekkere" data
+ * would silently start showing up under the new askı step. Everything from the
+ * insertion point on is shifted and currentStep is recomputed from the new
+ * layout, exactly like migrateTeiasEigmSplit above.
+ *
+ * Two shapes are handled: a workflow that never had askı steps (insert one),
+ * and - defensively, for any browser that ran the short-lived two-step version
+ * of this feature - a workflow carrying EPDK_ASKI_CIKIS + EPDK_ASKI_BITIS,
+ * which is collapsed into the single step with both dates preserved.
+ *
+ * Idempotent: once the workflow already contains EPDK_ASKI this is a no-op, so
+ * it is safe to run on every load.
+ */
+function migrateSahaKoordinatAskiSteps() {
+    const title = 'Saha Koordinat Tadili';
+    const oldStepsConf = Store.workflows?.[title];
+    if (!Array.isArray(oldStepsConf)) return;
+    if (oldStepsConf.some(s => s && s.type === 'EPDK_ASKI')) return;
+
+    const askiStep = { type: 'EPDK_ASKI', short: 'EPDK İtiraz Askı Süresi', long: 'EPDK İtiraz Askı Süresi' };
+    const cikisIdx = oldStepsConf.findIndex(s => s && s.type === 'EPDK_ASKI_CIKIS');
+    const bitisIdx = oldStepsConf.findIndex(s => s && s.type === 'EPDK_ASKI_BITIS');
+    const isCollapse = cikisIdx !== -1 && bitisIdx === cikisIdx + 1;
+
+    // Eklenecek/daraltılacak yer: 1-tabanlı, bu konumdan itibaren yazılır.
+    let anchor;
+    if (isCollapse) {
+        anchor = cikisIdx + 1;
+    } else {
+        const eigmDonusIdx = oldStepsConf.findIndex(s => s && s.type === 'EIGM_GORUS_DONUS');
+        if (eigmDonusIdx === -1) return; // henüz TEİAŞ/EİGM ayrıştırması yapılmamış
+        anchor = eigmDonusIdx + 2;
+    }
+    // Eski dizide, askı bloğundan SONRAKİ ilk adımın 1-tabanlı konumu.
+    const tailStart = isCollapse ? anchor + 2 : anchor;
+    const oldStepCount = oldStepsConf.length;
+
+    const newStepsConf = [];
+    oldStepsConf.forEach((s, i) => {
+        const pos = i + 1;
+        if (isCollapse && (pos === anchor || pos === anchor + 1)) {
+            if (pos === anchor) newStepsConf.push({ ...askiStep });
+            return;
+        }
+        if (!isCollapse && pos === anchor) newStepsConf.push({ ...askiStep });
+        newStepsConf.push({ ...s });
+    });
+    if (!isCollapse && anchor > oldStepCount) newStepsConf.push({ ...askiStep });
+    newStepsConf.forEach((s, i) => {
+        s.long = /^\d+\.\s*/.test(s.long) ? s.long.replace(/^\d+\.\s*/, `${i + 1}. `) : `${i + 1}. ${s.long}`;
+    });
+
+    Store.workflows[title] = newStepsConf;
+
+    (Store.jobs || []).forEach(job => {
+        if (job.title !== title || !job.steps) return;
+
+        const newSteps = {};
+        for (let k = 1; k < anchor; k++) {
+            if (job.steps[`step${k}`]) newSteps[`step${k}`] = job.steps[`step${k}`];
+        }
+        // İki adımlı halden geliyorsa girilmiş tarihleri tek kaleme taşı.
+        const oldCikis = isCollapse ? (job.steps[`step${anchor}`] || {}) : {};
+        const oldBitis = isCollapse ? (job.steps[`step${anchor + 1}`] || {}) : {};
+        newSteps[`step${anchor}`] = {
+            completed: false,
+            date: oldCikis.date || '',
+            bitisTarih: oldBitis.date || '',
+            number: oldCikis.number || '',
+            askiObgId: oldBitis.askiObgId || ''
+        };
+        for (let k = tailStart; k <= oldStepCount; k++) {
+            if (job.steps[`step${k}`]) newSteps[`step${k - tailStart + anchor + 1}`] = job.steps[`step${k}`];
+        }
+
+        // Askı adımı boş başladığı için, imleç bu noktaya gelmiş ya da geçmişse
+        // paralel kümenin başına (TEİAŞ çıkışı) geri çekilir - küme, üç kolu da
+        // bitmeden ötesine geçmiyor. Girilmiş hiçbir veri kaybolmaz, sadece
+        // sıradaki aksiyon askıyı da kapsayacak şekilde yeniden hesaplanır.
+        const oldCurrentStep = job.currentStep || 1;
+        const groupStartIdx = newStepsConf.findIndex(s => s.type === 'TEIAS_GORUS_CIKIS');
+        const groupStart = groupStartIdx === -1 ? 1 : groupStartIdx + 1;
+        job.steps = newSteps;
+        job.currentStep = oldCurrentStep < anchor ? oldCurrentStep : groupStart;
+    });
+
+    safeSetStorage('epdk_workflows', Store.workflows);
+    safeSetStorage('epdk_jobs', Store.jobs);
+    syncToFirestore().catch(err => logError('EPDK itiraz askısı iş akışı geçişi hatası', err));
+}
+
 export async function loadData() {
     // 1. First try Firestore (Source of Truth for the Team)
     if (auth.currentUser) {
@@ -596,6 +697,7 @@ export async function loadData() {
                 migrateBasvuruHazirlikToZkKontrol();
                 migrateTeiasEigmSplit();
                 migrateYazismaTakibiToSpecializedSteps();
+                migrateSahaKoordinatAskiSteps();
 
                 // Load step responsibility / difficulty assignments. Absent on
                 // documents written before this feature - js/step_meta.js then
@@ -726,6 +828,7 @@ export async function loadData() {
         migrateBasvuruHazirlikToZkKontrol();
         migrateTeiasEigmSplit();
         migrateYazismaTakibiToSpecializedSteps();
+        migrateSahaKoordinatAskiSteps();
 
         // Load step responsibility / difficulty assignments
         const savedStepMeta = safeGetStorage('epdk_stepMeta');

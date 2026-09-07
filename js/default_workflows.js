@@ -95,13 +95,20 @@ export const DEFAULT_WORKFLOWS = {
         { type: "TEIAS_GORUS_DONUS", short: "TEİAŞ Görüşünün Alınması", long: "5. TEİAŞ Görüşünün Alınması" },
         { type: "EIGM_GORUS_CIKIS", short: "EİGM Görüşüne Çıkılması", long: "6. EİGM Görüşüne Çıkılması" },
         { type: "EIGM_GORUS_DONUS", short: "EİGM Görüşünün Alınması", long: "7. EİGM Görüşünün Alınması" },
-        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "8. Müzekkere Yazımı" },
-        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "9. Müzekkerenin Gündeme Alınması" },
-        { type: "YUKUMLULUK_TANIMLAMA", short: "Yükümlülük Tanımlama", long: "10. Yükümlülük Tanımlanması" },
-        { type: "YUKUMLULUK_TAMAMLAMA", short: "Yükümlülük Tamamlama", long: "11. Yükümlülüklerin Tamamlanması" },
-        { type: "DERC_EDILME", short: "Tadil Derç", long: "12. Tadilin Önlisans/Lisansa Derç Edilmesi" },
-        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "13. Belgenin Teslim Alınması" },
-        { type: "DAGITIM", short: "Dağıtım", long: "14. Belgenin Dağıtımı" }
+        // TEİAŞ ve EİGM görüşleriyle paralel yürüyen üçüncü kol (sadece bu iş
+        // akışına özel). Diğer iki kolun aksine TEK kalem: askının başlangıç ve
+        // bitiş tarihi birlikte girilir, sonra aşama kendiliğinden takvimle
+        // dolar - bitiş tarihi gelmeden tamamlanması mümkün olmayan bir süreç
+        // olduğu için elle "tamamlandı" işareti yok. Bkz. js/jobs.js
+        // PARALLEL_STEP_GROUPS / PARALLEL_GROUP_TRACKS ve syncAskiCompletion.
+        { type: "EPDK_ASKI", short: "EPDK İtiraz Askı Süresi", long: "8. EPDK İtiraz Askı Süresi" },
+        { type: "OLUR_MUZEKKERE_YAZIMI", short: "Müzekkere", long: "9. Müzekkere Yazımı" },
+        { type: "OLUR_IMZALANMASI_VE_GUNDEM", short: "Gündem", long: "10. Müzekkerenin Gündeme Alınması" },
+        { type: "YUKUMLULUK_TANIMLAMA", short: "Yükümlülük Tanımlama", long: "11. Yükümlülük Tanımlanması" },
+        { type: "YUKUMLULUK_TAMAMLAMA", short: "Yükümlülük Tamamlama", long: "12. Yükümlülüklerin Tamamlanması" },
+        { type: "DERC_EDILME", short: "Tadil Derç", long: "13. Tadilin Önlisans/Lisansa Derç Edilmesi" },
+        { type: "BELGE_TESLIM", short: "Belge Teslim", long: "14. Belgenin Teslim Alınması" },
+        { type: "DAGITIM", short: "Dağıtım", long: "15. Belgenin Dağıtımı" }
     ],
     "Tesis Tamamlama Süre Uzatımı": [
         { type: "OZET_OZET_ISTEME", short: "Özet İsteme", long: "1. Özetin Diğer Birimlerden İstenmesi" },

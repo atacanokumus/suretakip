@@ -63,7 +63,15 @@ export function getWorkflowSteps(job) {
 
 /** Tip -> aynı anda açılıp aynı anda tamamlanması gereken küme kimliği. */
 const PARALLEL_STEP_GROUPS = {
-    teias_eigm_gorusleri: ['TEIAS_GORUS_CIKIS', 'TEIAS_GORUS_DONUS', 'EIGM_GORUS_CIKIS', 'EIGM_GORUS_DONUS']
+    teias_eigm_gorusleri: [
+        'TEIAS_GORUS_CIKIS', 'TEIAS_GORUS_DONUS',
+        'EIGM_GORUS_CIKIS', 'EIGM_GORUS_DONUS',
+        // Üçüncü kol - şu an sadece "Saha Koordinat Tadili" bu adımı içeriyor.
+        // Küme sınırları (getParallelGroupBounds) her zaman iş akışında
+        // GERÇEKTEN bulunan tiplerden hesaplandığı için, bu satır askı adımı
+        // olmayan akışları (Ünite Koordinat Tadili vb.) etkilemez.
+        'EPDK_ASKI'
+    ]
 };
 
 /**
@@ -75,8 +83,33 @@ const PARALLEL_STEP_GROUPS = {
 const PARALLEL_GROUP_TRACKS = {
     teias_eigm_gorusleri: [
         ['TEIAS_GORUS_CIKIS', 'TEIAS_GORUS_DONUS'],
-        ['EIGM_GORUS_CIKIS', 'EIGM_GORUS_DONUS']
+        ['EIGM_GORUS_CIKIS', 'EIGM_GORUS_DONUS'],
+        // Askı kolu tek duraklı: başlangıç ve bitiş tarihi aynı kalemde.
+        ['EPDK_ASKI']
     ]
+};
+
+/**
+ * Bir kümenin BU iş akışında gerçekten kaç kola ayrıldığı. Tanımdaki kol
+ * sayısı (yukarıda 3) üst sınır; askı adımı olmayan bir akışta hat yine iki
+ * kol olarak çizilsin diye, sadece adımı fiilen bulunan kollar sayılır ve
+ * kollar 0..n-1 olacak şekilde yeniden numaralanır.
+ */
+function getGroupRowLayout(stepsConf, bounds) {
+    const present = [];
+    for (let p = bounds.minPos; p <= bounds.maxPos; p++) {
+        const pos = getTrackPosition(stepsConf[p - 1].type);
+        if (pos && !present.includes(pos.row)) present.push(pos.row);
+    }
+    present.sort((a, b) => a - b);
+    return { rows: present, rowCount: present.length || 1 };
+}
+
+/** Kol sayısına göre düşey yerleşim - jobs.css'teki .row-of-N kurallarıyla eşleşmeli. */
+const ROW_Y_PERCENT_BY_COUNT = {
+    1: [50],
+    2: [28, 72],
+    3: [18, 50, 82]
 };
 
 // Bir kümenin sütunları düz sıradaki tek bir aşamanın yerini paylaştığı için
@@ -87,8 +120,54 @@ const PARALLEL_LINE_LABELS = {
     TEIAS_GORUS_CIKIS: 'TEİAŞ Çıkış',
     TEIAS_GORUS_DONUS: 'TEİAŞ Alındı',
     EIGM_GORUS_CIKIS: 'EİGM Çıkış',
-    EIGM_GORUS_DONUS: 'EİGM Alındı'
+    EIGM_GORUS_DONUS: 'EİGM Alındı',
+    EPDK_ASKI: 'EPDK Askı'
 };
+
+/**
+ * Askı aşamasının o anki hâli, ya da tarihler girilmemişse null.
+ *
+ * Askı diğer duraklar gibi "yapıldı / yapılmadı" ikilisine sığmıyor: arada,
+ * kartta görülebilmesi gereken üçüncü bir hâl var - "şu an askıda, N gün sonra
+ * inecek". elapsedFraction, askı süresinin ne kadarının geçtiği; metro
+ * hattında o kolun ne kadar dolduğunu buna göre çiziyoruz ki karta bakan kişi
+ * projenin askıya çıkmış olduğunu ve nerede olduğunu tek bakışta görsün.
+ */
+function getAskiStatus(sData) {
+    if (!sData || !sData.bitisTarih) return null;
+    const end = new Date(sData.bitisTarih);
+    if (isNaN(end.getTime())) return null;
+    end.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const daysLeft = Math.round((end - today) / 86400000);
+
+    let elapsedFraction = 0;
+    const start = sData.date ? new Date(sData.date) : null;
+    if (start && !isNaN(start.getTime())) {
+        start.setHours(0, 0, 0, 0);
+        const totalDays = (end - start) / 86400000;
+        elapsedFraction = totalDays > 0
+            ? Math.min(1, Math.max(0, (today - start) / 86400000 / totalDays))
+            : 1;
+    }
+    return { daysLeft, expired: daysLeft <= 0, elapsedFraction };
+}
+
+/**
+ * Metro hattındaki durak etiketi. Askı durağı, sabit bir ad yerine o anki
+ * durumu yazar ("Askıda · 12 gün") - hattın tek bakışta okunması için.
+ */
+function getMetroLineLabel(job, stepsConf, stepNum) {
+    const type = stepsConf[stepNum - 1]?.type;
+    if (type === 'EPDK_ASKI') {
+        const st = getAskiStatus(job.steps?.[`step${stepNum}`]);
+        if (!st) return 'EPDK Askı';
+        if (st.expired) return 'Askıdan İndi';
+        return `📌 Askıda · ${st.daysLeft} gün`;
+    }
+    return PARALLEL_LINE_LABELS[type] || null;
+}
 
 /** Bir tipin görsel hat üzerindeki { row, col } konumu, kümeye ait değilse null. */
 function getTrackPosition(type) {
@@ -220,6 +299,14 @@ export function getInitialStepData(type, isCompleted) {
             return { completed: isCompleted, cikildi: isCompleted, date: '', number: '' };
         case 'EIGM_GORUS_DONUS':
             return { completed: isCompleted, geldi: isCompleted, date: '', number: '' };
+        // 2026-09: TEİAŞ/EİGM kollarıyla paralel yürüyen EPDK itiraz askısı
+        // (şimdilik yalnızca "Saha Koordinat Tadili"nde). Tek kalem: `date`
+        // askıya çıkış, `bitisTarih` askı bitiş tarihi. Tamamlanma elle değil
+        // takvimle olur (bkz. syncAskiCompletion). Bitiş tarihi girildiğinde
+        // otomatik bir yükümlülük de oluşur; askiObgId o yükümlülüğün
+        // kimliğini tutar ki tekrar kaydetmek kopya üretmesin.
+        case 'EPDK_ASKI':
+            return { completed: isCompleted, date: '', bitisTarih: '', askiObgId: '' };
         case 'KURUM_GORUS_TEIAS':
             return { completed: isCompleted, teiasDondu: isCompleted, teiasCikisSayi: '', teiasCikisTarih: '', teiasSayi: '', teiasTarih: '' };
         case 'KURUM_GORUS_EIGM':
@@ -277,6 +364,46 @@ export function getInitialStepData(type, isCompleted) {
         default:
             return { completed: isCompleted };
     }
+}
+
+/**
+ * EPDK itiraz askısı, elle "tamamlandı" işaretlenen bir aşama değil - bitiş
+ * tarihinden önce kapanması mümkün olmayan bir bekleme süresi. Bu yüzden
+ * aşamanın `completed` durumu kaydedilen bir tercih değil, tarihten TÜRETİLİR:
+ * bugün askı bitiş tarihine geldiyse tamamlanmış, gelmediyse beklemede.
+ *
+ * ensureTadilSteps üzerinden her render/yükleme yolunda çağrılır, yani takvim
+ * o tarihe ulaştığında kimsenin bir şey yapmasına gerek kalmadan aşama kendini
+ * kapatır ve iş akışı ilerler. Yalnızca durum gerçekten değiştiğinde yazar -
+ * her çizimde Firestore'a gereksiz senkron göndermemek için.
+ *
+ * @returns {boolean} bir şey değiştiyse true
+ */
+function syncAskiCompletion(job, stepsConf) {
+    if (!job || !job.steps || job.status === 'completed') return false;
+    const idx = stepsConf.findIndex(s => s.type === 'EPDK_ASKI');
+    if (idx === -1) return false;
+
+    const sData = job.steps[`step${idx + 1}`];
+    if (!sData) return false;
+
+    const bitis = sData.bitisTarih;
+    let shouldBeCompleted = false;
+    if (bitis) {
+        const end = new Date(bitis);
+        if (!isNaN(end.getTime())) {
+            end.setHours(0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            shouldBeCompleted = today >= end;
+        }
+    }
+
+    if (!!sData.completed === shouldBeCompleted) return false;
+    sData.completed = shouldBeCompleted;
+    job.currentStep = deriveCurrentStep(job);
+    Store.updateJob(job.id, { steps: job.steps, currentStep: job.currentStep });
+    return true;
 }
 
 function ensureTadilSteps(job) {
@@ -388,6 +515,10 @@ function ensureTadilSteps(job) {
         job.currentStep = isCompleted ? expectedStepCount : 1;
         Store.updateJob(job.id, { steps: job.steps, currentStep: job.currentStep });
     }
+
+    // Askı aşamasının tamamlanması takvime bağlı - adım yapısı yerine oturduktan
+    // sonra, her görüntülemede bugünün tarihine göre yeniden değerlendirilir.
+    syncAskiCompletion(job, stepsConf);
 
     return job;
 }
@@ -886,6 +1017,13 @@ function getLiveStatusText(job) {
             return sData.completed || sData.cikildi ? `Aşama ${stepNum}: EİGM Görüşüne ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}Çıkıldı ✅` : `Aşama ${stepNum}: EİGM Görüşüne Çıkılması Bekleniyor 📤`;
         case 'EIGM_GORUS_DONUS':
             return sData.geldi ? `Aşama ${stepNum}: EİGM Görüşü Alındı ✅` : `Aşama ${stepNum}: EİGM Görüşü Bekleniyor ⏳`;
+        case 'EPDK_ASKI':
+            {
+                if (sData.completed) return `Aşama ${stepNum}: Proje ${sData.bitisTarih ? formatDate(sData.bitisTarih) + ' tarihinde ' : ''}Askıdan İndi ✅`;
+                const st = getAskiStatus(sData);
+                if (st) return `Aşama ${stepNum}: Proje Askıda 📌 ${formatDate(sData.bitisTarih)} tarihinde inecek (${st.daysLeft} gün)`;
+                return `Aşama ${stepNum}: EPDK İtiraz Askı Tarihlerinin Girilmesi Bekleniyor 📌`;
+            }
         case 'OZET_OZET_ISTEME':
             return sData.date ? `Aşama ${stepNum}: Özet Diğer Birimlerden ${formatDate(sData.date)} tarihinde İstendi ✅` : `Aşama ${stepNum}: Özetin diğer birimlerden istenmesi bekleniyor ⏳`;
         case 'OZET_BIRIM_DONUSU':
@@ -1038,6 +1176,14 @@ function getStepTooltipText(job, stepNum) {
             return `${titleText}\n⚡ TEİAŞ: ${sData.teiasDondu ? 'Cevaplandı (' + (sData.teiasSayi || 'Muaf') + ')' : 'Bekleniyor'}${sData.teiasBaglantiDurumu === 'itiraz' ? ' ⚠️ İtiraz sürecinde' : ''}\n🔀 Paralel yürütülür`;
         case 'EIGM_GORUS_DONUS':
             return `${titleText}\n🔍 EİGM: ${sData.geldi ? 'Cevaplandı (' + (sData.number || 'Muaf') + ')' : 'Bekleniyor'}\n🔀 Paralel yürütülür`;
+        case 'EPDK_ASKI':
+            {
+                const st = getAskiStatus(sData);
+                const durum = sData.completed
+                    ? 'Proje askıdan indi'
+                    : (st ? `Proje şu an ASKIDA - inmesine ${st.daysLeft} gün var (tarih gelince kendiliğinden tamamlanır)` : 'Tarihler henüz girilmedi');
+                return `${titleText}\n📌 Askıya Çıkış: ${sData.date ? formatDate(sData.date) : '-'} | Askıdan İniş: ${sData.bitisTarih ? formatDate(sData.bitisTarih) : '-'}\n⏳ ${durum}${sData.askiObgId ? '\n📋 Yükümlülük olarak takip ediliyor' : ''}\n🔀 Paralel yürütülür`;
+            }
         case 'OLUR_MUZEKKERE_YAZIMI':
             return `${titleText}\n📝 Evrak Sayısı: ${sData.number || '-'} | Tarih: ${sData.date ? formatDate(sData.date) : '-'}`;
         case 'OLUR_IMZALANMASI_VE_GUNDEM':
@@ -1176,6 +1322,18 @@ function generateProcessSummaryHtml(job) {
             case 'EIGM_GORUS_DONUS':
                 if (sData.geldi) {
                     lineText = `EİGM görüşü <strong>${sData.date ? formatDate(sData.date) + ' tarihinde' : ''}</strong> cevaplandı (${escapeHtml(sData.number || 'Muaf')}).`;
+                }
+                break;
+            case 'EPDK_ASKI':
+                if (sData.date || sData.bitisTarih) {
+                    lineText = `Proje EPDK itiraz askısına <strong>${sData.date ? formatDate(sData.date) + ' tarihinde' : ''}</strong> çıkarıldı; <strong>${sData.bitisTarih ? formatDate(sData.bitisTarih) : '-'}</strong> tarihinde ${sData.completed ? 'askıdan indi' : 'askıdan inecek'}.`;
+                    if (!sData.completed) {
+                        const st = getAskiStatus(sData);
+                        lineText += `<div style="margin-left:15px; color:#c084fc; font-size:11px; margin-top:2px;">↳ 📌 Proje şu an askıda${st ? ` - inmesine ${st.daysLeft} gün var` : ''}.</div>`;
+                    }
+                    if (sData.askiObgId) {
+                        lineText += `<div style="margin-left:15px; color:#10b981; font-size:11px; margin-top:2px;">↳ 📋 Askıdan iniş yükümlülük olarak tanımlandı (Son Gün: ${sData.bitisTarih ? formatDate(sData.bitisTarih) : '-'}).</div>`;
+                    }
                 }
                 break;
             case 'TEIAS_GORUS_DONUS':
@@ -1469,16 +1627,20 @@ function createJobCard(job) {
             if (bounds && bounds.minPos === i) {
                 const trackInfo = PARALLEL_GROUP_TRACKS[bounds.groupId] || [[stepsConf[i - 1].type]];
                 const colCount = Math.max(1, ...trackInfo.map(r => r.length));
+                // Kol numaraları, tanımdaki sıraya göre değil bu iş akışında
+                // gerçekten bulunan kollara göre 0'dan yeniden numaralanır -
+                // askı kolu olmayan bir akış yine iki kol olarak çizilsin diye.
+                const layout = getGroupRowLayout(stepsConf, bounds);
                 const minSlot = slotCounter;
                 for (let p = bounds.minPos; p <= bounds.maxPos; p++) {
                     const pos = getTrackPosition(stepsConf[p - 1].type);
                     slotIndexForStep[p] = pos ? slotCounter + pos.col : slotCounter;
-                    rowForStep[p] = pos ? pos.row : null;
+                    rowForStep[p] = pos ? layout.rows.indexOf(pos.row) : null;
                 }
                 slotCounter += colCount;
                 renderedGroups.push({
                     groupId: bounds.groupId, minPos: bounds.minPos, maxPos: bounds.maxPos,
-                    rowCount: trackInfo.length, colCount, minSlot, maxSlot: slotCounter - 1
+                    rowCount: layout.rowCount, colCount, minSlot, maxSlot: slotCounter - 1
                 });
                 i = bounds.maxPos + 1;
                 continue;
@@ -1556,7 +1718,17 @@ function createJobCard(job) {
     let metroStationsHtml = '';
     let intervalBadgesHtml = '';
     let parallelGroupsHtml = '';
-    const ROW_Y_PERCENT = [28, 72]; // .row-top / .row-bottom CSS'iyle eşleşmeli
+    // Bir adımın ait olduğu kümenin kaç kola ayrıldığı - durakların düşey
+    // konumu (jobs.css .rows-2 / .rows-3) buna göre değişiyor.
+    const rowCountForStep = {};
+    renderedGroups.forEach(g => {
+        for (let p = g.minPos; p <= g.maxPos; p++) rowCountForStep[p] = g.rowCount;
+    });
+    const ROW_CLASS_BY_COUNT = {
+        2: ['row-top', 'row-bottom'],
+        3: ['row-top', 'row-mid', 'row-bottom']
+    };
+    const maxGroupRowCount = renderedGroups.reduce((m, g) => Math.max(m, g.rowCount), 0);
 
     for (let i = 1; i <= stepCount; i++) {
         const stepDone = isCompleted || job.steps[`step${i}`]?.completed || (i < job.currentStep);
@@ -1572,12 +1744,22 @@ function createJobCard(job) {
         if (stepActive) stateClass = 'active';
 
         const row = rowForStep[i];
-        const rowClass = row === 0 ? 'row-top' : (row === 1 ? 'row-bottom' : '');
-        if (row !== null) stateClass += ' ' + rowClass;
-        const labelPosClass = row !== null ? (row === 0 ? 'label-top' : 'label-bottom') : ((i % 2 !== 0) ? 'label-top' : 'label-bottom');
+        const iRowCount = rowCountForStep[i] || 2;
+        const rowClass = (ROW_CLASS_BY_COUNT[iRowCount] || ROW_CLASS_BY_COUNT[2])[row] || '';
+        if (row !== null && row !== undefined) stateClass += ` rows-${iRowCount} ${rowClass}`;
+        const labelPosClass = (row !== null && row !== undefined)
+            ? (row === 0 ? 'label-top' : 'label-bottom')
+            : ((i % 2 !== 0) ? 'label-top' : 'label-bottom');
         const positionPercent = percentForStep(i);
         const tooltipText = getStepTooltipText(job, i);
-        const lineLabel = (row !== null && PARALLEL_LINE_LABELS[stepsConf[i - 1].type]) || getStepShortTitle(job, i);
+        const lineLabel = (row !== null && getMetroLineLabel(job, stepsConf, i)) || getStepShortTitle(job, i);
+
+        // Askı, "bekleniyor" değil "yürüyor" bir hâl - durağı da diğer aktif
+        // duraklardan ayrı görünsün (amber yerine mor/askı rengi + kalıcı halka).
+        if (stepsConf[i - 1].type === 'EPDK_ASKI') {
+            const askiSt = getAskiStatus(job.steps?.[`step${i}`]);
+            if (askiSt && !askiSt.expired && !stepDone) stateClass += ' askida';
+        }
 
         metroStationsHtml += `
             <div class="metro-station ${stateClass}" style="left: ${positionPercent}%;">
@@ -1623,14 +1805,27 @@ function createJobCard(job) {
     renderedGroups.forEach(g => {
         const laneStartPercent = percentForSlot(g.minSlot);
         const laneEndPercent = percentForSlot(g.maxSlot);
-        const rowYs = ROW_Y_PERCENT.slice(0, g.rowCount);
+        const rowYs = ROW_Y_PERCENT_BY_COUNT[g.rowCount] || ROW_Y_PERCENT_BY_COUNT[2];
 
         for (let row = 0; row < g.rowCount; row++) {
-            let rowDone = 0;
+            // Kolun doluluğu, kümenin en uzun kolundaki durak sayısına değil bu
+            // kolun KENDİ durak sayısına göre - askı kolu tek duraklı olduğu
+            // için, tamamlandığında çubuğu yarıda kalmasın diye.
+            let rowDone = 0, rowTotal = 0, askiFraction = null;
             for (let p = g.minPos; p <= g.maxPos; p++) {
-                if (rowForStep[p] === row && (isCompleted || job.steps[`step${p}`]?.completed)) rowDone++;
+                if (rowForStep[p] !== row) continue;
+                rowTotal++;
+                if (isCompleted || job.steps[`step${p}`]?.completed) {
+                    rowDone++;
+                } else if (stepsConf[p - 1].type === 'EPDK_ASKI') {
+                    // Askı kolu, bitene kadar boş görünmesin: geçen süre kadar
+                    // dolar, böylece kart "askıya çıkıldı, şurasındayız" der.
+                    const st = getAskiStatus(job.steps[`step${p}`]);
+                    if (st) askiFraction = st.elapsedFraction;
+                }
             }
-            const rowFillFraction = g.colCount > 0 ? rowDone / g.colCount : 0;
+            let rowFillFraction = rowTotal > 0 ? rowDone / rowTotal : 0;
+            if (askiFraction !== null) rowFillFraction = Math.max(rowFillFraction, askiFraction);
             const rowFillPercent = laneStartPercent + (laneEndPercent - laneStartPercent) * rowFillFraction;
             parallelGroupsHtml += `
                 <div class="metro-lane-bg" style="left:${laneStartPercent}%; width:${laneEndPercent - laneStartPercent}%; top:${rowYs[row]}%;"></div>
@@ -1656,7 +1851,16 @@ function createJobCard(job) {
                     if (firstStepNum === null) firstStepNum = p;
                     lastStepNum = p;
                 }
-                const inDone = isCompleted || (firstStepNum !== null && job.steps[`step${firstStepNum}`]?.completed);
+                // Kola GİRİŞ kavisi "bu kola sapıldı mı" sorusunu yanıtlar.
+                // TEİAŞ/EİGM kollarında bu, kolun ilk durağının (görüşe
+                // çıkılması) tamamlanmasıdır. Askı kolunda ise sapma zaten
+                // askıya çıkış tarihinin girilmesiyle olmuştur - durağın kendisi
+                // günler sonra kapanacağı için, o ana kadar yolu gri bırakmak
+                // "proje askıya çıkmamış" izlenimi veriyordu.
+                const firstType = firstStepNum !== null ? stepsConf[firstStepNum - 1].type : null;
+                const firstData = firstStepNum !== null ? job.steps?.[`step${firstStepNum}`] : null;
+                const askiBaslamis = firstType === 'EPDK_ASKI' && !!(firstData?.date || firstData?.bitisTarih);
+                const inDone = isCompleted || askiBaslamis || (firstStepNum !== null && job.steps[`step${firstStepNum}`]?.completed);
                 const outDone = isCompleted || (lastStepNum !== null && job.steps[`step${lastStepNum}`]?.completed);
                 const inColor = inDone ? GREEN : GREY;
                 const outColor = outDone ? GREEN : GREY;
@@ -1738,7 +1942,7 @@ function createJobCard(job) {
 
         <!-- Column 2: Stepper & Current Status -->
         <div class="job-stepper-col">
-            <div class="metro-line-wrapper ${hasParallelGroups ? 'has-parallel' : ''}">
+            <div class="metro-line-wrapper ${hasParallelGroups ? `has-parallel has-parallel-${maxGroupRowCount}` : ''}">
                 ${railBgHtml}
                 ${railProgressHtml}
                 ${parallelGroupsHtml}
@@ -2267,7 +2471,7 @@ function renderAccordionStep(job, stepNum) {
             <div class="step-accordion-content">
                 <div class="step-form-wrapper">
                     ${renderStepFields(job, stepNum)}
-                    ${!isLocked ? `<button class="btn btn-primary btn-block btn-sm save-step-btn" id="saveStepBtn-${stepNum}" style="margin-top: 15px;">Aşamayı Kaydet & İlerlet</button>` : ''}
+                    ${!isLocked ? `<button class="btn btn-primary btn-block btn-sm save-step-btn" id="saveStepBtn-${stepNum}" style="margin-top: 15px;"${stepConf.type === 'EPDK_ASKI' ? ' data-fixed-label="1"' : ''}>${stepConf.type === 'EPDK_ASKI' ? 'Askı Tarihlerini Kaydet (Süre Dolunca İlerler)' : 'Aşamayı Kaydet &amp; İlerlet'}</button>` : ''}
                     ${(isCompleted || job.status === 'completed') ? `
                         <button type="button" class="btn btn-sm btn-block rollback-step-btn" onclick="rollbackJobToStep('${job.id}', ${stepNum})" style="margin-top: 10px; background: rgba(156, 163, 175, 0.05); border: 1px solid rgba(156, 163, 175, 0.15); color: #9ca3af; font-style: italic; font-weight: 500; padding: 6px 12px; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; border-radius: 8px; font-size: 11px;">
                             🔄 Bu Aşamaya Geri Dön
@@ -2538,6 +2742,38 @@ function renderStepFields(job, stepNum) {
                     <label for="eigmDondu-${stepNum}" style="font-weight:bold; color:#10b981; margin-bottom:0; cursor:pointer; font-size:12px;">EİGM Görüşü Cevaplandı / Tamamlandı</label>
                 </div>
             `;
+        // EPDK itiraz askısı - TEİAŞ/EİGM kollarıyla paralel üçüncü kol, tek
+        // kalem. Elle "tamamlandı" kutusu YOK: aşama, girilen askı bitiş
+        // tarihine gelindiğinde kendiliğinden kapanır (bkz. syncAskiCompletion).
+        case 'EPDK_ASKI':
+            {
+                const askiSt = getAskiStatus(sData);
+                const durumHtml = !askiSt
+                    ? '<span style="color:var(--text-muted);">⏳ Askıdan iniş tarihi girilince süre otomatik takip edilmeye başlar.</span>'
+                    : (!askiSt.expired
+                        ? `<span style="color:#c084fc;">📌 Proje şu an <strong>askıda</strong> - inmesine <strong>${askiSt.daysLeft} gün</strong> var. Bu aşama o tarihte kendiliğinden tamamlanacak.</span>`
+                        : `<span style="color:#10b981;">✅ Askı süresi doldu, proje askıdan indi - aşama otomatik olarak tamamlandı.</span>`);
+                return `
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Askıya Çıkış Tarihi</label>
+                        <input type="date" id="askiCikisTarih-${stepNum}" value="${sData.date || ''}" class="modern-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Askıdan İniş Tarihi</label>
+                        <input type="date" id="askiBitisTarih-${stepNum}" value="${sData.bitisTarih || ''}" class="modern-input">
+                    </div>
+                </div>
+                <div style="margin-top:12px; font-size:11px; line-height:1.6; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:8px 10px;">
+                    ${durumHtml}
+                    <div style="color:var(--text-muted); margin-top:6px;">
+                        📋 Askıdan iniş tarihi, son günü o tarih olan <strong>otomatik bir yükümlülük</strong> olarak da
+                        Yükümlülük Tanımlama aşamasına eklenir. Tarihi silerseniz yükümlülük de kaldırılır.
+                        ${sData.askiObgId ? '<br>✅ Şu an bir yükümlülük tanımlı.' : ''}
+                    </div>
+                </div>
+            `;
+            }
         case 'TEIAS_GORUS_DONUS':
             return `
                 <div class="gorus-box" style="border:1px solid rgba(255,255,255,0.05); padding:12px; border-radius:10px; background:rgba(0,0,0,0.15);">
@@ -3221,7 +3457,10 @@ window.updateTeiasSaveButtonText = function(stepNum) {
     const saveBtn = document.getElementById(`saveStepBtn-${stepNum}`);
     
     if (!saveBtn) return;
-    
+    // Kendi sabit etiketi olan aşamalar (ör. EPDK askısı, "süre dolunca
+    // ilerler") burada genel metne geri döndürülmemeli.
+    if (saveBtn.dataset.fixedLabel) return;
+
     if (!selectEl) {
         saveBtn.textContent = 'Aşamayı Kaydet & İlerlet';
         saveBtn.style.background = '';
@@ -3490,6 +3729,96 @@ function saveStepData(jobId, stepNum) {
                 const cevapSayi = document.getElementById(`eigmSayi-${stepNum}`).value.trim();
                 const dondu = document.getElementById(`eigmDondu-${stepNum}`).checked || !!cevapTarih;
                 steps[`step${stepNum}`] = { completed: dondu, geldi: dondu, date: cevapTarih, number: cevapSayi };
+            }
+            break;
+
+        // Askı, tek kalemde girilen bir bekleme süresi. İki şey olur:
+        //   1) Bitiş tarihi aynı zamanda bir son gündür - TEİAŞ bağlantı kabul
+        //      taahhüdündeki (TEIAS_GORUS_DONUS) kalıbın aynısıyla otomatik bir
+        //      yükümlülük oluşturulur ve YUKUMLULUK_TANIMLAMA'ya bağlanır.
+        //      askiObgId sayesinde tekrar kaydetmek kopya üretmez, tarihi
+        //      silmek ise yükümlülüğü geri alır.
+        //   2) Aşamanın tamamlanması ELLE değil takvimle olur: burada da
+        //      syncAskiCompletion'ın kullandığı kuralın aynısı uygulanır, yani
+        //      bitiş tarihi gelmeden kaydetmek aşamayı tamamlamaz.
+        case 'EPDK_ASKI':
+            {
+                const sData = steps[`step${stepNum}`] || {};
+                const cikisTarih = document.getElementById(`askiCikisTarih-${stepNum}`).value;
+                const bitisTarih = document.getElementById(`askiBitisTarih-${stepNum}`).value;
+
+                if (cikisTarih && bitisTarih && new Date(bitisTarih) < new Date(cikisTarih)) {
+                    showToast('Askıdan iniş tarihi, askıya çıkış tarihinden önce olamaz.', 'warning');
+                    return;
+                }
+
+                let bitti = false;
+                if (bitisTarih) {
+                    const end = new Date(bitisTarih);
+                    if (!isNaN(end.getTime())) {
+                        end.setHours(0, 0, 0, 0);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        bitti = today >= end;
+                    }
+                }
+
+                let askiObgId = sData.askiObgId || '';
+                const obgDesc = 'EPDK İtiraz Askı Süresinin Dolması';
+
+                if (bitisTarih) {
+                    const existing = askiObgId ? Store.obligations.find(o => o.id === askiObgId) : null;
+                    if (existing) {
+                        existing.deadline = new Date(bitisTarih);
+                        existing.obligationDescription = obgDesc;
+                        existing.updatedAt = new Date();
+                    } else {
+                        askiObgId = generateId();
+                        Store.obligations.push({
+                            id: askiObgId,
+                            projectName: job.project,
+                            projectLink: '',
+                            obligationType: 'EPDK İtiraz Askı Süresi',
+                            obligationDescription: obgDesc,
+                            deadline: new Date(bitisTarih),
+                            notes: 'EPDK itiraz askı bitiş tarihi girildiğinde otomatik oluşturuldu.',
+                            status: 'pending',
+                            comments: [],
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        });
+                        showToast('EPDK itiraz askı süresi yükümlülük olarak eklendi.', 'success');
+                    }
+
+                    if (!bitti) {
+                        showToast(`Askı tarihleri kaydedildi. Proje ${formatDate(bitisTarih)} tarihinde askıdan inecek ve bu aşama kendiliğinden tamamlanacak.`, 'info');
+                    }
+
+                    const tanimlamaIdx = stepsConf.findIndex(s => s.type === 'YUKUMLULUK_TANIMLAMA');
+                    if (tanimlamaIdx !== -1) {
+                        const tStepKey = `step${tanimlamaIdx + 1}`;
+                        if (!steps[tStepKey]) steps[tStepKey] = { completed: false, obligationIds: [], noObligation: false };
+                        if (!steps[tStepKey].obligationIds) steps[tStepKey].obligationIds = [];
+                        if (!steps[tStepKey].obligationIds.includes(askiObgId)) {
+                            steps[tStepKey].obligationIds.push(askiObgId);
+                        }
+                        steps[tStepKey].completed = false;
+                        steps[tStepKey].noObligation = false;
+                    }
+                } else if (askiObgId) {
+                    Store.obligations = Store.obligations.filter(o => o.id !== askiObgId);
+                    const tanimlamaIdx = stepsConf.findIndex(s => s.type === 'YUKUMLULUK_TANIMLAMA');
+                    if (tanimlamaIdx !== -1) {
+                        const tStepKey = `step${tanimlamaIdx + 1}`;
+                        if (steps[tStepKey]?.obligationIds) {
+                            steps[tStepKey].obligationIds = steps[tStepKey].obligationIds.filter(id => id !== askiObgId);
+                        }
+                    }
+                    askiObgId = '';
+                    showToast('EPDK itiraz askı yükümlülüğü kaldırıldı.', 'info');
+                }
+
+                steps[`step${stepNum}`] = { completed: bitti, date: cikisTarih, bitisTarih, askiObgId };
             }
             break;
 

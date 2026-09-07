@@ -140,6 +140,14 @@
     margin-top: 26px;
 }
 
+/* Üç kola ayrılan küme (Saha Koordinat Tadili: TEİAŞ + EİGM + EPDK itiraz
+   askısı) bir kol daha sığdırmak zorunda - hat daha yüksek çizilir. */
+.metro-line-wrapper.has-parallel-3 {
+    height: 180px;
+    margin-top: 34px;
+    margin-bottom: 14px;
+}
+
 .metro-rail-bg {
     position: absolute;
     left: 0;
@@ -264,6 +272,16 @@
     position: absolute;
 }
 
+/* "Askıda" durağı, hattın mevcut yeşil/amber dilinin dışına çıkmaz - duraklar
+   ve tren simgesi diğer bekleyen aşamalarla birebir aynı. Tek farkı, ne kadar
+   süre kaldığını okunur kılan rozet biçimli etiketi. */
+.metro-station.askida .metro-station-label {
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    border-radius: 999px;
+    padding: 2px 7px;
+}
+
 .metro-station:hover .metro-station-dot {
     transform: scale(1.4);
     border-color: #fbbf24;
@@ -331,12 +349,25 @@
    sabiti (js/jobs.js, createJobCard) buradaki 28%/72% değerleriyle eşleşmeli.
    ========================================================================== */
 
-.metro-station.row-top {
+.metro-station.rows-2.row-top {
     top: 28%;
 }
 
-.metro-station.row-bottom {
+.metro-station.rows-2.row-bottom {
     top: 72%;
+}
+
+/* Üç kollu küme: ROW_Y_PERCENT_BY_COUNT[3] (js/jobs.js) ile eşleşmeli. */
+.metro-station.rows-3.row-top {
+    top: 18%;
+}
+
+.metro-station.rows-3.row-mid {
+    top: 50%;
+}
+
+.metro-station.rows-3.row-bottom {
+    top: 82%;
 }
 
 .metro-station.row-top .metro-station-label.label-top {
@@ -347,12 +378,15 @@
     bottom: 32px;
 }
 
-.metro-station.row-bottom .metro-station-label.label-bottom {
+.metro-station.row-bottom .metro-station-label.label-bottom,
+.metro-station.row-mid .metro-station-label.label-bottom {
     top: 20px;
 }
 
-/* Alt kolun treni de kendi durağının altına insin, üst koldakiyle çakışmasın. */
-.metro-station.row-bottom .metro-train-icon {
+/* Alt/orta kolun treni de kendi durağının altına insin, üst koldakiyle
+   çakışmasın. */
+.metro-station.row-bottom .metro-train-icon,
+.metro-station.row-mid .metro-train-icon {
     bottom: auto;
     top: 18px;
 }
@@ -362,7 +396,8 @@
     50% { transform: translate(-50%, 5px); }
 }
 
-.metro-station.row-bottom .metro-train-icon {
+.metro-station.row-bottom .metro-train-icon,
+.metro-station.row-mid .metro-train-icon {
     animation-name: trainBobDown;
 }
 
@@ -666,9 +701,14 @@
     transform: translateX(-50%);
     font-size: 9.5px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.4);
-    background: transparent !important;
-    padding: 0;
+    color: rgba(255, 255, 255, 0.55);
+    /* Hattın (z-index 1-2) ve durakların (3) üstünde dursun: aksi halde
+       özellikle çatal bölgesinde borunun altında kalıp okunmuyordu. Koyu
+       zemin de yazının boruyu "kesmesini" sağlıyor. */
+    z-index: 4;
+    background: rgba(10, 10, 24, 0.85) !important;
+    padding: 0 3px;
+    border-radius: 4px;
     white-space: nowrap;
     pointer-events: none;
     border: none !important;

@@ -76,6 +76,10 @@ export const STEP_META_DEFAULTS = {
     KURUM_GORUS_TEIAS_EIGM: { owner: OWNER_EXTERNAL, difficulty: 3 },
     TEIAS_GORUS_DONUS: { owner: OWNER_EXTERNAL, difficulty: 3 },
     EIGM_GORUS_DONUS: { owner: OWNER_EXTERNAL, difficulty: 3 },
+    // EPDK itiraz askısı: askıya çıkarma da, sürenin dolmasını beklemek de
+    // EPDK'nın süreci - bizde bir aksiyon yok, sadece tarihleri gireriz ve
+    // aşama takvimle kapanır.
+    EPDK_ASKI: { owner: OWNER_EXTERNAL, difficulty: 2 },
     KURUM_GORUS_TEIAS: { owner: OWNER_EXTERNAL, difficulty: 2 },
     KURUM_GORUS_EIGM: { owner: OWNER_EXTERNAL, difficulty: 2 },
     KURUM_GORUS_KDB: { owner: OWNER_EXTERNAL, difficulty: 2 },

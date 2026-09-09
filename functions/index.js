@@ -465,15 +465,10 @@ function buildDailyDigest(data) {
             </td>
         </tr>`;
 
-    const ownerPill = (ours) => `
-        <span style="display:inline-block; padding:2px 9px; border-radius:11px; font-size:11px; font-weight:700; white-space:nowrap;
-            ${ours ? 'background:#d1fae5; color:#047857;' : 'background:#e5e7eb; color:#4b5563;'}">
-            ${ours ? '🙋 Bizde' : '⏳ Karşı taraf'}
-        </span>`;
-
+    // Who holds the ball is shown by the two group headings, so the row
+    // itself no longer repeats it in a column.
     const renderActiveJobRow = (j) => `
         <tr>
-            <td style="padding:10px; border-bottom:1px solid #eee;">${ownerPill(j.ours)}</td>
             <td style="padding:10px; border-bottom:1px solid #eee; font-size:13px; color:#6b7280;">${j.company}</td>
             <td style="padding:10px; border-bottom:1px solid #eee;"><strong>${j.project}</strong></td>
             <td style="padding:10px; border-bottom:1px solid #eee; font-size:13px;">${j.type}</td>
@@ -487,7 +482,6 @@ function buildDailyDigest(data) {
 
     const activeJobsThead = `
         <tr>
-            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Aksiyon</th>
             <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Şirket</th>
             <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Proje</th>
             <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Tadil Çeşidi</th>

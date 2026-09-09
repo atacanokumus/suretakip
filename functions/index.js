@@ -9,7 +9,7 @@ const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const { Resend } = require("resend");
 const TeamsAIHelper = require("./teams_ai_helper");
-const { WORKFLOW_STAGE_LABELS } = require("./workflow_labels");
+const workflowEngine = require("./workflow_engine");
 
 // Initialize Firebase Admin
 initializeApp();
@@ -314,9 +314,15 @@ function collectActiveJobs(data) {
         })
         .map((j) => {
             const title = j.title || "";
-            const labels = WORKFLOW_STAGE_LABELS[title] || [];
-            const step = j.currentStep || 1;
-            const label = labels[step - 1];
+            // Stage name, stage number, total stages and who holds the ball are
+            // all read from the LIVE workflow definition carried on the master
+            // doc (data.workflows / data.stepMeta), so the mail can no longer
+            // drift from what the web app shows.
+            const info = workflowEngine.describeJobStage(j, {
+                workflows: data.workflows,
+                stepMeta: data.stepMeta
+            });
+            const stageDate = workflowEngine.getCurrentStageDate(j);
             return {
                 company: companyByProject.get(j.project) || "—",
                 project: j.project || "—",
@@ -324,17 +330,26 @@ function collectActiveJobs(data) {
                 // (e.g. "T15 TESİS TAMAMLAMA"), which is what distinguishes
                 // two extensions on the same project.
                 type: isPrelicenceMatrixJob(j) && j.subTitle ? `${title} (${j.subTitle})` : title,
-                stage: label ? `${step}. ${label}` : `Aşama ${step}`,
-                totalStages: labels.length || null
+                stage: info.label,
+                totalStages: info.totalStages,
+                ours: info.ours,
+                waitingDays: info.waitingDays,
+                _stageTime: stageDate ? stageDate.getTime() : null
             };
         })
         .sort((a, b) => {
-            // Projects with no company on file sort last rather than leading
-            // the table with a column of dashes.
-            const aUnknown = a.company === "—";
-            const bUnknown = b.company === "—";
-            if (aUnknown !== bUnknown) return aUnknown ? 1 : -1;
-            return a.company.localeCompare(b.company, "tr") ||
+            // Same order as the "Tadiller & Süreç Takibi" page's smart sort:
+            // action-on-us first, then within each group the one waiting
+            // longest (oldest stage date) on top.
+            if (a.ours !== b.ours) return a.ours ? -1 : 1;
+            if (a._stageTime === null && b._stageTime === null) {
+                return (a.company === "—") - (b.company === "—") ||
+                    a.company.localeCompare(b.company, "tr") ||
+                    a.project.localeCompare(b.project, "tr");
+            }
+            if (a._stageTime === null) return 1;
+            if (b._stageTime === null) return -1;
+            return a._stageTime - b._stageTime ||
                 a.project.localeCompare(b.project, "tr");
         });
 }
@@ -450,15 +465,47 @@ function buildDailyDigest(data) {
             </td>
         </tr>`;
 
+    const ownerPill = (ours) => `
+        <span style="display:inline-block; padding:2px 9px; border-radius:11px; font-size:11px; font-weight:700; white-space:nowrap;
+            ${ours ? 'background:#d1fae5; color:#047857;' : 'background:#e5e7eb; color:#4b5563;'}">
+            ${ours ? '🙋 Bizde' : '⏳ Karşı taraf'}
+        </span>`;
+
     const renderActiveJobRow = (j) => `
         <tr>
+            <td style="padding:10px; border-bottom:1px solid #eee;">${ownerPill(j.ours)}</td>
             <td style="padding:10px; border-bottom:1px solid #eee; font-size:13px; color:#6b7280;">${j.company}</td>
             <td style="padding:10px; border-bottom:1px solid #eee;"><strong>${j.project}</strong></td>
             <td style="padding:10px; border-bottom:1px solid #eee; font-size:13px;">${j.type}</td>
             <td style="padding:10px; border-bottom:1px solid #eee; color:#8b5cf6; font-size:13px; font-weight:600;">
                 ${j.stage}${j.totalStages ? ` <span style="color:#9ca3af; font-weight:400;">/ ${j.totalStages}</span>` : ''}
+                ${Number.isFinite(j.waitingDays) && j.waitingDays > 0
+        ? `<br><span style="color:#9ca3af; font-weight:400; font-size:11px;">${j.waitingDays} gündür bu aşamada</span>`
+        : ''}
             </td>
         </tr>`;
+
+    const activeJobsThead = `
+        <tr>
+            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Aksiyon</th>
+            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Şirket</th>
+            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Proje</th>
+            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Tadil Çeşidi</th>
+            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Bulunduğu Aşama</th>
+        </tr>`;
+
+    const activeJobsOurs = activeJobs.filter((j) => j.ours);
+    const activeJobsExternal = activeJobs.filter((j) => !j.ours);
+
+    const renderActiveJobsGroup = (list, accent, bg, textColor, heading, hint) => !list.length ? '' : `
+        <div style="background:${bg}; border-left:4px solid ${accent}; padding:8px 12px; border-radius:6px; margin:14px 0 6px;">
+            <strong style="color:${textColor}; font-size:13px;">${heading} (${list.length})</strong>
+            <span style="color:#6b7280; font-size:12px;"> — ${hint}</span>
+        </div>
+        <table style="width: 100%; border-collapse: collapse;">
+            ${activeJobsThead}
+            ${list.map(renderActiveJobRow).join('')}
+        </table>`;
 
     const renderPrelicenceRow = (p) => `
         <tr>
@@ -517,18 +564,22 @@ function buildDailyDigest(data) {
             <div style="margin-top: 32px; padding-top: 24px; border-top: 3px solid #e5e7eb;">
                 <h3 style="color: #8b5cf6; margin: 0 0 4px 0;">⚡ Aktif Tadiller ve Bulundukları Aşamalar (${activeJobs.length})</h3>
                 <p style="color: #6b7280; font-size: 12px; margin: 0 0 12px 0;">
-                    Devam eden tüm tadil süreçleri ve son durumları. Tarih kısıtı yoktur.
+                    Sitedeki "Tadiller & Süreç Takibi" sayfasıyla aynı sırada: önce
+                    aksiyonun <strong>bizde</strong> olduğu tadiller, ardından karşı
+                    taraftan dönüş beklenenler. Her grup en uzun süredir bekleyenden
+                    başlar. Tarih kısıtı yoktur.
                 </p>
                 ${activeJobs.length > 0 ? `
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr>
-                            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Şirket</th>
-                            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Proje</th>
-                            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Tadil Çeşidi</th>
-                            <th style="text-align:left; padding:8px 10px; background:#f9fafb; color:#6b7280; font-size:11px; text-transform:uppercase; border-bottom:2px solid #e5e7eb;">Bulunduğu Aşama</th>
-                        </tr>
-                        ${activeJobs.map(renderActiveJobRow).join('')}
-                    </table>
+                    ${renderActiveJobsGroup(
+        activeJobsOurs, '#10b981', '#ecfdf5', '#047857',
+        '🙋 Aksiyon Bizde',
+        'sıradaki adımı ilerletmek bizde'
+    )}
+                    ${renderActiveJobsGroup(
+        activeJobsExternal, '#9ca3af', '#f3f4f6', '#4b5563',
+        '⏳ Karşı Taraftan Dönüş Bekleniyor',
+        'top EPDK / kurum / imza makamında'
+    )}
                 ` : `
                     <p style="color:#6b7280; font-size:13px; margin:0;">Devam eden aktif tadil bulunmuyor.</p>
                 `}

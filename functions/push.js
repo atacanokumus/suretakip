@@ -18,6 +18,7 @@ const { getAuth } = require("firebase-admin/auth");
 const { getMessaging } = require("firebase-admin/messaging");
 const { sendToTeams } = require("./teams_notify");
 const { WORKFLOW_STAGE_LABELS } = require("./workflow_labels");
+const workflowEngine = require("./workflow_engine");
 
 const REGION = "europe-west1";
 const TOKENS = "pushTokens";
@@ -356,18 +357,30 @@ exports.listPushDevices = onRequest({ region: REGION, cors: true }, async (req, 
 // Firestore trigger: new obligations and tadil progress
 // ---------------------------------------------------------------------------
 
+/**
+ * Stage names come from the LIVE workflow definition on the master doc when
+ * available (`workflows` arg), so a redeployed function is no longer needed
+ * every time a workflow gains or renames a stage. The hand-maintained
+ * WORKFLOW_STAGE_LABELS is only a last-resort fallback.
+ */
+function stageLabels(title, workflows) {
+    return workflowEngine.stageLabelsForTitle(title, workflows) ||
+        WORKFLOW_STAGE_LABELS[title] ||
+        null;
+}
+
 /** "Başvuru (2/8)" for a known amendment type, else "Aşama 2". */
-function stageInfo(title, n) {
+function stageInfo(title, n, workflows) {
     if (!n || n < 1) return "Aşama ?";
-    const labels = WORKFLOW_STAGE_LABELS[title];
+    const labels = stageLabels(title, workflows);
     if (!labels) return `Aşama ${n}`;
     const name = labels[n - 1];
     return name ? `${name} (${n}/${labels.length})` : `Aşama ${n}/${labels.length}`;
 }
 
 /** Total number of stages for an amendment type, or null if unknown. */
-function stageCount(title) {
-    const labels = WORKFLOW_STAGE_LABELS[title];
+function stageCount(title, workflows) {
+    const labels = stageLabels(title, workflows);
     return labels ? labels.length : null;
 }
 
@@ -470,13 +483,14 @@ exports.onMasterDataChanged = onDocumentWritten(
                     { type: "job_bulk", badge, snapshot }
                 );
             } else {
+                const wf = (after && after.workflows) || null;
                 for (const { now: j, was } of changes) {
                     const who = `📁 ${j.project || "Proje"} — ${j.title || ""}`.trim();
                     let title;
                     let detail;
 
                     if (j.status === "completed" && was.status !== "completed") {
-                        const total = stageCount(j.title);
+                        const total = stageCount(j.title, wf);
                         title = "🎉 Tadil tamamlandı! 🏁";
                         detail = `🥳 ${who}\n\n` +
                             (total ? `Tüm ${total} aşama tamam.` : "Tüm aşamalar tamam.") +
@@ -486,18 +500,18 @@ exports.onMasterDataChanged = onDocumentWritten(
                         if (jumped === 1) {
                             title = "⚡ Tadilde ilerleme kaydedildi ✨";
                             detail = `${who}\n\n` +
-                                `✅ Tamamlanan: ${stageInfo(j.title, was.step)}\n` +
-                                `➡️ Sırada: ${stageInfo(j.title, j.step)}`;
+                                `✅ Tamamlanan: ${stageInfo(j.title, was.step, wf)}\n` +
+                                `➡️ Sırada: ${stageInfo(j.title, j.step, wf)}`;
                         } else {
                             title = "⚡ Tadilde büyük ilerleme! 🚀";
                             detail = `${who}\n\n` +
                                 `✅ ${jumped} aşama birden geçildi ` +
-                                `(${stageInfo(j.title, was.step)} → ${stageInfo(j.title, j.step)})\n` +
-                                `➡️ Sırada: ${stageInfo(j.title, j.step)}`;
+                                `(${stageInfo(j.title, was.step, wf)} → ${stageInfo(j.title, j.step, wf)})\n` +
+                                `➡️ Sırada: ${stageInfo(j.title, j.step, wf)}`;
                         }
                     } else {
                         title = "📝 Tadilde güncelleme";
-                        detail = `${who}\n\n📍 Bulunduğu aşama: ${stageInfo(j.title, j.step)}`;
+                        detail = `${who}\n\n📍 Bulunduğu aşama: ${stageInfo(j.title, j.step, wf)}`;
                     }
 
                     await sendToAllDevices(title, detail, { type: "job_progress", badge, snapshot });

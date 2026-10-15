@@ -16,7 +16,15 @@ export const Store = {
         bankBranch: 'Türkiye Cumhuriyeti Ziraat Bankası A.Ş. Gebze Kurumsal Şube',
         iban: 'TR96 0001 0020 8534 7551 9667 26'
     }, // TEA başvuru bedeli hesaplayıcısının birim fiyatları ve ödeme bilgileri (düzenlenebilir)
-    users: [], // List of user profiles { email, displayName, title, uid }
+    // Mail Hazırlığı bedel tablosu (Kurul Kararı): null = henüz özelleştirilmedi,
+    // js/mail_prep.js içindeki varsayılan 2026 değerleri kullanılır. Şekil:
+    // { year, minTadilFee, renewableRatio, tiers:[{max, fee}], payment:{bank, account, iban} }
+    mailFeeSettings: null,
+    users: [], // List of user profiles { email, displayName, title, uid, active? }
+    // Pasifleştirilmiş kullanıcıların e-postaları (daVinciData/master.inactiveUsers).
+    // Kullanıcı SİLİNMEZ: geçmiş kayıtlardaki adı çözülmeye devam eder, yalnızca
+    // atama listelerinden çıkar ve girişi engellenir. Bkz. js/cleanup_migration.js.
+    inactiveUsers: [],
     // Tadil iş akışı tanımları: { [title]: [{ type, short, long }, ...] }.
     // Editable via the workflow builder; seeded once from DEFAULT_WORKFLOWS in
     // js/jobs.js if Firestore has no "workflows" field yet (see js/data.js).
@@ -53,6 +61,11 @@ export const Store = {
 
     setTeaFeeSettings(newSettings) {
         this.teaFeeSettings = { ...this.teaFeeSettings, ...newSettings };
+        this.lastUpdate = new Date().toISOString();
+    },
+
+    setMailFeeSettings(newSettings) {
+        this.mailFeeSettings = newSettings || null;
         this.lastUpdate = new Date().toISOString();
     },
 
@@ -133,6 +146,20 @@ export const Store = {
         if (!email) return 'Bilinmiyor';
         const user = this.users.find(u => u.email === email);
         return user && user.displayName ? user.displayName : email.split('@')[0];
+    },
+
+    /** Pasif (artık sitede olmayan) kullanıcı mı? master.inactiveUsers VEYA profilde active:false. */
+    isUserInactive(email) {
+        if (!email) return false;
+        const key = String(email).toLowerCase();
+        if ((this.inactiveUsers || []).some(e => String(e).toLowerCase() === key)) return true;
+        const user = this.users.find(u => String(u.email || '').toLowerCase() === key);
+        return !!user && user.active === false;
+    },
+
+    /** Atama listeleri için: yalnızca aktif kullanıcılar. */
+    getActiveUsers() {
+        return this.users.filter(u => !this.isUserInactive(u.email));
     },
 
     getUserPhoto(email) {

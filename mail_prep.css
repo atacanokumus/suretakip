@@ -1,0 +1,182 @@
+/* Mail Hazırlığı sayfası (js/mail_prep.js).
+   Önizleme/tablolar için tea-calc-* ve tea-email-table sınıfları styles.css'ten yeniden kullanılır. */
+
+.mailprep-layout {
+    display: grid;
+    grid-template-columns: minmax(300px, 380px) 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .mailprep-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Grid çocukları içeriğin (geniş tablo) genişliğine kadar uzamasın. */
+.mailprep-layout > * {
+    min-width: 0;
+}
+
+.mailprep-preview {
+    overflow-x: auto;
+}
+
+.mailprep-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.mailprep-hint {
+    margin: 6px 0 0;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+
+.mailprep-hint:empty {
+    display: none;
+}
+
+.mailprep-empty {
+    text-align: center;
+    padding: 48px 16px;
+    color: var(--text-muted);
+}
+
+.mailprep-subject-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.mailprep-subject-row label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.mailprep-subject-row .form-input {
+    flex: 1;
+}
+
+.mailprep-preview {
+    max-height: none;
+    min-height: 260px;
+    font-size: 13px;
+    padding: 16px;
+}
+
+.mailprep-preview p {
+    margin: 0 0 10px;
+}
+
+/* Mail tablosu: kopyalanınca Outlook'ta da kenarlıklı görünsün diye satır içi
+   stil kullanılıyor (js/mail_prep.js); burada yalnızca ekran önizlemesi. */
+.mailprep-preview table.mail-fee-table,
+.mailprep-preview table.tea-email-table {
+    min-width: 0; /* styles.css'teki genel "table { min-width: 1200px }" kuralını ez */
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0;
+}
+
+.mailprep-preview table.mail-fee-table td,
+.mailprep-preview table.mail-fee-table th {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    height: auto;
+}
+
+.mailprep-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.mailprep-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    margin-bottom: 12px;
+    cursor: pointer;
+}
+
+.mailprep-check input {
+    width: 15px;
+    height: 15px;
+}
+
+/* Bedel ve Ödeme Ayarları penceresi */
+.mailfee-section {
+    margin: 4px 0 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.mailfee-tiers {
+    width: 100%;
+    min-width: 0; /* styles.css'teki genel "table { min-width: 1200px }" kuralını ez */
+    table-layout: fixed;
+    border-collapse: collapse;
+    margin: 6px 0 14px;
+    font-size: 12px;
+}
+
+.mailfee-tiers th:first-child,
+.mailfee-tiers td:first-child {
+    width: 24%;
+}
+
+.mailfee-tiers th {
+    text-align: left;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 4px 6px;
+}
+
+.mailfee-tiers td {
+    padding: 3px 6px;
+}
+
+.mailfee-tiers input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.mailprep-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+/* Bedel aralığı satırı: "alt < P ≤ üst MW" tek satırda */
+.mailfee-range {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.mailfee-range .form-input {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.mailfee-range span {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.mailfee-tiers th:first-child,
+.mailfee-tiers td:first-child {
+    width: 62%;
+}

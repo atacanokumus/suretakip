@@ -273,17 +273,21 @@ function generateWeeklyReportEmail(obligations) {
 
 /**
  * Stages tracked on the prelicence extension matrix, and the field each one
- * keeps its date in. Mirrors MATRIX_STEPS in js/jobs.js.
+ * keeps its date in. Resolved by step TYPE against the live workflow (not by
+ * position), so removing a stage (GD Kontrolü) cannot shift them. Mirrors
+ * MATRIX_COLUMN_DEFS in js/jobs.js.
  */
 const PRELICENCE_STAGES = [
-    { key: "step1", field: "date", label: "1. Özet İsteme" },
-    { key: "step2", field: "izinlerDate", label: "2. Birim Görüş Dönüşü" },
-    { key: "step3", field: "date", label: "3. AO Hazırlık" },
-    { key: "step4", field: "date", label: "4. GD Kontrol" },
-    { key: "step5", field: "date", label: "5. EPDK Başvuru Hazırlık" },
-    { key: "step6", field: "date", label: "6. EPDK Başvuru" },
-    { key: "step8", field: "kdbTarih", label: "7-8. KDB Görüşü" },
-    { key: "step11", field: "date", label: "9-11. Derç Edilme" }
+    { types: ["OZET_OZET_ISTEME"], field: "date", label: "Özet İsteme" },
+    { types: ["OZET_BIRIM_DONUSU"], field: "izinlerDate", label: "Birim Görüş Dönüşü" },
+    { types: ["AO_HAZIRLIK"], field: "date", label: "AO Hazırlık" },
+    // GD Kontrolü iş akışlarından kaldırıldı; henüz taşınmamış bir kayıt için
+    // eşleşirse görünür, taşındıktan sonra bu satır hiçbir şeyle eşleşmez.
+    { types: ["GD_KONTROL"], field: "date", label: "GD Kontrol" },
+    { types: ["ZK_KONTROL", "EPDK_BASVURU_HAZIRLIK"], field: "date", label: "ZK Kontrol" },
+    { types: ["EPDK_BASVURU_YAPILMASI"], field: "date", label: "EPDK Başvuru" },
+    { types: ["KDB_GORUS_DONUS"], field: "kdbTarih", label: "KDB Görüşü" },
+    { types: ["DERC_EDILME"], field: "date", label: "Derç Edilme" }
 ];
 
 /**
@@ -371,15 +375,18 @@ function isPrelicenceMatrixJob(job) {
  * has its own page and its own workflow. The digest reports them as a separate
  * block instead, so the two are read and judged independently.
  */
-function collectPrelicenceStageItems(jobs) {
+function collectPrelicenceStageItems(jobs, workflows) {
     const items = [];
 
     (jobs || []).forEach((job) => {
         if (!isPrelicenceMatrixJob(job) || job.status === "completed") return;
         const steps = job.steps || {};
+        const stepsConf = workflowEngine.getWorkflowSteps(job, workflows);
 
         PRELICENCE_STAGES.forEach((stage) => {
-            const step = steps[stage.key];
+            const idx = stepsConf.findIndex((s) => stage.types.includes(s.type));
+            if (idx === -1) return;
+            const step = steps[`step${idx + 1}`];
             if (!step || step.completed) return;
 
             const raw = step[stage.field] || step.date || step.plannedDate;
@@ -414,7 +421,7 @@ function collectPrelicenceStageItems(jobs) {
  *
  * @returns {{subject: string, html: string, counts: object, isEmpty: boolean,
  *            todayAndOverdue: Array, upcomingNext7Days: Array,
- *            aoTasks: Array, gdTasks: Array, prelicenceItems: Array}}
+ *            aoTasks: Array, zkTasks: Array, prelicenceItems: Array}}
  */
 function buildDailyDigest(data) {
     const obligations = data.obligations || [];
@@ -438,23 +445,26 @@ function buildDailyDigest(data) {
 
     // Writing tasks sitting on the current stage of an extension.
     const aoTasks = [];
-    const gdTasks = [];
+    const zkTasks = [];
     jobs.forEach((j) => {
         if (j.status === 'completed') return;
         const currentStep = j.currentStep || 1;
         const sData = (j.steps || {})[`step${currentStep}`] || {};
         if (j.title && j.title.includes('Süre Uzatımı')) {
-            if (currentStep === 3 && !sData.completed && !sData.aoDone) aoTasks.push(j);
-            else if (currentStep === 4 && !sData.completed && !sData.gdDone) gdTasks.push(j);
+            // Aşama POZİSYONA değil TİPE göre belirlenir: GD Kontrolü kaldırılınca
+            // ZK Kontrolü 5. aşamadan 4. aşamaya kaydı.
+            const stepType = (workflowEngine.getWorkflowSteps(j, data.workflows)[currentStep - 1] || {}).type;
+            if (stepType === 'AO_HAZIRLIK' && !sData.completed && !sData.aoDone) aoTasks.push(j);
+            else if (stepType === 'ZK_KONTROL' && !sData.completed && !sData.zkDone) zkTasks.push(j);
         }
     });
 
-    const prelicenceItems = collectPrelicenceStageItems(jobs);
+    const prelicenceItems = collectPrelicenceStageItems(jobs, data.workflows);
     // No date filter: this block reports current status, not deadlines.
     const activeJobs = collectActiveJobs(data);
 
     const isEmpty = todayAndOverdue.length === 0 && upcomingNext7Days.length === 0 &&
-        aoTasks.length === 0 && gdTasks.length === 0 && prelicenceItems.length === 0;
+        aoTasks.length === 0 && zkTasks.length === 0 && prelicenceItems.length === 0;
 
     const renderRow = (o) => `
         <tr>
@@ -524,11 +534,11 @@ function buildDailyDigest(data) {
                 </div>
             ` : ''}
 
-            ${gdTasks.length > 0 ? `
+            ${zkTasks.length > 0 ? `
                 <div style="background: #fdf2f8; border-left: 4px solid #ec4899; padding: 12px 16px; border-radius: 8px; margin-top: 16px;">
-                    <h3 style="color: #be185d; margin: 0 0 8px 0; font-size: 15px;">🔍 Gamze Durum - Kontrol Edilecek Yazılar (GD)</h3>
+                    <h3 style="color: #be185d; margin: 0 0 8px 0; font-size: 15px;">🔍 ZK - Kontrol Edilecek Yazılar (ZK)</h3>
                     <ul style="margin: 0; padding-left: 18px; color: #374151; font-size: 13px;">
-                        ${gdTasks.map(j => `<li style="margin-bottom: 4px;"><strong>${j.project}</strong> — ${j.title} (Yazı Kontrolü & Onay)</li>`).join('')}
+                        ${zkTasks.map(j => `<li style="margin-bottom: 4px;"><strong>${j.project}</strong> — ${j.title} (Yazı Kontrolü & Onay)</li>`).join('')}
                     </ul>
                 </div>
             ` : ''}
@@ -603,7 +613,7 @@ function buildDailyDigest(data) {
         </div>
     `;
 
-    const obligationCount = todayAndOverdue.length + upcomingNext7Days.length + aoTasks.length + gdTasks.length;
+    const obligationCount = todayAndOverdue.length + upcomingNext7Days.length + aoTasks.length + zkTasks.length;
     // The three blocks are counted separately on purpose and never summed:
     // they answer different questions (deadlines, current status, extensions).
     const subject = `📅 Günlük Özet: ${obligationCount} yükümlülük · ${activeJobs.length} aktif tadil · ${prelicenceItems.length} ÖSU İş Kalemi`;
@@ -616,14 +626,14 @@ function buildDailyDigest(data) {
             todayAndOverdue: todayAndOverdue.length,
             upcoming7: upcomingNext7Days.length,
             ao: aoTasks.length,
-            gd: gdTasks.length,
+            zk: zkTasks.length,
             activeJobs: activeJobs.length,
             prelicence: prelicenceItems.length
         },
         todayAndOverdue,
         upcomingNext7Days,
         aoTasks,
-        gdTasks,
+        zkTasks,
         activeJobs,
         prelicenceItems
     };
@@ -700,12 +710,12 @@ exports.checkDeadlines = onSchedule({
         console.log(`📊 Digest: ${JSON.stringify(digest.counts)}`);
 
         if (digest.isEmpty) {
-            console.log("📭 No deadlines, AO/GD tasks or prelicence stages. Skipping email to save quota.");
+            console.log("📭 No deadlines, AO/ZK tasks or prelicence stages. Skipping email to save quota.");
             return;
         }
 
         // --- 3. Send Email ---
-        const { todayAndOverdue, upcomingNext7Days, aoTasks, gdTasks, prelicenceItems } = digest;
+        const { todayAndOverdue, upcomingNext7Days, aoTasks, zkTasks, prelicenceItems } = digest;
         const info = await resend.emails.send({
             from: FROM_EMAIL,
             to: TARGET_EMAIL,
@@ -721,7 +731,7 @@ exports.checkDeadlines = onSchedule({
                 todayAndOverdue,
                 upcoming: upcomingNext7Days,
                 aoTasks,
-                gdTasks,
+                zkTasks,
                 prelicenceItems
             });
         } catch (pushErr) {

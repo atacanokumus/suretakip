@@ -42,16 +42,20 @@
     <link rel="stylesheet" href="bulk_job_styles.css">
     <!-- Loaded last so it can override desktop rules on phones / in the iOS shell -->
     <link rel="stylesheet" href="mobile.css?v=1">
+    <link rel="stylesheet" href="animations.css">
+    <link rel="stylesheet" href="mail_prep.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <!-- defer: ~700 KB of libraries no longer block the first paint. Deferred
+         classic scripts still run in order, before the app.js module below. -->
+    <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
 </head>
 
 <body>
@@ -134,6 +138,10 @@
                 <a href="#" class="nav-item" data-page="projects">
                     <span class="nav-icon">🏭</span>
                     <span>Projeler</span>
+                </a>
+                <a href="#" class="nav-item" data-page="mail-prep">
+                    <span class="nav-icon">✉️</span>
+                    <span>Mail Hazırlığı</span>
                 </a>
                 <a href="#" class="nav-item" data-page="analytics">
                     <span class="nav-icon">📈</span>
@@ -428,11 +436,11 @@
                                 <span class="stat-label">AO Hazırlığında</span>
                             </div>
                         </div>
-                        <div class="stat-card upcoming clickable-card" id="extStatGdCard">
+                        <div class="stat-card upcoming clickable-card" id="extStatZkCard">
                             <div class="stat-icon">🔍</div>
                             <div class="stat-content">
-                                <span class="stat-value" id="extStatGdCount">0</span>
-                                <span class="stat-label">GD Kontrolünde</span>
+                                <span class="stat-value" id="extStatZkCount">0</span>
+                                <span class="stat-label">ZK Kontrolünde</span>
                             </div>
                         </div>
                         <div class="stat-card success clickable-card" id="extStatCompletedCard">
@@ -526,35 +534,57 @@
                                 <div class="tea-chart-container"><canvas id="teaCompanyChart"></canvas></div>
                             </div>
 
-                            <!-- TEA Fee Calculator -->
-                            <div class="tea-chart-block">
-                                <div class="tea-chart-block-header">
-                                    <h4>🧮 TEA Başvuru Bedeli Hesaplayıcı</h4>
-                                    <button type="button" id="teaFeeSettingsBtn" class="tea-icon-btn" title="Birim fiyatları düzenle">⚙️</button>
-                                </div>
-                                <div class="form-group">
-                                    <label for="teaCalcProjectSelect">Proje</label>
-                                    <select id="teaCalcProjectSelect" class="glass-input">
-                                        <option value="">Proje Seçiniz...</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="teaCalcLastMw">Son Başvuru Mekanik Gücü (MW)</label>
-                                    <input type="number" id="teaCalcLastMw" class="form-input" step="0.01" min="0" placeholder="İlk başvuruysa boş bırakın">
-                                </div>
-                                <div class="form-group">
-                                    <label for="teaCalcNewMw">Yapılacak Başvurunun Mekanik Gücü (MW)</label>
-                                    <input type="number" id="teaCalcNewMw" class="form-input" step="0.01" min="0" placeholder="Örn: 15">
-                                </div>
+                        </div>
+                    </div>
+                </div>
 
-                                <div class="tea-calc-result" id="teaCalcResult" style="display: none;">
-                                    <div class="tea-calc-amount-box">
-                                        <span>TEA Başvuru Bedeli (KDV Dahil)</span>
-                                        <strong id="teaCalcAmount">0 ₺</strong>
-                                    </div>
-                                    <div class="tea-calc-email-preview" id="teaCalcEmailPreview" contenteditable="true"></div>
-                                    <button type="button" class="btn btn-secondary tea-calc-copy-btn" id="teaCalcCopyBtn">📋 Maili Kopyala</button>
+                <!-- Mail Hazırlığı Page -->
+                <div class="page" id="mail-prep">
+                    <div class="mailprep-layout">
+                        <!-- Sol: form -->
+                        <div class="mailprep-card">
+                            <div class="tea-chart-block-header">
+                                <h4>✉️ Mail Taslağı Hazırla</h4>
+                                <button type="button" id="mailPrepTeaSettingsBtn" class="tea-icon-btn" title="Bedel ve ödeme ayarları (Kurul Kararı fiyatları, TEA birim fiyatları)">⚙️ Bedel Ayarları</button>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="mailPrepType">Bedel İstenecek Tadil Tipi</label>
+                                <select id="mailPrepType" class="glass-input"></select>
+                                <p class="mailprep-hint" id="mailPrepTypeHint"></p>
+                            </div>
+                            <div class="form-group">
+                                <label for="mailPrepProject">Proje</label>
+                                <select id="mailPrepProject" class="glass-input">
+                                    <option value="">Proje Seçiniz...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="mailPrepGreeting">Mailin Gideceği Kişi (Hitap)</label>
+                                <input type="text" id="mailPrepGreeting" class="form-input" placeholder="Örn: Emre Bey">
+                            </div>
+                            <div id="mailPrepFields"></div>
+                        </div>
+
+                        <!-- Sağ: sonuç -->
+                        <div class="mailprep-card">
+                            <div id="mailPrepEmpty" class="mailprep-empty">
+                                <span style="font-size: 30px;">✉️</span>
+                                <p>Tadil tipini, projeyi ve gücü girdiğinizde mail taslağı burada hazırlanır.</p>
+                            </div>
+                            <div id="mailPrepResult" style="display: none;">
+                                <div class="tea-calc-amount-box">
+                                    <span id="mailPrepAmountLabel">Bedel</span>
+                                    <strong id="mailPrepAmount">0 ₺</strong>
                                 </div>
+                                <div class="mailprep-subject-row">
+                                    <label>Konu</label>
+                                    <input type="text" id="mailPrepSubject" class="form-input">
+                                    <button type="button" class="btn btn-secondary" id="mailPrepCopySubjectBtn">Kopyala</button>
+                                </div>
+                                <div class="tea-calc-email-preview mailprep-preview" id="mailPrepPreview" contenteditable="true"></div>
+                                <p class="mailprep-hint">Taslak düzenlenebilir; kopyalarken biçimiyle (tablolarıyla) birlikte alınır.</p>
+                                <button type="button" class="btn btn-primary tea-calc-copy-btn" id="mailPrepCopyBtn">📋 Maili Kopyala</button>
                             </div>
                         </div>
                     </div>
@@ -1017,6 +1047,21 @@
                             </div>
                         </div>
 
+                        <!-- Card: Tek Seferlik Veri Güncellemesi (GD Kontrolü / Müzekkere / Gamze Durum) -->
+                        <div class="card" id="cleanupMigrationCard">
+                            <div class="card-header">
+                                <h2>🧹 Veri Güncellemesi: GD Kontrolü, Müzekkere ve Pasif Kullanıcı</h2>
+                            </div>
+                            <div class="card-body">
+                                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 14px;">
+                                    GD Kontrolü ve Müzekkere/Olur Hazırlama aşamaları iş akışlarından kaldırılır,
+                                    Gamze Durum kullanıcısı pasifleştirilir. Hiçbir kayıt silinmez: kaldırılan
+                                    aşamaların verisi arşivlenir, uygulamadan önce yedek alınır ve geri alınabilir.
+                                </p>
+                                <div id="cleanupMigrationBody"></div>
+                            </div>
+                        </div>
+
                         <!-- Card: Tadil İş Akışı Yönetimi -->
                         <div class="card" id="workflowManagerCard">
                             <div class="card-header">
@@ -1273,15 +1318,53 @@
         </div>
     </div>
 
-    <!-- TEA Fee Calculator Settings Modal -->
+    <!-- Bedel ve Ödeme Ayarları (Mail Hazırlığı): Kurul Kararı bedelleri + TEA birim fiyatları -->
     <div class="modal-overlay" id="teaFeeSettingsModal">
-        <div class="modal-content modal-form">
+        <div class="modal-content modal-form" style="max-width: 640px;">
             <div class="modal-header">
-                <h3>⚙️ TEA Bedeli Birim Fiyatları</h3>
+                <h3>⚙️ Bedel ve Ödeme Ayarları</h3>
                 <button class="modal-close" id="teaFeeSettingsModalClose">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="max-height: 78vh; overflow-y: auto;">
                 <form id="teaFeeSettingsForm">
+                    <h4 class="mailfee-section">📜 Kurul Kararı Bedelleri (önlisans / lisans tadil ve süre uzatımı)</h4>
+                    <p class="mailprep-hint">Kurul Kararı her yıl yenilenir; yeni karar çıkınca buradan güncelleyin. Mail şablonlarının hepsi bu değerleri kullanır.</p>
+                    <div class="mailprep-row-2">
+                        <div class="form-group">
+                            <label for="mailFeeYear">Karar Yılı</label>
+                            <input type="number" id="mailFeeYear" class="form-input" step="1" min="2020" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="mailFeeMinTadil">Asgari Tadil Bedeli (₺)</label>
+                            <input type="number" id="mailFeeMinTadil" class="form-input" step="0.01" min="0" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="mailFeeRenewablePct">Yerli / Yenilenebilir Tesislerde Güç Artışı Bedeli Oranı (%)</label>
+                        <input type="number" id="mailFeeRenewablePct" class="form-input" step="1" min="0" max="100" required>
+                    </div>
+                    <label style="font-size: 12px; font-weight: 600;">Lisans / Önlisans Alma Bedeli (kurulu güç aralıklarına göre)</label>
+                    <table class="mailfee-tiers">
+                        <thead><tr><th>Kurulu Güç Aralığı (MW)</th><th>Bedel (₺)</th><th></th></tr></thead>
+                        <tbody id="mailFeeTiersBody"></tbody>
+                    </table>
+                    <p class="mailprep-hint" style="margin: -6px 0 10px;">Kurul Kararı'ndaki gibi her satıra alt ve üst sınırı yazın (ör. 25 &lt; P ≤ 50). Bir satırın üst sınırını değiştirince sonraki satırın alt sınırı kendiliğinden güncellenir.</p>
+                    <button type="button" class="btn btn-secondary" id="mailFeeAddTierBtn" style="margin-bottom: 14px;">➕ Aralık Ekle</button>
+                    <div class="form-group">
+                        <label for="mailFeeBank">Banka / Şube</label>
+                        <input type="text" id="mailFeeBank" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="mailFeeAccount">Hesap Adı</label>
+                        <input type="text" id="mailFeeAccount" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="mailFeeIban">IBAN</label>
+                        <input type="text" id="mailFeeIban" class="form-input" required>
+                    </div>
+                    <button type="button" class="btn btn-secondary" id="mailFeeResetBtn">↩️ Kurul Kararı 2026 Değerlerini Yükle</button>
+
+                    <h4 class="mailfee-section" style="margin-top: 22px;">🍵 TEA Başvuru Birim Fiyatları</h4>
                     <div class="form-group">
                         <label for="teaSettingLastRate">Son Başvuru için MW Başına Tutar (₺)</label>
                         <input type="number" id="teaSettingLastRate" class="form-input" step="1" min="0" required>
@@ -1456,6 +1539,14 @@
                                  this modal opens (see openModal() in js/jobs.js), so any type
                                  added via Ayarlar > Tadil İş Akışı Yönetimi shows up here too. -->
                         </select>
+                    </div>
+
+                    <div class="form-group" id="jobOzetIstemeGroup" style="display: none;">
+                        <label for="jobOzetIstemeDate">Özet İsteme Tarihi (Opsiyonel)</label>
+                        <input type="date" id="jobOzetIstemeDate" class="modern-input">
+                        <small style="color: var(--text-muted); font-size: 11px;">
+                            Önlisans süre uzatımları listesi bu tarihe göre sıralanır; girerseniz kayıt hemen doğru sıraya oturur.
+                        </small>
                     </div>
 
                     <div class="form-group">

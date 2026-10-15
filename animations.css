@@ -1,0 +1,92 @@
+/* ==========================================================================
+   Site geneli etkileşim animasyonları (js/animations.js ile birlikte).
+
+   Seçiciler :where() içinde - özgüllüğü sıfır, yani bir bileşenin kendi
+   hover/transition kuralı varsa o kazanır, burası sadece boşlukları doldurur.
+   Hepsi transform/opacity/box-shadow geçişi: yalnızca etkileşim anında
+   çalışır, sürekli dönen bir döngü yok.
+   ========================================================================== */
+
+/* ---- Kartlar: üzerine gelince hafifçe kalkar ---- */
+:where(.stat-card, .project-card, .obligation-item, .ext-matrix-card, .chart-card) {
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+:where(.stat-card, .project-card, .obligation-item, .ext-matrix-card, .chart-card):hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+/* ---- Tablo satırları: üzerine gelince hafif vurgu ---- */
+:where(#obligationsTable > tr) {
+    transition: background-color 0.2s ease;
+}
+
+:where(#obligationsTable > tr):hover {
+    background-color: rgba(99, 102, 241, 0.08);
+}
+
+/* ---- Butonlar: kalkar, basınca içeri göçer ---- */
+:where(.btn, .filter-btn, .premium-btn) {
+    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+:where(.btn, .filter-btn, .premium-btn):hover:not(:disabled) {
+    transform: translateY(-2px);
+    filter: brightness(1.08);
+}
+
+:where(.btn, .filter-btn, .premium-btn):active:not(:disabled) {
+    transform: translateY(0) scale(0.97);
+    transition-duration: 0.06s;
+}
+
+/* ---- Menü: ikon üzerine gelince zıplar, aktif öğe ikonu hafifçe büyük ---- */
+.nav-item .nav-icon {
+    display: inline-block;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.nav-item:hover .nav-icon {
+    animation: navIconBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.nav-item.active .nav-icon {
+    transform: scale(1.15);
+}
+
+@keyframes navIconBounce {
+    0% { transform: translateY(0) rotate(0); }
+    35% { transform: translateY(-4px) rotate(-8deg); }
+    65% { transform: translateY(1px) rotate(5deg); }
+    100% { transform: translateY(0) rotate(0); }
+}
+
+/* ---- Tıklama dalgası ---- */
+.ui-ripple-host {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.ui-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transform: scale(0);
+    pointer-events: none;
+}
+
+/* ---- Hareket azaltma tercihi: işletim sisteminde "animasyonları azalt"
+   açıksa hepsi kapanır ---- */
+@media (prefers-reduced-motion: reduce) {
+    :where(.stat-card, .project-card, .obligation-item, .ext-matrix-card, .chart-card, .btn, .filter-btn, .premium-btn):hover {
+        transform: none;
+    }
+
+    .nav-item:hover .nav-icon {
+        animation: none;
+    }
+}

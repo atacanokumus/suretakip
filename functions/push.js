@@ -111,6 +111,22 @@ function widgetSnapshot(data) {
         }));
 }
 
+/**
+ * daVinciData/master.inactiveUsers (web uygulamasinin "pasif kullanici" listesi).
+ * Okunamazsa bos kume doner: bildirimler kesilmesin, fazladan gonderilsin.
+ * @returns {Promise<Set<string>>} kucuk harfli e-postalar
+ */
+async function getInactiveEmails() {
+    try {
+        const snap = await db().collection("daVinciData").doc("master").get();
+        const list = snap.exists ? (snap.data().inactiveUsers || []) : [];
+        return new Set(list.map((e) => String(e).toLowerCase()));
+    } catch (e) {
+        console.error("Pasif kullanici listesi okunamadi:", e && e.message);
+        return new Set();
+    }
+}
+
 /** @returns {Promise<Array<{token: string, email: string, device: string, updatedAt: string}>>} */
 async function getTokenRecords() {
     const snap = await db().collection(TOKENS).get();
@@ -168,7 +184,14 @@ async function sendToAllDevices(title, body, opts = {}) {
     await sendToTeams(title, body)
         .catch((e) => console.error("Teams fan-out hatasi:", e && e.message));
 
-    const records = await getTokenRecords();
+    // Pasif (ör. sirketten ayrilan) kullanicilarin cihazlarina bildirim gitmez.
+    // Token kaydi silinmez; kullanici tekrar aktif edilirse bildirimler geri gelir.
+    const allRecords = await getTokenRecords();
+    const inactive = await getInactiveEmails();
+    const records = allRecords.filter((r) => !inactive.has(String(r.email).toLowerCase()));
+    if (allRecords.length !== records.length) {
+        console.log(`⏭️ ${allRecords.length - records.length} cihaz pasif kullaniciya ait, atlandi.`);
+    }
     if (!records.length) {
         console.log("📭 Kayitli cihaz yok, push atlandi.");
         return { sent: 0, failed: 0 };
@@ -529,7 +552,7 @@ exports.onMasterDataChanged = onDocumentWritten(
  * Mirrors the weekday morning e-mail as a push. Called from checkDeadlines so
  * both channels fire off exactly the same computed lists.
  */
-async function sendDigestPush(data, { todayAndOverdue, upcoming, aoTasks, gdTasks, prelicenceItems = [] }) {
+async function sendDigestPush(data, { todayAndOverdue, upcoming, aoTasks, zkTasks, prelicenceItems = [] }) {
     const settings = await getSettings();
     if (!settings.dailyDigest) {
         console.log("🔕 Gunluk ozet push'u ayarlardan kapali.");
@@ -539,7 +562,7 @@ async function sendDigestPush(data, { todayAndOverdue, upcoming, aoTasks, gdTask
     const parts = [];
     if (todayAndOverdue.length) parts.push(`🔴 ${todayAndOverdue.length} bugün/gecikmiş`);
     if (upcoming.length) parts.push(`🟡 ${upcoming.length} bu hafta`);
-    const pending = aoTasks.length + gdTasks.length;
+    const pending = aoTasks.length + zkTasks.length;
     if (pending) parts.push(`✍️ ${pending} bekleyen yazı`);
     // Listed separately from obligations, matching the e-mail's two blocks.
     if (prelicenceItems.length) parts.push(`🗂️ ${prelicenceItems.length} ÖSU İş Kalemi`);

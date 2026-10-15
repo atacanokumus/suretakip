@@ -230,6 +230,11 @@ export async function syncToFirestore(customTimestamp) {
             payload.teaFeeSettings = Store.teaFeeSettings || DEFAULT_TEA_FEE_SETTINGS;
         }
 
+        // Mail Hazırlığı bedel tablosu: yalnızca özelleştirilmişse yazılır (null =
+        // dokunma). Ayrı bir üst düzey alan olduğu için bu alanı bilmeyen eski bir
+        // istemci üzerine yazamaz.
+        if (Store.mailFeeSettings) payload.mailFeeSettings = Store.mailFeeSettings;
+
         // merge:true so a field this build doesn't know about is left alone
         // instead of being deleted. A plain setDoc replaces the whole document,
         // so any teammate still running an older build would silently drop
@@ -323,6 +328,16 @@ export function initFirestoreSync() {
                     Store.setTeaFeeSettings(data.teaFeeSettings);
                     safeSetStorage('epdk_teaFeeSettings', data.teaFeeSettings);
                 }
+
+                // 6b. Mail Hazırlığı bedel tablosu (Kurul Kararı fiyatları)
+                if (data.mailFeeSettings) {
+                    Store.setMailFeeSettings(data.mailFeeSettings);
+                    safeSetStorage('epdk_mailFeeSettings', data.mailFeeSettings);
+                }
+
+                // 7. Pasif kullanıcılar (yalnızca cleanup_migration.js yazar; bu
+                // istemci geri YAZMAZ, bkz. syncToFirestore payload'ı).
+                if (Array.isArray(data.inactiveUsers)) Store.inactiveUsers = data.inactiveUsers;
 
                 localStorage.setItem('epdk_lastUpdate', data.lastUpdate);
                 window.dispatchEvent(new CustomEvent('data-refreshed'));
@@ -774,6 +789,13 @@ export async function loadData() {
                     safeSetStorage('epdk_teaFeeSettings', data.teaFeeSettings);
                 }
 
+                if (Array.isArray(data.inactiveUsers)) Store.inactiveUsers = data.inactiveUsers;
+
+                if (data.mailFeeSettings) {
+                    Store.setMailFeeSettings(data.mailFeeSettings);
+                    safeSetStorage('epdk_mailFeeSettings', data.mailFeeSettings);
+                }
+
                 initFirestoreSync();
                 // Also fetch users
                 await fetchUsers();
@@ -849,6 +871,9 @@ export async function loadData() {
             Store.setTeaFeeSettings(savedTeaFeeSettings);
         }
 
+        const savedMailFee = safeGetStorage('epdk_mailFeeSettings');
+        if (savedMailFee) Store.setMailFeeSettings(savedMailFee);
+
         if (Store.obligations.length > 0 && auth.currentUser) initFirestoreSync();
         return { obligations: Store.obligations, jobs: Store.jobs };
 
@@ -919,6 +944,7 @@ export function saveData(syncWithCloud = true) {
         safeSetStorage('epdk_teaFeeSettings', Store.teaFeeSettings); // And TEA fee calculator unit prices
         safeSetStorage('epdk_workflows', Store.workflows); // Workflow definitions
         safeSetStorage('epdk_stepMeta', Store.stepMeta); // Step responsibility / difficulty
+        if (Store.mailFeeSettings) safeSetStorage('epdk_mailFeeSettings', Store.mailFeeSettings); // Mail bedel tablosu
         const timestamp = new Date().toISOString();
         localStorage.setItem('epdk_lastUpdate', timestamp);
 

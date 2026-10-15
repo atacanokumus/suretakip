@@ -36,9 +36,12 @@ import {
     formatDateLong, formatDate, getStatus, getStatusText, getStatusLabel, escapeHtml, generateId, validateDate, validateString, convertToDate
 } from './js/utils.js';
 import { initEmojiPicker } from './js/emoji.js';
+import { initAnimations } from './js/animations.js';
 import { initPush, syncWidgetSnapshot } from './js/push.js';
 import { initWorkflowManager, renderWorkflowTypesList, renderStepMetaSettings } from './js/workflow_builder.js';
 import { renderTeaApplicationsMatrix, initTeaEventHandlers, getTeaApplicationsForProject, getMonthYearLabel } from './js/tea.js';
+import { initMailPrep, renderMailPrep } from './js/mail_prep.js';
+import { renderCleanupCard } from './js/cleanup_migration.js';
 
 // ==========================================
 // Initialization
@@ -80,6 +83,7 @@ function initApp() {
         initMobileMenu();
         initPush();
         initWorkflowManager();
+        initAnimations();
     } catch (e) {
         console.error('UI Basic Init Error:', e);
     }
@@ -325,6 +329,16 @@ async function authorizedInit() {
         // Load data but don't let it block UI if it takes too long
         try {
             await loadData();
+
+            // Pasifleştirilmiş kullanıcı (ör. şirketten ayrılan): hesap silinmez,
+            // ama uygulamayı kullanamaz. Veri yüklendikten sonra kontrol edilir
+            // çünkü pasif liste master belgesinde tutulur.
+            if (auth.currentUser && Store.isUserInactive(auth.currentUser.email)) {
+                alert('Bu hesap pasif duruma alınmıştır ve uygulamayı kullanamaz. Gerekirse yöneticinizle iletişime geçin.');
+                await logout();
+                return;
+            }
+
             if (typeof seedPrelicenceExcelData === 'function') {
                 seedPrelicenceExcelData();
             }
@@ -337,6 +351,7 @@ async function authorizedInit() {
         setupEventHandlers();
         initJobsEventHandlers(); // Initialize Job Event Handlers
         initTeaEventHandlers(); // Initialize TEA Applications Event Handlers
+        initMailPrep(); // Mail Hazırlığı (TEA bedel hesaplayıcısı da burada)
 
 
         // Background/Async tasks
@@ -401,8 +416,9 @@ const PAGE_RENDERERS = {
     'prelicence-extensions': () => window.renderPrelicenceExtensionsMatrix?.(),
     projects: () => updateProjectsGrid(),
     'tea-applications': () => renderTeaApplicationsMatrix(),
+    'mail-prep': () => renderMailPrep(),
     analytics: () => renderAnalyticsPage(),
-    settings: () => { renderWorkflowTypesList(); renderStepMetaSettings(); }
+    settings: () => { renderWorkflowTypesList(); renderStepMetaSettings(); renderCleanupCard(); }
 };
 
 const dirtyPages = new Set();

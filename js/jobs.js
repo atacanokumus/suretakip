@@ -406,7 +406,7 @@ function syncAskiCompletion(job, stepsConf) {
     return true;
 }
 
-function ensureTadilSteps(job) {
+export function ensureTadilSteps(job) {
     if (!job) return job;
 
     // 1. Migrate old Kurulu Güç 9-step to 10-step
@@ -506,6 +506,18 @@ function ensureTadilSteps(job) {
     const hasCorrectSteps = job.steps && job.steps[`step${expectedStepCount}`] && !job.steps[`step${expectedStepCount + 1}`];
 
     if (!job.steps || !hasCorrectSteps) {
+        // Aşama şekli iş akışıyla uyuşmuyor ve bu kayıt boş şekle sıfırlanacak.
+        // Girilmiş veri varsa önce yedeğini kayıtta sakla: iş akışı tanımı
+        // (ör. GD Kontrolü/Müzekkere kaldırılması) kayıtlardan önce ya da
+        // eski bir istemci tarafından yazılmış kayıtlar yüzünden şekil kayması
+        // olursa bilgi kaybolmasın, elle geri taşınabilsin.
+        if (job.steps && Object.values(job.steps).some(s => s && typeof s === 'object' && Object.keys(s).length > 1)) {
+            job.stepsBackup = {
+                savedAt: new Date().toISOString(),
+                currentStep: job.currentStep || 1,
+                steps: JSON.parse(JSON.stringify(job.steps))
+            };
+        }
         const isCompleted = job.status === 'completed';
         const newSteps = {};
         for (let i = 0; i < expectedStepCount; i++) {
@@ -1012,6 +1024,9 @@ function getLiveStatusText(job) {
         case 'TEIAS_GORUS_CIKIS':
             return sData.completed || sData.cikildi ? `Aşama ${stepNum}: TEİAŞ Görüşüne ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}Çıkıldı ✅` : `Aşama ${stepNum}: TEİAŞ Görüşüne Çıkılması Bekleniyor 📤`;
         case 'TEIAS_GORUS_DONUS':
+            if (sData.teiasDondu && sData.teiasBaglantiDurumu === 'teblig_bekleniyor') {
+                return `Aşama ${stepNum}: TEİAŞ Görüşü EPDK'ya Döndü${sData.teiasSayi ? ' (' + sData.teiasSayi + ')' : ''} - Tebliğ Bekleniyor 📨`;
+            }
             return sData.teiasDondu ? `Aşama ${stepNum}: TEİAŞ Görüşü Alındı ✅` : `Aşama ${stepNum}: TEİAŞ Görüşü Bekleniyor ⏳`;
         case 'EIGM_GORUS_CIKIS':
             return sData.completed || sData.cikildi ? `Aşama ${stepNum}: EİGM Görüşüne ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}Çıkıldı ✅` : `Aşama ${stepNum}: EİGM Görüşüne Çıkılması Bekleniyor 📤`;
@@ -1058,7 +1073,7 @@ function getLiveStatusText(job) {
         case 'OLUR_MUZEKKERE_YAZIMI':
             return sData.completed || sData.hazirlandi ? `Aşama ${stepNum}: Müzekkere ${sData.date ? formatDate(sData.date) + ' tarihinde ' : ''}hazırlandı ✅` : `Aşama ${stepNum}: Müzekkere hazırlanması bekleniyor 📝`;
         case 'OLUR_IMZALANMASI_VE_GUNDEM':
-            return sData.completed || sData.gundemeAlindi ? `Aşama ${stepNum}: Müzekkere ${sData.date ? formatDate(sData.date) + ' tarihli ' : ''}Gündeme alındı 🏛️` : `Aşama ${stepNum}: Müzekkerenin gündeme alınması bekleniyor 🏛️`;
+            return sData.completed || sData.gundemeAlindi ? `Aşama ${stepNum}: Olur ${sData.date ? formatDate(sData.date) + ' tarihli ' : ''}imzalandı / Gündeme alındı 🏛️` : `Aşama ${stepNum}: Olurun imzalanması / gündeme alınması bekleniyor 🏛️`;
         case 'YUKUMLULUK_TANIMLAMA':
             return `Aşama ${stepNum}: Yükümlülük Tanımlaması Bekleniyor ⚠️`;
         case 'YUKUMLULUK_TAMAMLAMA':
@@ -1173,7 +1188,7 @@ function getStepTooltipText(job, stepNum) {
         case 'EIGM_GORUS_CIKIS':
             return `${titleText}\n📤 ${(sData.cikildi || sData.date) ? 'Çıkıldı' : 'Bekleniyor'}${sData.date ? ' - ' + formatDate(sData.date) : ''}${sData.number ? ' (' + sData.number + ')' : ''}\n🔀 Paralel yürütülür`;
         case 'TEIAS_GORUS_DONUS':
-            return `${titleText}\n⚡ TEİAŞ: ${sData.teiasDondu ? 'Cevaplandı (' + (sData.teiasSayi || 'Muaf') + ')' : 'Bekleniyor'}${sData.teiasBaglantiDurumu === 'itiraz' ? ' ⚠️ İtiraz sürecinde' : ''}\n🔀 Paralel yürütülür`;
+            return `${titleText}\n⚡ TEİAŞ: ${sData.teiasDondu ? 'Cevaplandı (' + (sData.teiasSayi || 'Muaf') + ')' : 'Bekleniyor'}${sData.teiasBaglantiDurumu === 'itiraz' ? ' ⚠️ İtiraz sürecinde' : ''}${sData.teiasBaglantiDurumu === 'teblig_bekleniyor' ? ' 📨 Tebliğ bekleniyor' : ''}\n🔀 Paralel yürütülür`;
         case 'EIGM_GORUS_DONUS':
             return `${titleText}\n🔍 EİGM: ${sData.geldi ? 'Cevaplandı (' + (sData.number || 'Muaf') + ')' : 'Bekleniyor'}\n🔀 Paralel yürütülür`;
         case 'EPDK_ASKI':
@@ -1284,7 +1299,9 @@ function generateProcessSummaryHtml(job) {
                             } else if (sData.teiasDondu) {
                                 lineText += `<div style="margin-left:15px; color:#10b981; font-size:11px; margin-top:2px;">↳ ✅ Bağlantı noktası değişmedi / kabul edildi.</div>`;
                             }
-                        } else if (baglantiDurumu === 'itiraz') {
+                        } else if (baglantiDurumu === 'teblig_bekleniyor') {
+                                lineText += `<div style="margin-left:15px; color:#f59e0b; font-size:11px; margin-top:2px;">↳ 📨 EPDK'ya dönüş kaydedildi; yazının tebliği bekleniyor (bağlantı kabul taahhüdü tanımlanıp tanımlanmadığı henüz bilinmiyor).</div>`;
+                            } else if (baglantiDurumu === 'itiraz') {
                             let activeObjText = `<div style="margin-left:15px; color:#f87171; font-size:11px; margin-top:2px;">↳ ⚠️ Bağlantı görüşüne itiraz edildi (Süreç Takipte).`;
                             if (sData.teiasItirazEpdkTarih || sData.teiasItirazEpdkSayi) {
                                 activeObjText += `<br>  • EPDK Sunum: ${sData.teiasItirazEpdkSayi || '-'} (${sData.teiasItirazEpdkTarih ? formatDate(sData.teiasItirazEpdkTarih) : '-'})`;
@@ -1350,7 +1367,9 @@ function generateProcessSummaryHtml(job) {
                         } else if (sData.teiasDondu) {
                             lineText += `<div style="margin-left:15px; color:#10b981; font-size:11px; margin-top:2px;">↳ ✅ Bağlantı noktası değişmedi / kabul edildi.</div>`;
                         }
-                    } else if (baglantiDurumu === 'itiraz') {
+                    } else if (baglantiDurumu === 'teblig_bekleniyor') {
+                                lineText += `<div style="margin-left:15px; color:#f59e0b; font-size:11px; margin-top:2px;">↳ 📨 EPDK'ya dönüş kaydedildi; yazının tebliği bekleniyor (bağlantı kabul taahhüdü tanımlanıp tanımlanmadığı henüz bilinmiyor).</div>`;
+                            } else if (baglantiDurumu === 'itiraz') {
                         let activeObjText = `<div style="margin-left:15px; color:#f87171; font-size:11px; margin-top:2px;">↳ ⚠️ Bağlantı görüşüne itiraz edildi (Süreç Takipte).`;
                         if (sData.teiasItirazEpdkTarih || sData.teiasItirazEpdkSayi) {
                             activeObjText += `<br>  • EPDK Sunum: ${sData.teiasItirazEpdkSayi || '-'} (${sData.teiasItirazEpdkTarih ? formatDate(sData.teiasItirazEpdkTarih) : '-'})`;
@@ -1394,7 +1413,9 @@ function generateProcessSummaryHtml(job) {
                             } else if (sData.teiasDondu) {
                                 lineText += `<div style="margin-left:15px; color:#10b981; font-size:11px; margin-top:2px;">↳ ✅ Bağlantı noktası değişmedi / kabul edildi.</div>`;
                             }
-                        } else if (baglantiDurumu === 'itiraz') {
+                        } else if (baglantiDurumu === 'teblig_bekleniyor') {
+                                lineText += `<div style="margin-left:15px; color:#f59e0b; font-size:11px; margin-top:2px;">↳ 📨 EPDK'ya dönüş kaydedildi; yazının tebliği bekleniyor (bağlantı kabul taahhüdü tanımlanıp tanımlanmadığı henüz bilinmiyor).</div>`;
+                            } else if (baglantiDurumu === 'itiraz') {
                             let activeObjText = `<div style="margin-left:15px; color:#f87171; font-size:11px; margin-top:2px;">↳ ⚠️ Bağlantı görüşüne itiraz edildi (Süreç Takipte).`;
                             if (sData.teiasItirazEpdkTarih || sData.teiasItirazEpdkSayi) {
                                 activeObjText += `<br>  • EPDK Sunum: ${sData.teiasItirazEpdkSayi || '-'} (${sData.teiasItirazEpdkTarih ? formatDate(sData.teiasItirazEpdkTarih) : '-'})`;
@@ -1517,7 +1538,7 @@ function generateProcessSummaryHtml(job) {
                 break;
             case 'OLUR_IMZALANMASI_VE_GUNDEM':
                 if (sData.completed || sData.gundemeAlindi || sData.date || sData.number) {
-                    lineText = `Müzekkere <strong>${sData.date ? formatDate(sData.date) + ' tarihli ' : ''}</strong>Gündeme alındı (${escapeHtml(sData.number || '-')}).`;
+                    lineText = `Olur <strong>${sData.date ? formatDate(sData.date) + ' tarihli ' : ''}</strong>imzalandı / Gündeme alındı (${escapeHtml(sData.number || '-')}).`;
                 }
                 break;
             case 'YUKUMLULUK_TANIMLAMA':
@@ -1557,6 +1578,18 @@ function generateProcessSummaryHtml(job) {
         if (lineText) {
             summaryLines.push(`<div class="summary-line-item" style="margin-bottom:6px; display:flex; align-items:flex-start; gap:6px;"><span style="color:var(--accent-light);">•</span> <div><strong>${stepNum}. ${escapeHtml(stepConf.short)}:</strong> ${lineText}</div></div>`);
         }
+    });
+
+    // İş akışından kaldırılan aşamaların (GD Kontrolü, Müzekkere/Olur Hazırlama)
+    // verisi silinmez; kayıtta arşivlenir ve burada salt-okunur gösterilir.
+    const ARCHIVED_LABELS = { GD_KONTROL: 'GD Kontrolü (kaldırıldı)', OLUR_MUZEKKERE_YAZIMI: 'Müzekkere / Olur Hazırlama (kaldırıldı)' };
+    Object.entries(job.archivedSteps || {}).forEach(([type, data]) => {
+        if (!data) return;
+        const parts = [];
+        if (data.date) parts.push(`Tarih: ${formatDate(data.date)}`);
+        if (data.number) parts.push(`Sayı: ${escapeHtml(String(data.number))}`);
+        if (!parts.length) parts.push(data.completed ? 'Tamamlanmıştı' : 'Veri girilmişti');
+        summaryLines.push(`<div class="summary-line-item" style="margin-bottom:6px; display:flex; align-items:flex-start; gap:6px; opacity:0.75;"><span style="color:#9ca3af;">📦</span> <div><strong>${escapeHtml(ARCHIVED_LABELS[type] || type)}:</strong> ${parts.join(' · ')}</div></div>`);
     });
 
     if (summaryLines.length === 0) {
@@ -2011,6 +2044,23 @@ export function initJobsEventHandlers() {
             titleSelect.innerHTML = '<option value="">Seçiniz...</option>' +
                 titles.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join('');
             if (titles.includes(currentVal)) titleSelect.value = currentVal;
+
+            // Özet isteme tarihi alanı yalnızca "Özet İsteme" aşamasıyla başlayan
+            // tadil tiplerinde (süre uzatımları) gösterilir; matris bu tarihe
+            // göre sıralandığı için kayıt oluşurken girilebilsin.
+            const syncOzetField = () => {
+                const group = document.getElementById('jobOzetIstemeGroup');
+                if (!group) return;
+                const conf = getWorkflowSteps({ title: titleSelect.value });
+                const has = !!titleSelect.value && conf.some(s => s.type === 'OZET_OZET_ISTEME');
+                group.style.display = has ? '' : 'none';
+                if (!has) {
+                    const input = document.getElementById('jobOzetIstemeDate');
+                    if (input) input.value = '';
+                }
+            };
+            titleSelect.onchange = syncOzetField;
+            syncOzetField();
         }
 
         // Populate Assignees Dropdown
@@ -2020,7 +2070,9 @@ export function initJobsEventHandlers() {
             if (auth.currentUser) {
                 html += `<option value="${auth.currentUser.email}">Bana Ata (${Store.getUserName(auth.currentUser.email)})</option>`;
             }
-            Store.users.forEach(u => {
+            // Pasif (artık sitede olmayan) kullanıcılar atama listesinde çıkmaz;
+            // geçmiş kayıtlardaki adları Store.getUserName ile çözülmeye devam eder.
+            Store.getActiveUsers().forEach(u => {
                 if (u.email !== auth.currentUser?.email) {
                     html += `<option value="${u.email}">${escapeHtml(u.displayName || u.email)}</option>`;
                 }
@@ -2061,7 +2113,17 @@ export function initJobsEventHandlers() {
                 steps[`step${sNum}`] = getInitialStepData(stepConf.type, false);
             });
 
-            const currentStep = 1;
+            let currentStep = 1;
+
+            // Özet isteme tarihi girildiyse o aşama baştan dolu gelir (aşama
+            // formunun kaydettiği şekliyle) ve matris listesinde doğru sıraya oturur.
+            const ozetPos = stepsConf.findIndex(s => s.type === 'OZET_OZET_ISTEME') + 1;
+            const ozetDate = document.getElementById('jobOzetIstemeDate')?.value || '';
+            if (ozetPos && ozetDate) {
+                steps[`step${ozetPos}`] = { completed: true, date: ozetDate };
+                if (currentStep === ozetPos) currentStep = ozetPos + 1;
+            }
+
             const currentUserEmail = auth.currentUser?.email || 'Herkes';
 
             const newTadil = {
@@ -2504,8 +2566,15 @@ function renderTeiasObjectionHtml(sData, stepNum) {
                 <label style="font-weight: bold; color: var(--accent-light); font-size: 11px; display: block; margin-bottom: 6px;">🔗 Bağlantı Görüşü Kabul Taahhüt / İtiraz Durumu</label>
                 <select id="teiasBaglantiDurumu-${stepNum}" class="modern-select" onchange="toggleTeiasObjectionFields(${stepNum}); updateTeiasSaveButtonText(${stepNum});" style="font-size: 11px; padding: 4px 8px; height: auto;">
                     <option value="kabul" ${baglantiDurumu === 'kabul' ? 'selected' : ''}>✅ Kabul Edildi / Bağlantı Noktası Değişmedi</option>
+                    <option value="teblig_bekleniyor" ${baglantiDurumu === 'teblig_bekleniyor' ? 'selected' : ''}>📨 EPDK'ya Döndü - Tebliğ Bekleniyor (taahhüt durumu henüz bilinmiyor)</option>
                     <option value="itiraz" ${baglantiDurumu === 'itiraz' ? 'selected' : ''}>⚠️ İtiraz Edildi</option>
                 </select>
+            </div>
+
+            <div id="teiasTebligFields-${stepNum}" style="display: ${baglantiDurumu === 'teblig_bekleniyor' ? 'block' : 'none'}; margin-top: 10px; padding: 10px; background: rgba(245, 158, 11, 0.07); border-left: 3px solid #f59e0b; border-radius: 6px; font-size: 11px; line-height: 1.5; color: var(--text-secondary);">
+                📨 <strong>Tebliğ bekleniyor.</strong> Yukarıya EPDK'ya dönüş yazısının sayı/tarihini kaydedin; aşama bununla tamamlanır ve süreç ilerler.
+                Yazı size tebliğ edilince bu aşamayı yeniden açıp durumu <em>Kabul Edildi</em> (varsa bağlantı kabul taahhüdünü tanımlayın) ya da <em>İtiraz Edildi</em> olarak güncelleyin.
+                Tebliğ gelene kadar "Yükümlülük Tanımlama" aşamasında bir uyarı görünür; taahhüt durumu bilinmeden o aşama sessizce geçilmez.
             </div>
             
             <div id="teiasKabulFields-${stepNum}" style="display: ${baglantiDurumu === 'kabul' ? 'block' : 'none'}; margin-top: 10px; padding: 10px; background: rgba(16, 185, 129, 0.05); border-left: 3px solid #10b981; border-radius: 6px;">
@@ -2976,7 +3045,21 @@ function renderStepFields(job, stepNum) {
                     obligationsListHtml = `<p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Henüz yükümlülük tanımlanmadı.</p>`;
                 }
 
+                // TEİAŞ görüşü EPDK'ya döndü ama yazı henüz tebliğ edilmedi: bağlantı
+                // kabul taahhüdü olup olmadığı bilinmiyor. "Yükümlülük yok" demeden
+                // önce kullanıcıyı uyar (TEİAŞ aşaması 'Tebliğ Bekleniyor' durumunda).
+                const pendingTebligSteps = stepsConf
+                    .map((s, i) => ({ s, num: i + 1 }))
+                    .filter(({ s, num }) => (s.type === 'TEIAS_GORUS_DONUS' || s.type === 'KURUM_GORUS_TEIAS')
+                        && steps[`step${num}`]?.teiasBaglantiDurumu === 'teblig_bekleniyor');
+                const tebligWarningHtml = pendingTebligSteps.length ? `
+                    <div style="background:rgba(245,158,11,0.10); border-left:3px solid #f59e0b; padding:10px 12px; border-radius:6px; margin-bottom:12px; font-size:12px; line-height:1.5; color:#fbbf24;">
+                        📨 <strong>TEİAŞ yazısının tebliği bekleniyor.</strong> Bağlantı kabul taahhüdü tanımlanıp tanımlanmadığı henüz bilinmiyor;
+                        tebliğ gelince ${pendingTebligSteps.map(p => `${p.num}. aşamayı`).join(', ')} güncelleyin, ardından yükümlülükleri tanımlayın.
+                    </div>` : '';
+
                 return `
+                    ${tebligWarningHtml}
                     ${obligationsListHtml}
                     <div style="display:flex; gap:10px; margin-bottom:10px;">
                         <button type="button" class="btn btn-secondary btn-sm" onclick="openAddObligationForTadil('${job.id}', '${escapeHtml(job.project)}')" style="font-size:12px; font-weight:600; background:rgba(99,102,241,0.15); border-color:rgba(99,102,241,0.3); color:#818cf8; flex-grow:1; display:flex; align-items:center; justify-content:center; gap:4px; padding: 6px 12px;">
@@ -3448,6 +3531,8 @@ window.toggleTeiasObjectionFields = function(stepNum) {
     if (selectEl) {
         if (fieldsEl) fieldsEl.style.display = selectEl.value === 'itiraz' ? 'block' : 'none';
         if (kabulEl) kabulEl.style.display = selectEl.value === 'kabul' ? 'block' : 'none';
+        const tebligEl = document.getElementById(`teiasTebligFields-${stepNum}`);
+        if (tebligEl) tebligEl.style.display = selectEl.value === 'teblig_bekleniyor' ? 'block' : 'none';
     }
 };
 
@@ -3625,7 +3710,7 @@ function saveStepData(jobId, stepNum) {
                         }
                         showToast('Bağlantı Kabul Taahhüt Yükümlülüğü oluşturuldu.', 'success');
                     }
-                } else if (teiasKabulObgId) {
+                } else if (teiasKabulObgId && teiasBaglantiDurumu !== 'teblig_bekleniyor') {
                     Store.obligations = Store.obligations.filter(o => o.id !== teiasKabulObgId);
                     const tanimlamaIdx = stepsConf.findIndex(s => s.type === 'YUKUMLULUK_TANIMLAMA');
                     if (tanimlamaIdx !== -1) {
@@ -3669,7 +3754,7 @@ function saveStepData(jobId, stepNum) {
                     if (currentStep > stepNum) currentStep = stepNum;
                     showToast('TEİAŞ itiraz cevabı arşivlendi ve süreç yeni kurum görüşü girişi için başa döndürüldü.', 'info');
                 } else {
-                    const teiasCompleted = (teiasBaglantiDurumu === 'kabul') && teias;
+                    const teiasCompleted = (teiasBaglantiDurumu === 'kabul' || teiasBaglantiDurumu === 'teblig_bekleniyor') && teias;
                     const isCompletedVal = teiasCompleted && eigm;
 
                     steps[`step${stepNum}`] = {
@@ -3893,7 +3978,7 @@ function saveStepData(jobId, stepNum) {
                         }
                         showToast('Bağlantı Kabul Taahhüt Yükümlülüğü oluşturuldu.', 'success');
                     }
-                } else if (teiasKabulObgId) {
+                } else if (teiasKabulObgId && teiasBaglantiDurumu !== 'teblig_bekleniyor') {
                     Store.obligations = Store.obligations.filter(o => o.id !== teiasKabulObgId);
                     const tanimlamaIdx = stepsConf.findIndex(s => s.type === 'YUKUMLULUK_TANIMLAMA');
                     if (tanimlamaIdx !== -1) {
@@ -3942,7 +4027,7 @@ function saveStepData(jobId, stepNum) {
 
                     showToast('TEİAŞ itiraz cevabı arşivlendi ve TEİAŞ süreci yeni görüş girişi için başa döndürüldü.', 'info');
                 } else {
-                    const teiasCompleted = (teiasBaglantiDurumu === 'kabul') && teias;
+                    const teiasCompleted = (teiasBaglantiDurumu === 'kabul' || teiasBaglantiDurumu === 'teblig_bekleniyor') && teias;
 
                     steps[`step${stepNum}`] = {
                         completed: teiasCompleted,
@@ -4033,7 +4118,7 @@ function saveStepData(jobId, stepNum) {
                         }
                         showToast('Bağlantı Kabul Taahhüt Yükümlülüğü oluşturuldu.', 'success');
                     }
-                } else if (teiasKabulObgId) {
+                } else if (teiasKabulObgId && teiasBaglantiDurumu !== 'teblig_bekleniyor') {
                     Store.obligations = Store.obligations.filter(o => o.id !== teiasKabulObgId);
                     const tanimlamaIdx = stepsConf.findIndex(s => s.type === 'YUKUMLULUK_TANIMLAMA');
                     if (tanimlamaIdx !== -1) {
@@ -4075,7 +4160,7 @@ function saveStepData(jobId, stepNum) {
                     if (currentStep > stepNum) currentStep = stepNum;
                     showToast('TEİAŞ itiraz cevabı arşivlendi ve süreç yeni kurum görüşü girişi için başa döndürüldü.', 'info');
                 } else {
-                    const teiasCompleted = (teiasBaglantiDurumu === 'kabul') && teias;
+                    const teiasCompleted = (teiasBaglantiDurumu === 'kabul' || teiasBaglantiDurumu === 'teblig_bekleniyor') && teias;
 
                     steps[`step${stepNum}`] = {
                         completed: teiasCompleted,
@@ -4956,6 +5041,11 @@ function plannedStep(existing, dateStr, extraWhenDone = {}) {
     };
 }
 
+/** Bir kaydın iş akışında verilen tipin 1-tabanlı konumu (yoksa 0). */
+function stepPosByType(job, type) {
+    return getWorkflowSteps(job).findIndex(s => s.type === type) + 1;
+}
+
 export function seedPrelicenceExcelData() {
     if (!Store.jobs || !Store.projects) return;
 
@@ -4988,6 +5078,33 @@ export function seedPrelicenceExcelData() {
 
         const fullTitle = seed.title.startsWith('ÖNLİSANS') ? 'Önlisans Süre Uzatımı' : (seed.title.startsWith('T') || seed.title.includes('TESİS') ? 'Tesis Tamamlama Süre Uzatımı' : seed.title);
 
+        // Excel planı, aşama POZİSYONUNA değil aşama TİPİNE yazılır: "GD Kontrol"
+        // kaldırıldıktan sonra pozisyonlar kaydığı için sabit step4/5/6 yazmak
+        // başka bir aşamanın verisini ezerdi. Tipi iş akışında olmayan alan atlanır.
+        //   gdDate   -> GD_KONTROL (yalnızca henüz kaldırılmamış iş akışlarında)
+        //   epdkDate -> ZK_KONTROL + EPDK_BASVURU_YAPILMASI (eski seed'in davranışı)
+        // existingOnly: kayıtta zaten girilmiş bir tarih varsa ASLA ezme.
+        const applySeed = (target, existingOnly) => {
+            let changed = false;
+            const put = (type, dateStr, base, doneExtra, guardField = 'date') => {
+                if (!dateStr) return;
+                const pos = stepPosByType(target, type);
+                if (!pos) return;
+                const key = `step${pos}`;
+                const cur = target.steps[key];
+                if (existingOnly && cur && cur[guardField]) return;
+                target.steps[key] = plannedStep({ ...(cur || {}), ...base }, dateStr, doneExtra);
+                changed = true;
+            };
+            put('OZET_OZET_ISTEME', seed.s1Date, { date: seed.s1Date }, {});
+            put('OZET_BIRIM_DONUSU', seed.s2Date, { izinlerDate: seed.s2Date, teknikDate: seed.s2Date }, { izinlerDondu: true, teknikDondu: true }, 'izinlerDate');
+            put('AO_HAZIRLIK', seed.aoDate, { date: seed.aoDate }, { aoDone: true });
+            put('GD_KONTROL', seed.gdDate, { date: seed.gdDate }, { gdDone: true });
+            put('ZK_KONTROL', seed.epdkDate, { date: seed.epdkDate }, { zkDone: true });
+            put('EPDK_BASVURU_YAPILMASI', seed.epdkDate, { date: seed.epdkDate }, { basvuruYapildi: true });
+            return changed;
+        };
+
         if (!job) {
             job = {
                 id: generateId(),
@@ -5003,48 +5120,19 @@ export function seedPrelicenceExcelData() {
                 updatedAt: new Date()
             };
 
-            for (let k = 1; k <= 13; k++) {
-                job.steps[`step${k}`] = { completed: false };
-            }
+            getWorkflowSteps(job).forEach((stepConf, idx) => {
+                job.steps[`step${idx + 1}`] = getInitialStepData(stepConf.type, false);
+            });
 
-            if (seed.s1Date) job.steps.step1 = plannedStep({ date: seed.s1Date }, seed.s1Date);
-            if (seed.s2Date) job.steps.step2 = plannedStep({ izinlerDate: seed.s2Date, teknikDate: seed.s2Date }, seed.s2Date, { izinlerDondu: true, teknikDondu: true });
-            if (seed.aoDate) job.steps.step3 = plannedStep({ date: seed.aoDate }, seed.aoDate, { aoDone: true });
-            if (seed.gdDate) job.steps.step4 = plannedStep({ date: seed.gdDate }, seed.gdDate, { gdDone: true });
-            if (seed.epdkDate) {
-                job.steps.step5 = plannedStep({ date: seed.epdkDate }, seed.epdkDate, { hazir: true });
-                job.steps.step6 = plannedStep({ date: seed.epdkDate }, seed.epdkDate, { basvuruYapildi: true });
-            }
-
+            applySeed(job, false);
             job.currentStep = deriveCurrentStep(job);
 
             Store.jobs.push(job);
             hasChanges = true;
         } else {
             if (!job.steps) job.steps = {};
-            let updated = false;
+            let updated = applySeed(job, true);
 
-            if (seed.s1Date && !job.steps.step1?.date) {
-                job.steps.step1 = plannedStep({ ...job.steps.step1, date: seed.s1Date }, seed.s1Date);
-                updated = true;
-            }
-            if (seed.s2Date && !job.steps.step2?.izinlerDate) {
-                job.steps.step2 = plannedStep({ ...job.steps.step2, izinlerDate: seed.s2Date, teknikDate: seed.s2Date }, seed.s2Date, { izinlerDondu: true, teknikDondu: true });
-                updated = true;
-            }
-            if (seed.aoDate && !job.steps.step3?.date) {
-                job.steps.step3 = plannedStep({ ...job.steps.step3, date: seed.aoDate }, seed.aoDate, { aoDone: true });
-                updated = true;
-            }
-            if (seed.gdDate && !job.steps.step4?.date) {
-                job.steps.step4 = plannedStep({ ...job.steps.step4, date: seed.gdDate }, seed.gdDate, { gdDone: true });
-                updated = true;
-            }
-            if (seed.epdkDate && !job.steps.step6?.date) {
-                job.steps.step5 = plannedStep({ ...job.steps.step5, date: seed.epdkDate }, seed.epdkDate, { hazir: true });
-                job.steps.step6 = plannedStep({ ...job.steps.step6, date: seed.epdkDate }, seed.epdkDate, { basvuruYapildi: true });
-                updated = true;
-            }
             if (seed.isYellow && !job.isYellow) {
                 job.isYellow = true;
                 updated = true;
@@ -5094,6 +5182,7 @@ function uncompleteFutureSteps(job) {
             step.completed = false;
             if (step.aoDone) step.aoDone = false;
             if (step.gdDone) step.gdDone = false;
+            if (step.zkDone) step.zkDone = false;
             if (step.hazir) step.hazir = false;
             if (step.basvuruYapildi) step.basvuruYapildi = false;
             if (step.izinlerDondu) step.izinlerDondu = false;
@@ -5160,17 +5249,85 @@ export function formatDateForInput(dVal) {
     }
 }
 
-/** Shared column/stage definition for the prelicence matrix (table + cards). */
-const MATRIX_STEPS = [
-    { num: 1, key: 'step1', field: 'date', label: '1. Özet İsteme' },
-    { num: 2, key: 'step2', field: 'izinlerDate', label: '2. Birim Dönüş' },
-    { num: 3, key: 'step3', field: 'date', label: '3. AO Hazırlık' },
-    { num: 4, key: 'step4', field: 'date', label: '4. GD Kontrol' },
-    { num: 5, key: 'step5', field: 'date', label: '5. EPDK Hazırlık' },
-    { num: 6, key: 'step6', field: 'date', label: '6. EPDK Başvuru' },
-    { num: 8, key: 'step8', field: 'kdbTarih', label: '7-8. KDB Görüşü' },
-    { num: 11, key: 'step11', field: 'date', label: '9-11. Derç Edilme' }
+/**
+ * Önlisans süre uzatımı matrisinin kolonları. Kolon, aşama POZİSYONUNA değil
+ * aşama TİPİNE bağlıdır: GD Kontrolü kaldırıldığında ya da bir iş akışı
+ * (ör. Tesis Tamamlama'da KDB yok) farklı dizildiğinde matris yanlış aşamanın
+ * tarihini göstermesin diye her kayıt için konum iş akışından çözülür.
+ *
+ *  - types: sırayla denenir; kayıtta bulunan ilk tip kolonun kaynağıdır
+ *  - legacyOnly: yalnızca iş akışında hâlâ varsa görünür (GD Kontrolü)
+ */
+const MATRIX_COLUMN_DEFS = [
+    { id: 'ozet', types: ['OZET_OZET_ISTEME'], field: 'date', name: 'ÖZET İSTEME', color: '#10b981' },
+    { id: 'birim', types: ['OZET_BIRIM_DONUSU'], field: 'izinlerDate', name: 'BİRİM DÖNÜŞ', color: '#60a5fa' },
+    { id: 'ao', types: ['AO_HAZIRLIK'], field: 'date', name: 'AO HAZIRLIK', color: '#818cf8' },
+    { id: 'gd', types: ['GD_KONTROL'], field: 'date', name: 'GD KONTROL (ESKİ)', color: '#f472b6', legacyOnly: true },
+    { id: 'zk', types: ['ZK_KONTROL', 'EPDK_BASVURU_HAZIRLIK'], field: 'date', name: 'ZK KONTROL', color: '#fbbf24' },
+    { id: 'epdk', types: ['EPDK_BASVURU_YAPILMASI'], field: 'date', name: 'EPDK BAŞVURU', color: '#f59e0b' },
+    { id: 'kdb', types: ['KDB_GORUS_DONUS'], field: 'kdbTarih', name: 'KDB GÖRÜŞÜ', color: '#a78bfa' },
+    { id: 'derc', types: ['DERC_EDILME'], field: 'date', name: 'DERÇ EDİLME', color: '#34d399' }
 ];
+
+/** Görünecek kolonlar, ekrandaki sırayla numaralanmış ("4. ZK KONTROL"). */
+function getMatrixColumns(jobs) {
+    const legacyPresent = (type) => jobs.some(j => getWorkflowSteps(j).some(s => s.type === type));
+    return MATRIX_COLUMN_DEFS
+        .filter(col => !col.legacyOnly || col.types.some(legacyPresent))
+        .map((col, i) => ({ ...col, label: `${i + 1}. ${col.name}`, shortLabel: `${i + 1}. ${col.name.replace(' (ESKİ)', '')}` }));
+}
+
+/** Bu kayıtta kolonun karşılığı olan aşama: { pos, key, type } ya da null (kolon bu iş akışında yok). */
+function resolveMatrixCell(job, col) {
+    const conf = getWorkflowSteps(job);
+    for (const type of col.types) {
+        const idx = conf.findIndex(s => s.type === type);
+        if (idx !== -1) return { pos: idx + 1, key: `step${idx + 1}`, type };
+    }
+    return null;
+}
+
+/** Hücrede gösterilecek tarih (aşamanın kendi alanı, sonra yedekleri). */
+function getMatrixCellDate(job, col, cell) {
+    const step = (job.steps && job.steps[cell.key]) || {};
+    let value = step[col.field] || step.date || step.plannedDate || '';
+    if (!value && col.id === 'kdb') {
+        const cikisPos = stepPosByType(job, 'KDB_GORUS_CIKIS');
+        const cikis = cikisPos ? job.steps?.[`step${cikisPos}`] : null;
+        value = (cikis && (cikis.kdbCikisTarih || cikis.date)) || '';
+    }
+    return value;
+}
+
+/** Özet isteme tarihi (ms) - matris sıralamasının anahtarı. Girilmemişse null. */
+function getOzetIstemeTime(job) {
+    const pos = stepPosByType(job, 'OZET_OZET_ISTEME');
+    if (!pos) return null;
+    const step = job.steps?.[`step${pos}`] || {};
+    const raw = step.date || step.plannedDate;
+    if (!raw) return null;
+    const t = new Date(raw).getTime();
+    return isNaN(t) ? null : t;
+}
+
+/**
+ * Matris sırası: özet isteme tarihi eskiden yeniye. Tarihi henüz girilmemiş
+ * satırlar (yeni açılan ya da planı olmayan) en alta, kendi aralarında Excel
+ * sıra numarasına ve açılış zamanına göre. Sıralama her çizimde yeniden
+ * hesaplanır; yeni bir tadil eklenip özet isteme tarihi girildiği anda
+ * kendiliğinden doğru yerine oturur.
+ */
+function compareMatrixJobs(a, b) {
+    const ta = getOzetIstemeTime(a);
+    const tb = getOzetIstemeTime(b);
+    if (ta !== null && tb !== null && ta !== tb) return ta - tb;
+    if (ta !== null && tb === null) return -1;
+    if (ta === null && tb !== null) return 1;
+    if (a.matrixRow && b.matrixRow && a.matrixRow !== b.matrixRow) return a.matrixRow - b.matrixRow;
+    if (a.matrixRow && !b.matrixRow) return -1;
+    if (!a.matrixRow && b.matrixRow) return 1;
+    return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+}
 
 /** <option> list for the matrix's inline project picker, current job's project first-selected. */
 function buildMatrixProjectOptions(allProjectNames, currentProject) {
@@ -5195,24 +5352,25 @@ function isNarrowViewport() {
  * updateMatrixCellDate / toggleMatrixStepCompletion actions as the desktop
  * table, stacked vertically with tappable targets. Styled by mobile.css.
  */
-function renderMatrixCard(job, idx, projectsByName, allProjectNames) {
+function renderMatrixCard(job, idx, projectsByName, allProjectNames, columns) {
     const pObj = projectsByName.get(job.project);
-    const steps = job.steps || {};
     const isYellow = job.isYellow || [14, 17, 29, 30].includes(job.matrixRow);
-    const rowNum = job.matrixRow || (idx + 1);
+    const rowNum = idx + 1;
     const projectOptionsHtml = buildMatrixProjectOptions(allProjectNames, job.project);
 
     const expiryVal = formatDateForInput(pObj ? (pObj.licenceExpiry || pObj.constructionDeadline) : '');
+    const totalSteps = getWorkflowSteps(job).length;
 
     const stageBadge = job.status === 'completed'
         ? '<span class="badge badge-success" style="font-size:11px;">🟢 Tamamlandı</span>'
-        : `<span class="badge badge-info" style="font-size:11px;">⚡ Aşama ${job.currentStep}/13</span>`;
+        : `<span class="badge badge-info" style="font-size:11px;">⚡ Aşama ${job.currentStep}/${totalSteps}</span>`;
 
-    const stepsHtml = MATRIX_STEPS.map(sd => {
-        const step = steps[sd.key] || {};
+    const stepsHtml = columns.map(col => {
+        const cell = resolveMatrixCell(job, col);
+        if (!cell) return '';
+        const step = (job.steps && job.steps[cell.key]) || {};
         const isCompleted = !!step.completed;
-        const rawDate = step[sd.field] || step.date || step.plannedDate || '';
-        const dateVal = formatDateForInput(rawDate);
+        const dateVal = formatDateForInput(getMatrixCellDate(job, col, cell));
         const isPlanned = !isCompleted && !!dateVal && !isDateReached(dateVal);
 
         const cls = isCompleted ? 'is-done' : (isPlanned ? 'is-planned' : '');
@@ -5220,11 +5378,11 @@ function renderMatrixCard(job, idx, projectsByName, allProjectNames) {
 
         return `
             <div class="ext-matrix-step ${cls}">
-                <span class="ext-matrix-step__label">${sd.label}</span>
+                <span class="ext-matrix-step__label">${col.shortLabel}</span>
                 <input type="date" class="ext-matrix-step__date" value="${dateVal}"
-                       onchange="window.updateMatrixCellDate('${job.id}', '${sd.key}', '${sd.field}', this.value)">
+                       onchange="window.updateMatrixCellDate('${job.id}', '${cell.key}', '${col.field}', this.value)">
                 <button type="button" class="ext-matrix-step__toggle"
-                        onclick="window.toggleMatrixStepCompletion('${job.id}', ${sd.num})"
+                        onclick="window.toggleMatrixStepCompletion('${job.id}', ${cell.pos})"
                         title="Aşamayı tamamlandı olarak işaretle veya geri al">${btnLabel}</button>
             </div>
         `;
@@ -5297,19 +5455,24 @@ export function renderPrelicenceExtensionsMatrix() {
     jobs.forEach(j => ensureTadilSteps(j));
 
     // Update Stats
+    const countAtStage = (type) => jobs.filter(j => {
+        if (j.status === 'completed') return false;
+        const pos = stepPosByType(j, type);
+        return pos && j.currentStep === pos && !j.steps?.[`step${pos}`]?.completed;
+    }).length;
     const totalCount = jobs.length;
-    const aoCount = jobs.filter(j => j.status !== 'completed' && j.currentStep === 3 && (!j.steps?.step3?.completed && !j.steps?.step3?.aoDone)).length;
-    const gdCount = jobs.filter(j => j.status !== 'completed' && j.currentStep === 4 && (!j.steps?.step4?.completed && !j.steps?.step4?.gdDone)).length;
+    const aoCount = countAtStage('AO_HAZIRLIK');
+    const zkCount = countAtStage('ZK_KONTROL');
     const completedCount = jobs.filter(j => j.status === 'completed').length;
 
     const elTotal = document.getElementById('extStatTotal');
     const elAo = document.getElementById('extStatAoCount');
-    const elGd = document.getElementById('extStatGdCount');
+    const elZk = document.getElementById('extStatZkCount');
     const elComp = document.getElementById('extStatCompleted');
 
     if (elTotal) elTotal.textContent = totalCount;
     if (elAo) elAo.textContent = aoCount;
-    if (elGd) elGd.textContent = gdCount;
+    if (elZk) elZk.textContent = zkCount;
     if (elComp) elComp.textContent = completedCount;
 
     // Apply Filters
@@ -5332,13 +5495,8 @@ export function renderPrelicenceExtensionsMatrix() {
         });
     }
 
-    // Sort by Matrix Row number if available
-    jobs.sort((a, b) => {
-        if (a.matrixRow && b.matrixRow) return a.matrixRow - b.matrixRow;
-        if (a.matrixRow) return -1;
-        if (b.matrixRow) return 1;
-        return new Date(getJobActualLastUpdateDate(a) || 0) - new Date(getJobActualLastUpdateDate(b) || 0);
-    });
+    // Özet isteme tarihine göre (eskiden yeniye); tarihsizler en altta.
+    jobs.sort(compareMatrixJobs);
 
     if (jobs.length === 0) {
         container.innerHTML = `
@@ -5349,6 +5507,8 @@ export function renderPrelicenceExtensionsMatrix() {
         `;
         return;
     }
+
+    const columns = getMatrixColumns(jobs);
 
     // Helper for rendering inline step cell with completion toggle
     const renderInlineStepCell = (job, stepNum, stepKey, dateField, currentDateVal) => {
@@ -5379,14 +5539,14 @@ export function renderPrelicenceExtensionsMatrix() {
 
         return `
             <div style="${containerStyle}">
-                <input type="date" 
-                       value="${dateVal}" 
+                <input type="date"
+                       value="${dateVal}"
                        onchange="window.updateMatrixCellDate('${job.id}', '${stepKey}', '${dateField}', this.value)"
                        style="background: transparent; border: none; ${textStyle} width: 100%; box-sizing: border-box; cursor: pointer; text-align: center;">
                 <div style="text-align: center;">
-                    <button type="button" 
-                            onclick="window.toggleMatrixStepCompletion('${job.id}', ${stepNum})" 
-                            style="${btnStyle}" 
+                    <button type="button"
+                            onclick="window.toggleMatrixStepCompletion('${job.id}', ${stepNum})"
+                            style="${btnStyle}"
                             title="Aşamayı tamamlandı olarak işaretle veya geri al">
                         ${btnLabel}
                     </button>
@@ -5401,7 +5561,7 @@ export function renderPrelicenceExtensionsMatrix() {
     if (isNarrowViewport()) {
         container.innerHTML = `
             <div class="ext-matrix-cards">
-                ${jobs.map((j, idx) => renderMatrixCard(j, idx, projectsByName, allProjectNames)).join('')}
+                ${jobs.map((j, idx) => renderMatrixCard(j, idx, projectsByName, allProjectNames, columns)).join('')}
             </div>
         `;
         return;
@@ -5410,74 +5570,51 @@ export function renderPrelicenceExtensionsMatrix() {
     // Render Matrix HTML Table
     const tableRows = jobs.map((j, idx) => {
         const pObj = projectsByName.get(j.project);
-        const steps = j.steps || {};
         const isYellowRow = j.isYellow || [14, 17, 29, 30].includes(j.matrixRow);
 
-        const rowBg = isYellowRow 
-            ? 'background: rgba(234, 179, 8, 0.18); border-left: 4px solid #eab308;' 
+        const rowBg = isYellowRow
+            ? 'background: rgba(234, 179, 8, 0.18); border-left: 4px solid #eab308;'
             : 'border-bottom: 1px solid rgba(255,255,255,0.05);';
 
-        const rowNum = j.matrixRow || (idx + 1);
+        // Sıra, ekrandaki sıradır (özet isteme tarihine göre); Excel'deki sabit
+        // satır numarası değil - aksi halde numaralar karışık görünürdü.
+        const rowNum = idx + 1;
         const projectSelectHtml = `<select class="ext-matrix-project-select" style="color: ${isYellowRow ? '#fef08a' : 'var(--accent-light)'}; font-size: 11px;" onchange="window.updateMatrixJobProject('${j.id}', this.value)">${buildMatrixProjectOptions(allProjectNames, j.project)}</select>`;
 
-        // Step Cells mapping to Workflow
-        const s1 = steps.step1 || {};
-        const s1Cell = renderInlineStepCell(j, 1, 'step1', 'date', s1.date);
-
-        const s2 = steps.step2 || {};
-        const s2Cell = renderInlineStepCell(j, 2, 'step2', 'izinlerDate', s2.izinlerDate || s2.date);
-
-        const s3 = steps.step3 || {};
-        const s3Cell = renderInlineStepCell(j, 3, 'step3', 'date', s3.date);
-
-        const s4 = steps.step4 || {};
-        const s4Cell = renderInlineStepCell(j, 4, 'step4', 'date', s4.date);
-
-        const s5 = steps.step5 || {};
-        const s5Cell = renderInlineStepCell(j, 5, 'step5', 'date', s5.date);
-
-        const s6 = steps.step6 || {};
-        const s6Cell = renderInlineStepCell(j, 6, 'step6', 'date', s6.date);
-
-        const s8 = steps.step8 || {};
-        const s7 = steps.step7 || {};
-        const kdbCell = renderInlineStepCell(j, 8, 'step8', 'kdbTarih', s8.kdbTarih || s8.date || s7.kdbCikisTarih);
-
-        const s11 = steps.step11 || {};
-        const s10 = steps.step10 || {};
-        const s9 = steps.step9 || {};
-        const dercCell = renderInlineStepCell(j, 11, 'step11', 'date', s11.date || s10.date || s9.date);
+        // Step cells: each column resolves to this job's own step of that TYPE.
+        const cellsHtml = columns.map(col => {
+            const cell = resolveMatrixCell(j, col);
+            if (!cell) {
+                return `<td style="padding: 4px 4px;"><div style="text-align:center; color: var(--text-muted); opacity: 0.45; font-size: 11px;" title="Bu iş akışında bu aşama yok">—</div></td>`;
+            }
+            const dateVal = getMatrixCellDate(j, col, cell);
+            return `<td style="padding: 4px 4px;">${renderInlineStepCell(j, cell.pos, cell.key, col.field, dateVal)}</td>`;
+        }).join('');
 
         // Expiry Date (Süre Bitiş Tarihi)
         const expiryDateVal = formatDateForInput(pObj ? (pObj.licenceExpiry || pObj.constructionDeadline) : '');
 
         const expiryInput = `
             <div style="background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; padding: 3px 4px; text-align: center;">
-                <input type="date" 
-                       value="${expiryDateVal}" 
+                <input type="date"
+                       value="${expiryDateVal}"
                        onchange="window.updateMatrixProjectExpiry('${escapeHtml(j.project)}', this.value)"
                        style="background: transparent; border: none; color: #f87171; font-size: 11px; padding: 0; width: 100%; box-sizing: border-box; cursor: pointer; text-align: center; font-weight: 700;">
             </div>
         `;
 
         // Current Stage Badge
+        const totalSteps = getWorkflowSteps(j).length;
         const stageBadge = j.status === 'completed'
             ? '<span class="badge badge-success" style="font-size:10px; padding:2px 4px;">🟢 Tamamlandı</span>'
-            : `<span class="badge badge-info" style="font-size:10px; padding:2px 4px;">⚡ Aşama ${j.currentStep}/13</span>`;
+            : `<span class="badge badge-info" style="font-size:10px; padding:2px 4px;">⚡ Aşama ${j.currentStep}/${totalSteps}</span>`;
 
         return `
             <tr style="${rowBg} transition: background 0.2s;" onmouseover="if(!${isYellowRow}) this.style.background='rgba(255,255,255,0.03)'" onmouseout="if(!${isYellowRow}) this.style.background='transparent'">
                 <td style="padding: 4px 6px; font-weight: bold; color: ${isYellowRow ? '#fef08a' : 'var(--text-muted)'}; font-size: 11px; text-align: center;">${rowNum}</td>
                 <td style="padding: 4px 6px; font-weight: 700; font-size: 11px;">${projectSelectHtml}</td>
                 <td style="padding: 4px 6px; font-size: 10px; color: ${isYellowRow ? '#fef08a' : 'var(--text-secondary)'}; font-weight: 600;">${escapeHtml(j.subTitle || j.title)}</td>
-                <td style="padding: 4px 4px;">${s1Cell}</td>
-                <td style="padding: 4px 4px;">${s2Cell}</td>
-                <td style="padding: 4px 4px;">${s3Cell}</td>
-                <td style="padding: 4px 4px;">${s4Cell}</td>
-                <td style="padding: 4px 4px;">${s5Cell}</td>
-                <td style="padding: 4px 4px;">${s6Cell}</td>
-                <td style="padding: 4px 4px;">${kdbCell}</td>
-                <td style="padding: 4px 4px;">${dercCell}</td>
+                ${cellsHtml}
                 <td style="padding: 4px 4px;">${expiryInput}</td>
                 <td style="padding: 4px 4px; text-align: center;">${stageBadge}</td>
                 <td style="padding: 4px 4px; text-align: center;">
@@ -5497,14 +5634,7 @@ export function renderPrelicenceExtensionsMatrix() {
         { label: 'SIRA', width: 35, align: 'center' },
         { label: 'PROJE ADI', width: 125 },
         { label: 'KONU / AÇIKLAMA', width: 145 },
-        { label: '1. ÖZET İSTEME', width: 110, align: 'center', color: '#10b981' },
-        { label: '2. BİRİM DÖNÜŞ', width: 110, align: 'center', color: '#60a5fa' },
-        { label: '3. AO HAZIRLIK', width: 110, align: 'center', color: '#818cf8' },
-        { label: '4. GD KONTROL', width: 110, align: 'center', color: '#f472b6' },
-        { label: '5. EPDK HAZIRLIK', width: 110, align: 'center', color: '#fbbf24' },
-        { label: '6. EPDK BAŞVURU', width: 110, align: 'center', color: '#f59e0b' },
-        { label: '7-8. KDB GÖRÜŞÜ', width: 110, align: 'center', color: '#a78bfa' },
-        { label: '9-11. DERÇ EDİLME', width: 110, align: 'center', color: '#34d399' },
+        ...columns.map(col => ({ label: col.label, width: 110, align: 'center', color: col.color })),
         { label: 'SÜRE BİTİŞ', width: 110, align: 'center', color: '#f87171' },
         { label: 'DURUM', width: 95, align: 'center' },
         { label: 'İŞLEM', width: 80, align: 'center' }
@@ -5532,7 +5662,7 @@ export function renderPrelicenceExtensionsMatrix() {
     initMatrixColumnResize(container);
 }
 
-const MATRIX_COL_WIDTHS_KEY = 'extMatrixColWidths';
+const MATRIX_COL_WIDTHS_KEY = 'extMatrixColWidths_v2';
 
 function loadMatrixColWidths() {
     try {
@@ -5637,6 +5767,17 @@ export function initPrelicenceMatrixEvents() {
     }
 }
 
+/** Matristen "tamamlandı" işaretlenince aşama formunun beklediği bayrak (tipe göre). */
+const MATRIX_DONE_FLAG_BY_TYPE = {
+    AO_HAZIRLIK: 'aoDone',
+    GD_KONTROL: 'gdDone',
+    ZK_KONTROL: 'zkDone',
+    EPDK_BASVURU_HAZIRLIK: 'hazir',
+    EPDK_BASVURU_YAPILMASI: 'basvuruYapildi',
+    KDB_GORUS_DONUS: 'geldi',
+    DERC_EDILME: 'dercEdildi'
+};
+
 window.toggleMatrixStepCompletion = function(jobId, stepNum) {
     const job = Store.jobs.find(j => j.id == jobId);
     if (!job) return;
@@ -5652,11 +5793,12 @@ window.toggleMatrixStepCompletion = function(jobId, stepNum) {
     const stepsConf = getWorkflowSteps(job);
     const totalSteps = stepsConf.length;
 
+    // Aşama bayrağı ve tarih alanı POZİSYONA değil TİPE göre belirlenir.
+    const stepType = stepsConf[stepNum - 1]?.type;
+    const doneFlag = MATRIX_DONE_FLAG_BY_TYPE[stepType];
+
     if (newCompleted) {
-        if (stepNum === 3) job.steps[stepKey].aoDone = true;
-        if (stepNum === 4) job.steps[stepKey].gdDone = true;
-        if (stepNum === 5) job.steps[stepKey].hazir = true;
-        if (stepNum === 6) job.steps[stepKey].basvuruYapildi = true;
+        if (doneFlag) job.steps[stepKey][doneFlag] = true;
 
         // Marking a step done by hand means it happened - stamp today unless the
         // cell already carries a real (already-arrived) date, so the step is not
@@ -5664,11 +5806,14 @@ window.toggleMatrixStepCompletion = function(jobId, stepNum) {
         const existingDate = job.steps[stepKey].date || job.steps[stepKey].izinlerDate || job.steps[stepKey].kdbTarih;
         if (!existingDate || !isDateReached(existingDate)) {
             const todayStr = new Date().toISOString().split('T')[0];
-            if (stepKey === 'step2') {
+            if (stepType === 'OZET_BIRIM_DONUSU') {
                 job.steps[stepKey].izinlerDate = todayStr;
                 job.steps[stepKey].teknikDate = todayStr;
-            } else if (stepKey === 'step8') {
+                job.steps[stepKey].izinlerDondu = true;
+                job.steps[stepKey].teknikDondu = true;
+            } else if (stepType === 'KDB_GORUS_DONUS') {
                 job.steps[stepKey].kdbTarih = todayStr;
+                job.steps[stepKey].date = todayStr;
             } else {
                 job.steps[stepKey].date = todayStr;
             }
@@ -5716,9 +5861,11 @@ window.updateMatrixCellDate = function(jobId, stepKey, field, newDate) {
     const reached = isDateReached(newDate);
     if (newDate) {
         job.steps[stepKey].completed = reached;
-        if (stepKey === 'step3') job.steps[stepKey].aoDone = reached;
-        if (stepKey === 'step4') job.steps[stepKey].gdDone = reached;
-        if (stepKey === 'step6') job.steps[stepKey].basvuruYapildi = reached;
+        const stepNumFromKey = parseInt(String(stepKey).replace('step', ''), 10);
+        const stepType = getWorkflowSteps(job)[stepNumFromKey - 1]?.type;
+        const doneFlag = MATRIX_DONE_FLAG_BY_TYPE[stepType];
+        if (doneFlag) job.steps[stepKey][doneFlag] = reached;
+        if (field === 'kdbTarih') job.steps[stepKey].date = newDate;
         if (field === 'izinlerDate') {
             job.steps[stepKey].teknikDate = newDate;
             job.steps[stepKey].izinlerDondu = reached;

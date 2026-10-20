@@ -211,7 +211,7 @@ function calculateTeaFeeCase(lastMW, newMW) {
 // ---------------------------------------------------------------------------
 //
 // Her mailin KONUSU ve GÖVDESİ, {{degisken}} yer tutucuları içeren bir metindir ve
-// Ayarlar > Mail Taslakları'ndan düzenlenir (daVinciData/master.mailTemplates).
+// Mail Hazırlığı > Taslak Ayarları'ndan düzenlenir (daVinciData/master.mailTemplates).
 // Aşağıdakiler yalnızca VARSAYILAN metinlerdir. compute() tutarı hesaplar ve yer
 // tutucuların değerlerini (vars) üretir; vars değerleri HTML'e hazırdır (kaçışlıdır),
 // tablolar da birer değişkendir (bedel_tablosu, banka_tablosu).
@@ -935,11 +935,12 @@ export function initMailPrep() {
     });
 
     initFeeSettingsModal();
+    initMailTemplateSettings();
     renderMailPrep();
 }
 
 // ---------------------------------------------------------------------------
-// Ayarlar > Mail Taslakları
+// Mail Hazırlığı > Taslak Ayarları
 // ---------------------------------------------------------------------------
 
 let tplBound = false;
@@ -1056,7 +1057,7 @@ function initMailTemplateSettings() {
     };
     ['keyup', 'mouseup', 'focusout'].forEach(ev => editor.addEventListener(ev, remember));
 
-    document.querySelectorAll('#mailTemplatesCard [data-tpl-cmd]').forEach(btn => {
+    document.querySelectorAll('#mailTemplatesModal [data-tpl-cmd]').forEach(btn => {
         btn.addEventListener('mousedown', (e) => e.preventDefault()); // editörün seçimini kaybetme
         btn.addEventListener('click', () => {
             editor.focus();
@@ -1071,18 +1072,13 @@ function initMailTemplateSettings() {
         if (key) insertTplToken(`{{${key}}}`);
     });
 
+    el('mailPrepTemplatesBtn')?.addEventListener('click', () => {
+        sel.value = currentTemplateKey(); // sayfada seçili mail açılır
+        loadTplEditor();
+        el('mailTemplatesModal').classList.add('show');
+    });
+
     el('mailTplSaveBtn').addEventListener('click', saveTpl);
     el('mailTplPreviewBtn').addEventListener('click', previewTpl);
     el('mailTplResetBtn').addEventListener('click', resetTpl);
-}
-
-/** Ayarlar sayfası her çizildiğinde çağrılır; yarım kalmış düzenlemeyi ezmez. */
-export function renderMailTemplateSettings() {
-    if (!el('mailTplSelect')) return;
-    if (!tplBound) {
-        initMailTemplateSettings();
-        loadTplEditor();
-        return;
-    }
-    if (!tplDirty) loadTplEditor(); // başka biri kaydettiyse güncel metni göster
 }

@@ -40,7 +40,7 @@ import { initAnimations } from './js/animations.js';
 import { initPush, syncWidgetSnapshot } from './js/push.js';
 import { initWorkflowManager, renderWorkflowTypesList, renderStepMetaSettings } from './js/workflow_builder.js';
 import { renderTeaApplicationsMatrix, initTeaEventHandlers, getTeaApplicationsForProject, getMonthYearLabel } from './js/tea.js';
-import { initMailPrep, renderMailPrep, renderMailTemplateSettings } from './js/mail_prep.js';
+import { initMailPrep, renderMailPrep } from './js/mail_prep.js';
 import { renderCleanupCard } from './js/cleanup_migration.js';
 
 // ==========================================
@@ -418,7 +418,7 @@ const PAGE_RENDERERS = {
     'tea-applications': () => renderTeaApplicationsMatrix(),
     'mail-prep': () => renderMailPrep(),
     analytics: () => renderAnalyticsPage(),
-    settings: () => { renderWorkflowTypesList(); renderStepMetaSettings(); renderCleanupCard(); renderMailTemplateSettings(); }
+    settings: () => { renderWorkflowTypesList(); renderStepMetaSettings(); renderCleanupCard(); }
 };
 
 const dirtyPages = new Set();

@@ -20,7 +20,7 @@ export const Store = {
     // js/mail_prep.js içindeki varsayılan 2026 değerleri kullanılır. Şekil:
     // { year, minTadilFee, renewableRatio, tiers:[{max, fee}], payment:{bank, account, iban} }
     mailFeeSettings: null,
-    // Mail taslakları (Ayarlar > Mail Taslakları): { [şablonAnahtarı]: { subject, body } }.
+    // Mail taslakları (Mail Hazırlığı > Taslak Ayarları): { [şablonAnahtarı]: { subject, body } }.
     // null / eksik anahtar = js/mail_prep.js içindeki varsayılan metin.
     mailTemplates: null,
     users: [], // List of user profiles { email, displayName, title, uid, active? }

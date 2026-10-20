@@ -545,7 +545,7 @@
                         <div class="mailprep-card">
                             <div class="tea-chart-block-header">
                                 <h4>✉️ Mail Taslağı Hazırla</h4>
-                                <button type="button" id="mailPrepTeaSettingsBtn" class="tea-icon-btn" title="Bedel ve ödeme ayarları (Kurul Kararı fiyatları, TEA birim fiyatları)">⚙️ Bedel Ayarları</button>
+                                <div style="display: flex; gap: 6px; flex-wrap: wrap;"><button type="button" id="mailPrepTeaSettingsBtn" class="tea-icon-btn" title="Bedel ve ödeme ayarları (Kurul Kararı fiyatları, TEA birim fiyatları)">⚙️ Bedel Ayarları</button><button type="button" id="mailPrepTemplatesBtn" class="tea-icon-btn" title="Maillerin konu ve metnini düzenle">📝 Taslak Ayarları</button></div>
                             </div>
 
                             <div class="form-group">
@@ -1047,47 +1047,6 @@
                             </div>
                         </div>
 
-                        <!-- Card: Mail Taslakları (Mail Hazırlığı sayfasındaki maillerin metinleri) -->
-                        <div class="card" id="mailTemplatesCard">
-                            <div class="card-header">
-                                <h2>✉️ Mail Taslakları</h2>
-                            </div>
-                            <div class="card-body">
-                                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 14px;">
-                                    Mail Hazırlığı sayfasındaki her mailin metnini buradan düzenleyip kaydedebilirsiniz.
-                                    Metindeki <code>{{proje}}</code> gibi yer tutucular, mail hazırlanırken gerçek değerle
-                                    (proje adı, tutar, tablolar...) değişir. Değişiklik anında herkes için geçerli olur;
-                                    kod değişikliği ya da yayınlama gerekmez.
-                                </p>
-                                <div class="form-group">
-                                    <label for="mailTplSelect">Mail</label>
-                                    <select id="mailTplSelect" class="glass-input"></select>
-                                    <p class="mailprep-hint" id="mailTplState"></p>
-                                </div>
-                                <div class="form-group">
-                                    <label for="mailTplSubject">Konu</label>
-                                    <input type="text" id="mailTplSubject" class="form-input">
-                                </div>
-                                <div class="mailtpl-toolbar">
-                                    <button type="button" class="btn btn-secondary btn-sm" data-tpl-cmd="bold" title="Kalın"><b>B</b></button>
-                                    <button type="button" class="btn btn-secondary btn-sm" data-tpl-cmd="italic" title="Eğik"><i>I</i></button>
-                                    <button type="button" class="btn btn-secondary btn-sm" data-tpl-cmd="underline" title="Altı çizili"><u>U</u></button>
-                                    <select id="mailTplVarSelect" class="glass-input" style="max-width: 320px;"></select>
-                                </div>
-                                <div id="mailTplEditor" class="mailtpl-editor" contenteditable="true" spellcheck="false"></div>
-                                <details class="mailtpl-vars">
-                                    <summary>Kullanılabilir değişkenler</summary>
-                                    <div id="mailTplVarList"></div>
-                                </details>
-                                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px;">
-                                    <button type="button" class="btn btn-primary" id="mailTplSaveBtn">💾 Kaydet</button>
-                                    <button type="button" class="btn btn-secondary" id="mailTplPreviewBtn">👁 Örnek Önizleme</button>
-                                    <button type="button" class="btn btn-secondary" id="mailTplResetBtn">↩️ Varsayılana Dön</button>
-                                </div>
-                                <div id="mailTplPreview" class="tea-calc-email-preview mailprep-preview" style="display: none; margin-top: 14px;"></div>
-                            </div>
-                        </div>
-
                         <!-- Card: Tek Seferlik Veri Güncellemesi (GD Kontrolü / Müzekkere / Gamze Durum) -->
                         <div class="card" id="cleanupMigrationCard">
                             <div class="card-header">
@@ -1355,6 +1314,49 @@
                         <button type="submit" class="btn btn-primary">💾 Kaydet</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mail Taslağı Ayarları: Mail Hazırlığı sayfasındaki maillerin konu ve metinleri -->
+    <div class="modal-overlay" id="mailTemplatesModal">
+        <div class="modal-content modal-form" style="max-width: 860px;">
+            <div class="modal-header">
+                <h3>📝 Mail Taslağı Ayarları</h3>
+                <button class="modal-close" id="mailTemplatesModalClose">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 78vh; overflow-y: auto;">
+                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 14px;">
+                    Her mailin metnini buradan düzenleyip kaydedebilirsiniz. Metindeki <code>{{proje}}</code> gibi
+                    yer tutucular, mail hazırlanırken gerçek değerle (proje adı, tutar, tablolar...) değişir.
+                    Değişiklik anında herkes için geçerli olur; kod değişikliği ya da yayınlama gerekmez.
+                </p>
+                <div class="form-group">
+                    <label for="mailTplSelect">Mail</label>
+                    <select id="mailTplSelect" class="glass-input"></select>
+                    <p class="mailprep-hint" id="mailTplState"></p>
+                </div>
+                <div class="form-group">
+                    <label for="mailTplSubject">Konu</label>
+                    <input type="text" id="mailTplSubject" class="form-input">
+                </div>
+                <div class="mailtpl-toolbar">
+                    <button type="button" class="btn btn-secondary btn-sm" data-tpl-cmd="bold" title="Kalın"><b>B</b></button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-tpl-cmd="italic" title="Eğik"><i>I</i></button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-tpl-cmd="underline" title="Altı çizili"><u>U</u></button>
+                    <select id="mailTplVarSelect" class="glass-input" style="max-width: 320px;"></select>
+                </div>
+                <div id="mailTplEditor" class="mailtpl-editor" contenteditable="true" spellcheck="false"></div>
+                <details class="mailtpl-vars">
+                    <summary>Kullanılabilir değişkenler</summary>
+                    <div id="mailTplVarList"></div>
+                </details>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px;">
+                    <button type="button" class="btn btn-primary" id="mailTplSaveBtn">💾 Kaydet</button>
+                    <button type="button" class="btn btn-secondary" id="mailTplPreviewBtn">👁 Örnek Önizleme</button>
+                    <button type="button" class="btn btn-secondary" id="mailTplResetBtn">↩️ Varsayılana Dön</button>
+                </div>
+                <div id="mailTplPreview" class="tea-calc-email-preview mailprep-preview" style="display: none; margin-top: 14px;"></div>
             </div>
         </div>
     </div>

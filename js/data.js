@@ -338,7 +338,7 @@ export function initFirestoreSync() {
                     safeSetStorage('epdk_mailFeeSettings', data.mailFeeSettings);
                 }
 
-                // 6c. Mail taslakları (Ayarlar > Mail Taslakları)
+                // 6c. Mail taslakları (Mail Hazırlığı > Taslak Ayarları)
                 if (data.mailTemplates) {
                     Store.setMailTemplates(data.mailTemplates);
                     safeSetStorage('epdk_mailTemplates', data.mailTemplates);

@@ -42,6 +42,7 @@ import { initWorkflowManager, renderWorkflowTypesList, renderStepMetaSettings } 
 import { renderTeaApplicationsMatrix, initTeaEventHandlers, getTeaApplicationsForProject, getMonthYearLabel } from './js/tea.js';
 import { initMailPrep, renderMailPrep } from './js/mail_prep.js';
 import { renderCleanupCard } from './js/cleanup_migration.js';
+import { initGuide, bindHelpButton, renderWhatsNew } from './js/guide.js';
 
 // ==========================================
 // Initialization
@@ -84,6 +85,8 @@ function initApp() {
         initPush();
         initWorkflowManager();
         initAnimations();
+        initGuide(); // Kullanım Kılavuzu (web / mobil ayrı) + sürüm etiketi
+        bindHelpButton();
     } catch (e) {
         console.error('UI Basic Init Error:', e);
     }
@@ -352,6 +355,7 @@ async function authorizedInit() {
         initJobsEventHandlers(); // Initialize Job Event Handlers
         initTeaEventHandlers(); // Initialize TEA Applications Event Handlers
         initMailPrep(); // Mail Hazırlığı (TEA bedel hesaplayıcısı da burada)
+        renderWhatsNew(auth.currentUser?.email); // Yeni sürümde Ana Sayfa'ya "Son güncelleme" kartı
 
 
         // Background/Async tasks
@@ -880,21 +884,7 @@ function setupEventHandlers() {
         });
     }
 
-    // Help Modal (Sidebar only as per user request)
-    const sidebarHelpBtn = document.getElementById('sidebarHelpBtn');
-    const helpModal = document.getElementById('helpModal');
-    if (sidebarHelpBtn && helpModal) {
-        sidebarHelpBtn.addEventListener('click', () => {
-            helpModal.classList.add('show');
-        });
-    }
-
-    document.getElementById('helpModalOk')?.addEventListener('click', () => {
-        document.getElementById('helpModal')?.classList.remove('show');
-    });
-    document.getElementById('helpModalClose')?.addEventListener('click', () => {
-        document.getElementById('helpModal')?.classList.remove('show');
-    });
+    // Kullanım Kılavuzu: düğme bağlantısı ve içerik js/guide.js içinde (initApp).
 
     // Logout
     const logoutBtn = document.getElementById('logoutBtn');

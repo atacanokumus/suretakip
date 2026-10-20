@@ -156,11 +156,31 @@ function bankTable() {
     </table>`;
 }
 
-function simpleFeeTable(bedelTuru, fee) {
-    return `<table class="mail-fee-table" style="border-collapse:collapse; border:1px solid #444; width:100%;">
-        <tr>${th('Bedel Türü')}${th('Bedel (TL)')}${th('ÖDEME BİLGİLERİ')}</tr>
-        <tr>${td(esc(bedelTuru))}${td(`<b>${fmtMoney(fee)}</b>`)}${td(`<b>${esc(getPayment().bank)}<br>${esc(getPayment().account)}</b><br><br><b>${esc(getPayment().iban)}</b>`)}</tr>
-    </table>`;
+/**
+ * Ünite / diğer tadiller için bedel tablosu (Kurul Kararı'ndaki sütunlarla):
+ * Lisans Türü, Bedel Türü, Bedel Kıstası, Bedel. Banka bilgisi ikinci tabloda (bankTable).
+ */
+function tadilFeeTable(lic, kistas, fee) {
+    const head = `<tr>
+        ${th('Lisans Türü')}${th('Bedel Türü')}
+        ${th('Bedel Kıstası (Kurulu Güç(P=MW), Bir yılda dağıtımı yapılan/yapılması öngörülen enerji miktarı (D=kWh))')}
+        ${th('Bedel (TL)')}
+    </tr>`;
+    const body = `<tr>
+        ${td(esc(lic.lisansTuruMetni))}
+        ${td(esc(`${lic.Tadil} Bedeli`))}
+        ${td(esc(kistas))}
+        ${td(`${fmtMoney(fee)}TL`)}
+    </tr>`;
+    return `<table class="mail-fee-table" style="border-collapse:collapse; border:1px solid #444; width:100%;">${head}${body}</table>`;
+}
+
+/**
+ * Dekont açıklaması paragrafı: TEA hariç tüm EPDK tadil maillerinde, bedel
+ * tablosundan sonra ve banka/IBAN tablosundan önce gelir.
+ */
+function dekontParagraph(aciklama) {
+    return `<p>Ödeme için banka ve hesap bilgileri aşağıda sunulmaktadır. Dekont açıklamasına <b>“${esc(aciklama)}”</b> yazılmalıdır. Başvuru Sahibi – Lisans Sahibi tüzel kişiliğin adı ve VKN (Vergi Kimlik No) dekontta yer almalı; “Alıcı Unvanı”nın kısaltma yapılmaksızın eksiksiz yazılması gerekmektedir.</p>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -240,8 +260,8 @@ function teaEmailBody({ projectName, company, lastMW, newMW, caseType, lastMwRat
 function licenseWording(lisansTuru) {
     const onlisans = lisansTuru !== 'Üretim Lisansı';
     return onlisans
-        ? { alma: 'önlisans alma bedeli', tadil: 'önlisans tadil', Tadil: 'Önlisans Tadil' }
-        : { alma: 'lisans alma bedeli', tadil: 'lisans tadil', Tadil: 'Lisans Tadil' };
+        ? { alma: 'önlisans alma bedeli', tadil: 'önlisans tadil', Tadil: 'Önlisans Tadil', lisansTuruMetni: 'Önlisans/OSB Üretim Önlisans' }
+        : { alma: 'lisans alma bedeli', tadil: 'lisans tadil', Tadil: 'Lisans Tadil', lisansTuruMetni: 'Üretim Lisansı/OSB Üretim Lisansı' };
 }
 
 const greetingLine = (ctx) => `<p>${ctx.greeting ? esc(ctx.greeting) + ' merhaba,' : 'Merhaba,'}</p>`;
@@ -268,7 +288,9 @@ const TEMPLATES = {
                 ${greetingLine(ctx)}
                 <p>${esc(ctx.project)} projesi için üretim lisansında tesis tamamlanma tarihi süre sonu <b>${fmtDate(v.sureSonu)}</b> olarak belirlendiğinden, söz konusu ${esc(v.unite)} süresinin uzatılması için başvuruda bulunmamız gerekecektir.</p>
                 <p>Lisans yönetmeliği m.43/9’a göre Üretim lisanslarında tesis tamamlanma süresinin uzatılmasına ilişkin tadillerde, lisansa konu tesis için içerisinde bulunulan yıl itibarıyla geçerli olan <i>lisans alma bedeli kadar tutar</i>, lisans tadil bedeli olarak alınır. Bu nedenle aşağıdaki tabloda belirtildiği üzere <b>${fmtMoney(fee)} TL</b> tutarında tadil bedeli yatırılması gerekecektir. ${harcamaCumle}</p>
-                ${feeTable(tier, fee, 'Önlisans/Lisans alma bedeli*', true)}
+                ${feeTable(tier, fee, 'Önlisans/Lisans alma bedeli*', false)}
+                ${dekontParagraph(`${ctx.project} Tesis Tamamlama Süresinin Uzatılması Tadil Bedeli`)}
+                ${bankTable()}
                 <p>Şimdiden teşekkür eder, iyi çalışmalar dileriz.</p>
                 <p>Saygılarımızla,</p>`;
             return {
@@ -359,14 +381,21 @@ const TEMPLATES = {
                 computed = Math.max(min, base);
                 explain = `Kurulu güç artışı (${fmtMw(v.lastMw)} MW → ${fmtMw(v.mw)} MW) ${oldTier.label} aralığından ${newTier.label} aralığına geçtiğinden, aralıkların ${lic.alma} farkı (${fmtMoney(newTier.fee)} TL − ${fmtMoney(oldTier.fee)} TL = ${fmtMoney(diff)} TL)${v.renewable ? ' üzerinden yerli ve yenilenebilir enerji kaynaklarına dayalı tesisler için %10’u' : ''} dikkate alınmakta olup bu bedel asgari tadil bedeli olan ${fmtMoney(min)} TL’den az olamaz.`;
             } else {
-                explain = `Söz konusu tadil için asgari ${lic.tadil} bedeli olan <b>${fmtMoney(min)} TL</b> uygulanmaktadır.`;
+                explain = ''; // güç artışı aralık atlamıyorsa ayrıca açıklama gerekmez
             }
             const fee = v.manualFee > 0 ? v.manualFee : computed;
+            // Bedel kıstası: Kurul Kararı'nda ünite tadilleri "Asgari"; güç artışı aralık
+            // atlıyorsa artışın kendisi yazılır.
+            const kistas = crossesTier ? `Kurulu güç artışı (${fmtMw(v.lastMw)} MW → ${fmtMw(v.mw)} MW)` : 'Asgari';
             const html = `
                 ${greetingLine(ctx)}
-                <p>${esc(ctx.project)} projesinde yapılacak <b>${esc(v.tadilTuru)}</b> için ${getFeeTable().year} yılında uygulanacak bedellere ilişkin Kurul Kararı uyarınca ${lic.tadil} bedeli yatırılması gerekmektedir.</p>
-                <p>${explain} Bu doğrultuda <b>${fmtMoney(fee)} TL</b> tutarında tadil bedeli yatırılması gerekecektir.</p>
-                ${simpleFeeTable(`${lic.Tadil} Bedeli`, fee)}
+                <p>${esc(ctx.project)} projesinde yapılacak ${esc(v.tadilTuru)} için Elektrik Piyasası Lisans Yönetmeliği uyarınca ${getFeeTable().year} yılında uygulanacak bedellere ilişkin Kurul Kararı’nda tanımlı ${lic.tadil} bedeli yatırılması gerekmektedir.</p>
+                <p>${explain
+        ? `${explain} Bu doğrultuda <b>${fmtMoney(fee)} TL</b> tutarında tadil bedeli yatırılması gerekecektir.`
+        : `Yatırılması gereken tadil bedeli <b>${fmtMoney(fee)} TL</b>’dir.`}</p>
+                ${tadilFeeTable(lic, kistas, fee)}
+                ${dekontParagraph(`${ctx.project} ${v.tadilTuru.replace(/ Tadili$/, '')} Tadil Bedeli`)}
+                ${bankTable()}
                 <p>Şimdiden teşekkür eder, iyi çalışmalar dileriz.</p>
                 <p>Saygılarımızla,</p>`;
             return {
@@ -391,8 +420,10 @@ const TEMPLATES = {
             const fee = v.manualFee > 0 ? v.manualFee : getFeeTable().minTadilFee;
             const html = `
                 ${greetingLine(ctx)}
-                <p>${esc(ctx.project)} projesinde yapılacak <b>${esc(v.tadilAdi)}</b> tadili için ${getFeeTable().year} yılında uygulanacak bedellere ilişkin Kurul Kararı uyarınca asgari ${lic.tadil} bedeli olan <b>${fmtMoney(fee)} TL</b> tutarında tadil bedeli yatırılması gerekmektedir.</p>
-                ${simpleFeeTable(`${lic.Tadil} Bedeli (Asgari)`, fee)}
+                <p>${esc(ctx.project)} projesinde yapılacak ${esc(v.tadilAdi)} tadili için Elektrik Piyasası Lisans Yönetmeliği uyarınca ${getFeeTable().year} yılında uygulanacak bedellere ilişkin Kurul Kararı’nda tanımlı asgari ${lic.tadil} bedeli olan <b>${fmtMoney(fee)} TL</b> tutarında tadil bedeli yatırılması gerekmektedir.</p>
+                ${tadilFeeTable(lic, 'Asgari', fee)}
+                ${dekontParagraph(`${ctx.project} ${v.tadilAdi} Tadil Bedeli`)}
+                ${bankTable()}
                 <p>Şimdiden teşekkür eder, iyi çalışmalar dileriz.</p>
                 <p>Saygılarımızla,</p>`;
             return {

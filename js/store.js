@@ -20,6 +20,9 @@ export const Store = {
     // js/mail_prep.js içindeki varsayılan 2026 değerleri kullanılır. Şekil:
     // { year, minTadilFee, renewableRatio, tiers:[{max, fee}], payment:{bank, account, iban} }
     mailFeeSettings: null,
+    // Mail taslakları (Ayarlar > Mail Taslakları): { [şablonAnahtarı]: { subject, body } }.
+    // null / eksik anahtar = js/mail_prep.js içindeki varsayılan metin.
+    mailTemplates: null,
     users: [], // List of user profiles { email, displayName, title, uid, active? }
     // Pasifleştirilmiş kullanıcıların e-postaları (daVinciData/master.inactiveUsers).
     // Kullanıcı SİLİNMEZ: geçmiş kayıtlardaki adı çözülmeye devam eder, yalnızca
@@ -66,6 +69,11 @@ export const Store = {
 
     setMailFeeSettings(newSettings) {
         this.mailFeeSettings = newSettings || null;
+        this.lastUpdate = new Date().toISOString();
+    },
+
+    setMailTemplates(newTemplates) {
+        this.mailTemplates = newTemplates || null;
         this.lastUpdate = new Date().toISOString();
     },
 

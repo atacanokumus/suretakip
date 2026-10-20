@@ -175,14 +175,6 @@ function tadilFeeTable(lic, kistas, fee) {
     return `<table class="mail-fee-table" style="border-collapse:collapse; border:1px solid #444; width:100%;">${head}${body}</table>`;
 }
 
-/**
- * Dekont açıklaması paragrafı: TEA hariç tüm EPDK tadil maillerinde, bedel
- * tablosundan sonra ve banka/IBAN tablosundan önce gelir.
- */
-function dekontParagraph(aciklama) {
-    return `<p>Ödeme için banka ve hesap bilgileri aşağıda sunulmaktadır. Dekont açıklamasına <b>“${esc(aciklama)}”</b> yazılmalıdır. Başvuru Sahibi – Lisans Sahibi tüzel kişiliğin adı ve VKN (Vergi Kimlik No) dekontta yer almalı; “Alıcı Unvanı”nın kısaltma yapılmaksızın eksiksiz yazılması gerekmektedir.</p>`;
-}
-
 // ---------------------------------------------------------------------------
 // TEA başvuru bedeli (eski js/tea.js hesaplayıcısı, mantığı aynen taşındı)
 // ---------------------------------------------------------------------------
@@ -214,43 +206,15 @@ function calculateTeaFeeCase(lastMW, newMW) {
     return { caseType, base, total, lastMwRate, newMwRate, vatRate };
 }
 
-function teaEmailBody({ projectName, company, lastMW, newMW, caseType, lastMwRate, newMwRate, vatRate, base, total }) {
-    let calcLine;
-    if (caseType === 'increase') {
-        calcLine = `${fmtMw(lastMW)} MW x ${fmtMoney(lastMwRate)}₺ + (${fmtMw(newMW)} MW - ${fmtMw(lastMW)} MW) x ${fmtMoney(newMwRate)}₺ = <b>${fmtMoney(base)}₺</b>`;
-    } else if (caseType === 'same') {
-        calcLine = `${fmtMw(lastMW)} MW x ${fmtMoney(lastMwRate)}₺ = <b>${fmtMoney(base)}₺</b>`;
-    } else if (caseType === 'decrease') {
-        calcLine = `${fmtMw(newMW)} MW x ${fmtMoney(lastMwRate)}₺ = <b>${fmtMoney(base)}₺</b>`;
-    } else {
-        calcLine = `${fmtMw(newMW)} MW x ${fmtMoney(newMwRate)}₺ = <b>${fmtMoney(base)}₺</b>`;
-    }
-    const vatPercent = Math.round(vatRate * 100);
-    const s = Store.teaFeeSettings || {};
-    const recipientName = s.recipientName || 'Tübitak Bilgem';
-    const bankBranch = s.bankBranch || 'Türkiye Cumhuriyeti Ziraat Bankası A.Ş. Gebze Kurumsal Şube';
-    const iban = s.iban || 'TR96 0001 0020 8534 7551 9667 26';
-
-    return `
-        <div>${esc(projectName)} için yapacağımız TEA başvurusu için ödenmesi gereken tutar <b>${fmtMoney(total)}₺</b> olup ücretin detaylarını aşağıda bilgilerinize sunarım:</div>
-        <br>
-        <div><b>Ödeme Yapılacak Hesap Bilgileri:</b></div>
-        <br>
-        <table class="tea-email-table">
-            <tr><td>Gönderilen Kişi</td><td>: ${esc(recipientName)}</td></tr>
-            <tr><td>Yatırılacak Tutar</td><td>: ${calcLine} + %${vatPercent} KDV'dir. Vergiler Dahil Ödenecek Tutar: <b>${fmtMoney(total)}₺</b>'dir.</td></tr>
-            <tr><td>Şube</td><td>: ${esc(bankBranch)}</td></tr>
-            <tr><td>IBAN</td><td>: <b>${esc(iban)}</b></td></tr>
-            <tr><td>Açıklama</td><td>: <b>${esc(company)}-${esc(projectName)} TEA Başvuru Bedeli</b></td></tr>
-        </table>
-        <br>
-        <div>Saygılarımla,</div>
-    `;
-}
-
 // ---------------------------------------------------------------------------
 // Şablonlar
 // ---------------------------------------------------------------------------
+//
+// Her mailin KONUSU ve GÖVDESİ, {{degisken}} yer tutucuları içeren bir metindir ve
+// Ayarlar > Mail Taslakları'ndan düzenlenir (daVinciData/master.mailTemplates).
+// Aşağıdakiler yalnızca VARSAYILAN metinlerdir. compute() tutarı hesaplar ve yer
+// tutucuların değerlerini (vars) üretir; vars değerleri HTML'e hazırdır (kaçışlıdır),
+// tablolar da birer değişkendir (bedel_tablosu, banka_tablosu).
 
 /**
  * Proje önlisans aşamasındaysa "önlisans", üretim lisansı aşamasındaysa "lisans"
@@ -264,7 +228,31 @@ function licenseWording(lisansTuru) {
         : { alma: 'lisans alma bedeli', tadil: 'lisans tadil', Tadil: 'Lisans Tadil', lisansTuruMetni: 'Üretim Lisansı/OSB Üretim Lisansı' };
 }
 
-const greetingLine = (ctx) => `<p>${ctx.greeting ? esc(ctx.greeting) + ' merhaba,' : 'Merhaba,'}</p>`;
+const COMMON_VARIABLES = [
+    ['selamlama', 'Hitap + "merhaba," (örn. Emre Bey merhaba,); hitap boşsa "Merhaba,"'],
+    ['proje', 'Seçilen projenin adı'],
+    ['yil', 'Kurul Kararı yılı (Bedel Ayarları\'ndaki yıl)']
+];
+
+const FEE_VARIABLES = [
+    ['bedel', 'Ödenecek tutar (örn. 92.200,00 TL)'],
+    ['bedel_tablosu', 'Lisans türü / bedel türü / bedel kıstası / bedel tablosu'],
+    ['banka_tablosu', 'EPDK banka, hesap adı ve IBAN tablosu'],
+    ['dekont_aciklamasi', 'Dekont açıklamasına yazılacak metin']
+];
+
+/** Dekont açıklaması paragrafı: TEA hariç tüm EPDK tadil maillerinde bedel tablosundan sonra, banka tablosundan önce. */
+const DEKONT_METNI = '<p>Ödeme için banka ve hesap bilgileri aşağıda sunulmaktadır. Dekont açıklamasına <b>“{{dekont_aciklamasi}}”</b> yazılmalıdır. Başvuru Sahibi – Lisans Sahibi tüzel kişiliğin adı ve VKN (Vergi Kimlik No) dekontta yer almalı; “Alıcı Unvanı” kısaltma yapılmaksızın eksiksiz “ENERJİ PİYASASI DÜZENLEME KURUMU” olarak yazılmalıdır.</p>';
+
+const KAPANIS_METNI = '<p>Şimdiden teşekkür eder, iyi çalışmalar dileriz.</p>\n<p>Saygılarımızla,</p>';
+
+function commonVars(ctx) {
+    return {
+        selamlama: ctx.greeting ? `${esc(ctx.greeting)} merhaba,` : 'Merhaba,',
+        proje: esc(ctx.project),
+        yil: String(getFeeTable().year)
+    };
+}
 
 const TEMPLATES = {
     tesis_tamamlama: {
@@ -277,6 +265,22 @@ const TEMPLATES = {
             { id: 'harcamaBaslangic', label: 'Harcama Tablosu Başlangıç Ayı', type: 'month', hint: 'Boş bırakırsanız cümlede ay geçmez.' },
             { id: 'manualFee', label: 'Bedeli Elle Gir (TL, opsiyonel)', type: 'number', placeholder: 'Boşsa tablo bedeli kullanılır' }
         ],
+        variables: [
+            ...COMMON_VARIABLES,
+            ['sure_sonu', 'Tesis tamamlanma süre sonu (gg.aa.yyyy)'],
+            ['unite', 'türbinlerin / ünitelerin / panellerin'],
+            ['harcama_cumlesi', 'Harcama tablosu cümlesi (başlangıç ayına göre)'],
+            ...FEE_VARIABLES
+        ],
+        defaultSubject: '{{proje}} - Tesis Tamamlama Süre Uzatımı Tadil Bedeli',
+        defaultBody: `<p>{{selamlama}}</p>
+<p>{{proje}} projesi için üretim lisansında tesis tamamlanma tarihi süre sonu <b>{{sure_sonu}}</b> olarak belirlendiğinden, söz konusu {{unite}} süresinin uzatılması için başvuruda bulunmamız gerekecektir.</p>
+<p>Lisans yönetmeliği m.43/9’a göre Üretim lisanslarında tesis tamamlanma süresinin uzatılmasına ilişkin tadillerde, lisansa konu tesis için içerisinde bulunulan yıl itibarıyla geçerli olan <i>lisans alma bedeli kadar tutar</i>, lisans tadil bedeli olarak alınır. Bu nedenle aşağıdaki tabloda belirtildiği üzere <b>{{bedel}}</b> tutarında tadil bedeli yatırılması gerekecektir. {{harcama_cumlesi}}</p>
+{{bedel_tablosu}}
+${DEKONT_METNI}
+{{banka_tablosu}}
+${KAPANIS_METNI}`,
+        sample: { values: { mw: 9.8, sureSonu: '2026-12-31', unite: 'ünitelerin', harcamaBaslangic: '2024-11', manualFee: 0 }, ctx: { project: 'ÖRNEK GES', greeting: 'Emre Bey', company: 'NESMA' } },
         compute(v, ctx) {
             const tier = getLicenseFeeTier(v.mw);
             const fee = v.manualFee > 0 ? v.manualFee : tier.fee;
@@ -284,20 +288,19 @@ const TEMPLATES = {
             const harcamaCumle = harcama
                 ? `Ayrıca süre uzatımı başvurusunda kullanmak üzere ${harcama}’ten itibaren yapılan ödemeleri içeren ekteki harcama tablosunun doldurulması ve harcamaları gösteren belgelerin de ibraz edilmesi gerekmektedir.`
                 : 'Ayrıca süre uzatımı başvurusunda kullanmak üzere yapılan ödemeleri içeren ekteki harcama tablosunun doldurulması ve harcamaları gösteren belgelerin de ibraz edilmesi gerekmektedir.';
-            const html = `
-                ${greetingLine(ctx)}
-                <p>${esc(ctx.project)} projesi için üretim lisansında tesis tamamlanma tarihi süre sonu <b>${fmtDate(v.sureSonu)}</b> olarak belirlendiğinden, söz konusu ${esc(v.unite)} süresinin uzatılması için başvuruda bulunmamız gerekecektir.</p>
-                <p>Lisans yönetmeliği m.43/9’a göre Üretim lisanslarında tesis tamamlanma süresinin uzatılmasına ilişkin tadillerde, lisansa konu tesis için içerisinde bulunulan yıl itibarıyla geçerli olan <i>lisans alma bedeli kadar tutar</i>, lisans tadil bedeli olarak alınır. Bu nedenle aşağıdaki tabloda belirtildiği üzere <b>${fmtMoney(fee)} TL</b> tutarında tadil bedeli yatırılması gerekecektir. ${harcamaCumle}</p>
-                ${feeTable(tier, fee, 'Önlisans/Lisans alma bedeli*', false)}
-                ${dekontParagraph(`${ctx.project} Tesis Tamamlama Süresinin Uzatılması Tadil Bedeli`)}
-                ${bankTable()}
-                <p>Şimdiden teşekkür eder, iyi çalışmalar dileriz.</p>
-                <p>Saygılarımızla,</p>`;
             return {
                 amount: fee,
                 amountLabel: `Tadil Bedeli (${tier.label})`,
-                subject: `${ctx.project} - Tesis Tamamlama Süre Uzatımı Tadil Bedeli`,
-                html
+                vars: {
+                    ...commonVars(ctx),
+                    sure_sonu: fmtDate(v.sureSonu),
+                    unite: esc(v.unite),
+                    harcama_cumlesi: harcamaCumle,
+                    bedel: `${fmtMoney(fee)} TL`,
+                    bedel_tablosu: feeTable(tier, fee, 'Önlisans/Lisans alma bedeli*', false),
+                    banka_tablosu: bankTable(),
+                    dekont_aciklamasi: esc(`${ctx.project} Tesis Tamamlama Süresinin Uzatılması Tadil Bedeli`)
+                }
             };
         }
     },
@@ -310,6 +313,15 @@ const TEMPLATES = {
             { id: 'storage', label: 'Depolama Kapasitesi (MW, varsa)', type: 'number', placeholder: 'Yoksa boş bırakın', hint: 'Varsa mekanik güce eklenir; bedel toplam güce göre çıkar.' },
             { id: 'manualFee', label: 'Bedeli Elle Gir (TL, opsiyonel)', type: 'number', placeholder: 'Boşsa tablo bedeli kullanılır' }
         ],
+        variables: [...COMMON_VARIABLES, ...FEE_VARIABLES],
+        defaultSubject: '{{proje}} - Önlisans Süre Uzatımı Tadil Bedeli',
+        defaultBody: `<p>{{selamlama}}</p>
+<p>{{proje}} projesinde önlisans süre uzatımı başvurusu için Elektrik Piyasası Lisans Yönetmeliği 43.Madde 9.bendinde yer alan; <i>“önlisans süresinin uzatılmasına ilişkin tadillerde önlisans alma bedelinin tamamı tadil bedeli olarak alınır”</i> ibaresine göre ve buna istinaden Elektrik Piyasasında {{yil}} yılında uygulanacak olan önlisans ve lisans alma, yıllık lisans, lisans yenileme, önlisans ve lisans tadili, önlisans ve lisans sureti çıkartma bedellerine ilişkin olarak alınan Kurul Kararına göre:</p>
+{{bedel_tablosu}}
+<p>EPDK’ya <b>{{bedel}}</b> tutarında önlisans tadil bedeli yatırılması gerekmektedir. Ödeme için banka ve hesap bilgileri aşağıda sunulmaktadır. Dekont açıklamasına <b>“{{dekont_aciklamasi}}”</b> yazılmalıdır. Başvuru Sahibi – Lisans Sahibi tüzel kişiliğin adı ve VKN (Vergi Kimlik No) dekontta yer almalı; “Alıcı Unvanı” kısaltma yapılmaksızın eksiksiz “ENERJİ PİYASASI DÜZENLEME KURUMU” olarak yazılmalıdır.</p>
+{{banka_tablosu}}
+<p>Saygılarımla,</p>`,
+        sample: { values: { mw: 45, storage: 10, manualFee: 0 }, ctx: { project: 'ÖRNEK RES', greeting: 'Nurdan Hanım', company: 'NESMA' } },
         compute(v, ctx) {
             const storage = v.storage > 0 ? v.storage : 0;
             const power = v.mw + storage;
@@ -318,18 +330,16 @@ const TEMPLATES = {
                 ? `Mekanik güç ${fmtMw(v.mw)} MW + depolama kapasitesi ${fmtMw(storage)} MW = ${fmtMw(power)} MW`
                 : '';
             const fee = v.manualFee > 0 ? v.manualFee : tier.fee;
-            const html = `
-                ${greetingLine(ctx)}
-                <p>${esc(ctx.project)} projesinde önlisans süre uzatımı başvurusu için Elektrik Piyasası Lisans Yönetmeliği 43.Madde 9.bendinde yer alan; <i>“önlisans süresinin uzatılmasına ilişkin tadillerde önlisans alma bedelinin tamamı tadil bedeli olarak alınır”</i> ibaresine göre ve buna istinaden Elektrik Piyasasında ${getFeeTable().year} yılında uygulanacak olan önlisans ve lisans alma, yıllık lisans, lisans yenileme, önlisans ve lisans tadili, önlisans ve lisans sureti çıkartma bedellerine ilişkin olarak alınan Kurul Kararına göre:</p>
-                ${feeTable(tier, fee, 'Lisans alma bedeli*', false, kistasNote)}
-                <p>EPDK’ya <b>${fmtMoney(fee)} TL</b> tutarında önlisans tadil bedeli yatırılması gerekmektedir. Ödeme için banka ve hesap bilgileri aşağıda sunulmaktadır. Dekont açıklamasına <b>“${esc(ctx.project)} Önlisans Süresinin Uzatılması Tadil Bedeli”</b> yazılmalıdır. Başvuru Sahibi – Lisans Sahibi tüzel kişiliğin adı ve VKN (Vergi Kimlik No) dekontta yer almalı; “Alıcı Unvanı”nın kısaltma yapılmaksızın eksiksiz yazılması gerekmektedir.</p>
-                ${bankTable()}
-                <p>Saygılarımla,</p>`;
             return {
                 amount: fee,
                 amountLabel: `Önlisans Tadil Bedeli (${storage > 0 ? fmtMw(power) + ' MW: ' : ''}${tier.label})`,
-                subject: `${ctx.project} - Önlisans Süre Uzatımı Tadil Bedeli`,
-                html
+                vars: {
+                    ...commonVars(ctx),
+                    bedel: `${fmtMoney(fee)} TL`,
+                    bedel_tablosu: feeTable(tier, fee, 'Lisans alma bedeli*', false, kistasNote),
+                    banka_tablosu: bankTable(),
+                    dekont_aciklamasi: esc(`${ctx.project} Önlisans Süresinin Uzatılması Tadil Bedeli`)
+                }
             };
         }
     },
@@ -341,16 +351,61 @@ const TEMPLATES = {
             { id: 'lastMw', label: 'Son Başvuru Mekanik Gücü (MW)', type: 'number', placeholder: 'İlk başvuruysa boş bırakın' },
             { id: 'mw', label: 'Yapılacak Başvurunun Mekanik Gücü (MW)', type: 'number', placeholder: 'Örn: 15', required: true }
         ],
+        variables: [
+            ...COMMON_VARIABLES,
+            ['sirket', 'Projenin şirketi'],
+            ['toplam_tutar', 'KDV dahil toplam tutar (örn. 208.800,00₺)'],
+            ['hesap_satiri', 'Hesaplama satırı (MW x birim fiyat = tutar)'],
+            ['kdv_orani', 'KDV oranı (yüzde olarak, örn. 20)'],
+            ['alici', 'Ödemenin gönderileceği kişi/kurum'],
+            ['sube', 'Banka şubesi'],
+            ['iban', 'IBAN']
+        ],
+        defaultSubject: '{{proje}} - TEA Başvuru Bedeli',
+        defaultBody: `<p>{{selamlama}}</p>
+<div>{{proje}} için yapacağımız TEA başvurusu için ödenmesi gereken tutar <b>{{toplam_tutar}}</b> olup ücretin detaylarını aşağıda bilgilerinize sunarım:</div>
+<br>
+<div><b>Ödeme Yapılacak Hesap Bilgileri:</b></div>
+<br>
+<table class="tea-email-table">
+<tr><td>Gönderilen Kişi</td><td>: {{alici}}</td></tr>
+<tr><td>Yatırılacak Tutar</td><td>: {{hesap_satiri}} + %{{kdv_orani}} KDV'dir. Vergiler Dahil Ödenecek Tutar: <b>{{toplam_tutar}}</b>'dir.</td></tr>
+<tr><td>Şube</td><td>: {{sube}}</td></tr>
+<tr><td>IBAN</td><td>: <b>{{iban}}</b></td></tr>
+<tr><td>Açıklama</td><td>: <b>{{sirket}}-{{proje}} TEA Başvuru Bedeli</b></td></tr>
+</table>
+<br>
+<div>Saygılarımla,</div>`,
+        sample: { values: { lastMw: 10, mw: 15 }, ctx: { project: 'ÖRNEK RES', greeting: 'Emre Bey', company: 'NESMA' } },
         compute(v, ctx) {
             const calc = calculateTeaFeeCase(v.lastMw || 0, v.mw);
-            const html = `
-                ${ctx.greeting ? `<p>${esc(ctx.greeting)} merhaba,</p>` : ''}
-                ${teaEmailBody({ projectName: ctx.project, company: ctx.company || '', lastMW: v.lastMw || 0, newMW: v.mw, ...calc })}`;
+            const { caseType, lastMwRate, newMwRate, vatRate, base, total } = calc;
+            const lastMW = v.lastMw || 0;
+            const newMW = v.mw;
+            let calcLine;
+            if (caseType === 'increase') {
+                calcLine = `${fmtMw(lastMW)} MW x ${fmtMoney(lastMwRate)}₺ + (${fmtMw(newMW)} MW - ${fmtMw(lastMW)} MW) x ${fmtMoney(newMwRate)}₺ = <b>${fmtMoney(base)}₺</b>`;
+            } else if (caseType === 'same') {
+                calcLine = `${fmtMw(lastMW)} MW x ${fmtMoney(lastMwRate)}₺ = <b>${fmtMoney(base)}₺</b>`;
+            } else if (caseType === 'decrease') {
+                calcLine = `${fmtMw(newMW)} MW x ${fmtMoney(lastMwRate)}₺ = <b>${fmtMoney(base)}₺</b>`;
+            } else {
+                calcLine = `${fmtMw(newMW)} MW x ${fmtMoney(newMwRate)}₺ = <b>${fmtMoney(base)}₺</b>`;
+            }
+            const s = Store.teaFeeSettings || {};
             return {
-                amount: calc.total,
+                amount: total,
                 amountLabel: 'TEA Başvuru Bedeli (KDV Dahil)',
-                subject: `${ctx.project} - TEA Başvuru Bedeli`,
-                html
+                vars: {
+                    ...commonVars(ctx),
+                    sirket: esc(ctx.company || ''),
+                    toplam_tutar: `${fmtMoney(total)}₺`,
+                    hesap_satiri: calcLine,
+                    kdv_orani: String(Math.round(vatRate * 100)),
+                    alici: esc(s.recipientName || 'Tübitak Bilgem'),
+                    sube: esc(s.bankBranch || 'Türkiye Cumhuriyeti Ziraat Bankası A.Ş. Gebze Kurumsal Şube'),
+                    iban: esc(s.iban || 'TR96 0001 0020 8534 7551 9667 26')
+                }
             };
         }
     },
@@ -366,6 +421,22 @@ const TEMPLATES = {
             { id: 'renewable', label: 'Yerli / yenilenebilir kaynaklı tesis (bedelin %10\'u alınır)', type: 'checkbox', default: true },
             { id: 'manualFee', label: 'Bedeli Elle Gir (TL, opsiyonel)', type: 'number', placeholder: 'Boşsa hesaplanan bedel kullanılır' }
         ],
+        variables: [
+            ...COMMON_VARIABLES,
+            ['tadil_turu', 'Seçilen tadil türü (örn. Saha Koordinat Tadili)'],
+            ['lisans_tadil', '"önlisans tadil" ya da "lisans tadil" (Proje Aşaması seçimine göre)'],
+            ['hesap_aciklamasi', 'Bedelin nasıl hesaplandığını anlatan cümle'],
+            ...FEE_VARIABLES
+        ],
+        defaultSubject: '{{proje}} - {{tadil_turu}} Bedeli',
+        defaultBody: `<p>{{selamlama}}</p>
+<p>{{proje}} projesinde yapılacak {{tadil_turu}} için Elektrik Piyasası Lisans Yönetmeliği uyarınca {{yil}} yılında uygulanacak bedellere ilişkin Kurul Kararı’nda tanımlı {{lisans_tadil}} bedeli yatırılması gerekmektedir.</p>
+<p>{{hesap_aciklamasi}}</p>
+{{bedel_tablosu}}
+${DEKONT_METNI}
+{{banka_tablosu}}
+${KAPANIS_METNI}`,
+        sample: { values: { tadilTuru: 'Saha Koordinat Tadili', lisansTuru: 'Önlisans', lastMw: 0, mw: 0, renewable: true, manualFee: 0 }, ctx: { project: 'ÖRNEK GES', greeting: 'Emre Bey', company: 'NESMA' } },
         compute(v, ctx) {
             const lic = licenseWording(v.lisansTuru);
             const min = getFeeTable().minTadilFee;
@@ -374,35 +445,32 @@ const TEMPLATES = {
             const crossesTier = !!(oldTier && newTier && v.mw > v.lastMw && newTier.fee > oldTier.fee);
 
             let computed = min;
-            let explain;
+            let explain = ''; // güç artışı aralık atlamıyorsa ayrıca açıklama gerekmez
             if (crossesTier) {
                 const diff = newTier.fee - oldTier.fee;
                 const base = v.renewable ? diff * getFeeTable().renewableTadilRatio : diff;
                 computed = Math.max(min, base);
                 explain = `Kurulu güç artışı (${fmtMw(v.lastMw)} MW → ${fmtMw(v.mw)} MW) ${oldTier.label} aralığından ${newTier.label} aralığına geçtiğinden, aralıkların ${lic.alma} farkı (${fmtMoney(newTier.fee)} TL − ${fmtMoney(oldTier.fee)} TL = ${fmtMoney(diff)} TL)${v.renewable ? ' üzerinden yerli ve yenilenebilir enerji kaynaklarına dayalı tesisler için %10’u' : ''} dikkate alınmakta olup bu bedel asgari tadil bedeli olan ${fmtMoney(min)} TL’den az olamaz.`;
-            } else {
-                explain = ''; // güç artışı aralık atlamıyorsa ayrıca açıklama gerekmez
             }
             const fee = v.manualFee > 0 ? v.manualFee : computed;
             // Bedel kıstası: Kurul Kararı'nda ünite tadilleri "Asgari"; güç artışı aralık
             // atlıyorsa artışın kendisi yazılır.
             const kistas = crossesTier ? `Kurulu güç artışı (${fmtMw(v.lastMw)} MW → ${fmtMw(v.mw)} MW)` : 'Asgari';
-            const html = `
-                ${greetingLine(ctx)}
-                <p>${esc(ctx.project)} projesinde yapılacak ${esc(v.tadilTuru)} için Elektrik Piyasası Lisans Yönetmeliği uyarınca ${getFeeTable().year} yılında uygulanacak bedellere ilişkin Kurul Kararı’nda tanımlı ${lic.tadil} bedeli yatırılması gerekmektedir.</p>
-                <p>${explain
-        ? `${explain} Bu doğrultuda <b>${fmtMoney(fee)} TL</b> tutarında tadil bedeli yatırılması gerekecektir.`
-        : `Yatırılması gereken tadil bedeli <b>${fmtMoney(fee)} TL</b>’dir.`}</p>
-                ${tadilFeeTable(lic, kistas, fee)}
-                ${dekontParagraph(`${ctx.project} ${v.tadilTuru.replace(/ Tadili$/, '')} Tadil Bedeli`)}
-                ${bankTable()}
-                <p>Şimdiden teşekkür eder, iyi çalışmalar dileriz.</p>
-                <p>Saygılarımızla,</p>`;
             return {
                 amount: fee,
                 amountLabel: `${v.tadilTuru} - ${lic.Tadil} Bedeli`,
-                subject: `${ctx.project} - ${v.tadilTuru} Tadil Bedeli`,
-                html
+                vars: {
+                    ...commonVars(ctx),
+                    tadil_turu: esc(v.tadilTuru),
+                    lisans_tadil: lic.tadil,
+                    hesap_aciklamasi: explain
+                        ? `${explain} Bu doğrultuda <b>${fmtMoney(fee)} TL</b> tutarında tadil bedeli yatırılması gerekecektir.`
+                        : `Yatırılması gereken tadil bedeli <b>${fmtMoney(fee)} TL</b>’dir.`,
+                    bedel: `${fmtMoney(fee)} TL`,
+                    bedel_tablosu: tadilFeeTable(lic, kistas, fee),
+                    banka_tablosu: bankTable(),
+                    dekont_aciklamasi: esc(`${ctx.project} ${v.tadilTuru.replace(/ Tadili$/, '')} Tadil Bedeli`)
+                }
             };
         }
     },
@@ -415,26 +483,79 @@ const TEMPLATES = {
             { id: 'lisansTuru', label: 'Proje Aşaması', type: 'select', options: ['Önlisans', 'Üretim Lisansı'] },
             { id: 'manualFee', label: 'Bedeli Elle Gir (TL, opsiyonel)', type: 'number', placeholder: 'Boşsa Kurul Kararı asgari bedeli' }
         ],
+        variables: [
+            ...COMMON_VARIABLES,
+            ['tadil_konusu', 'Yazdığınız tadil konusu'],
+            ['lisans_tadil', '"önlisans tadil" ya da "lisans tadil" (Proje Aşaması seçimine göre)'],
+            ...FEE_VARIABLES
+        ],
+        defaultSubject: '{{proje}} - Tadil Bedeli',
+        defaultBody: `<p>{{selamlama}}</p>
+<p>{{proje}} projesinde yapılacak {{tadil_konusu}} tadili için Elektrik Piyasası Lisans Yönetmeliği uyarınca {{yil}} yılında uygulanacak bedellere ilişkin Kurul Kararı’nda tanımlı asgari {{lisans_tadil}} bedeli olan <b>{{bedel}}</b> tutarında tadil bedeli yatırılması gerekmektedir.</p>
+{{bedel_tablosu}}
+${DEKONT_METNI}
+{{banka_tablosu}}
+${KAPANIS_METNI}`,
+        sample: { values: { tadilAdi: 'ortaklık yapısı değişikliği', lisansTuru: 'Önlisans', manualFee: 0 }, ctx: { project: 'ÖRNEK GES', greeting: 'Emre Bey', company: 'NESMA' } },
         compute(v, ctx) {
             const lic = licenseWording(v.lisansTuru);
             const fee = v.manualFee > 0 ? v.manualFee : getFeeTable().minTadilFee;
-            const html = `
-                ${greetingLine(ctx)}
-                <p>${esc(ctx.project)} projesinde yapılacak ${esc(v.tadilAdi)} tadili için Elektrik Piyasası Lisans Yönetmeliği uyarınca ${getFeeTable().year} yılında uygulanacak bedellere ilişkin Kurul Kararı’nda tanımlı asgari ${lic.tadil} bedeli olan <b>${fmtMoney(fee)} TL</b> tutarında tadil bedeli yatırılması gerekmektedir.</p>
-                ${tadilFeeTable(lic, 'Asgari', fee)}
-                ${dekontParagraph(`${ctx.project} ${v.tadilAdi} Tadil Bedeli`)}
-                ${bankTable()}
-                <p>Şimdiden teşekkür eder, iyi çalışmalar dileriz.</p>
-                <p>Saygılarımızla,</p>`;
             return {
                 amount: fee,
                 amountLabel: `Asgari ${lic.Tadil} Bedeli`,
-                subject: `${ctx.project} - Tadil Bedeli`,
-                html
+                vars: {
+                    ...commonVars(ctx),
+                    tadil_konusu: esc(v.tadilAdi),
+                    lisans_tadil: lic.tadil,
+                    bedel: `${fmtMoney(fee)} TL`,
+                    bedel_tablosu: tadilFeeTable(lic, 'Asgari', fee),
+                    banka_tablosu: bankTable(),
+                    dekont_aciklamasi: esc(`${ctx.project} ${v.tadilAdi} Tadil Bedeli`)
+                }
             };
         }
     }
 };
+
+// ---------------------------------------------------------------------------
+// Taslak metinlerinin işlenmesi (Ayarlar'da düzenlenenler + varsayılanlar)
+// ---------------------------------------------------------------------------
+
+/** Bu mail için geçerli konu ve gövde: Ayarlar'da kaydedilmiş varsa o, yoksa varsayılan. */
+export function getTemplateParts(key) {
+    const tpl = TEMPLATES[key];
+    const saved = Store.mailTemplates && Store.mailTemplates[key];
+    return {
+        subject: saved && typeof saved.subject === 'string' ? saved.subject : tpl.defaultSubject,
+        body: saved && typeof saved.body === 'string' ? saved.body : tpl.defaultBody
+    };
+}
+
+/** {{degisken}} yer tutucularını değerleriyle değiştirir; bilinmeyenler olduğu gibi kalır (fark edilsin diye). */
+function renderMailTemplate(text, vars) {
+    return String(text || '').replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, (m, k) => (k in vars ? vars[k] : m));
+}
+
+/** HTML parçasını düz metne çevirir (konu satırı için). */
+function plainText(html) {
+    const d = document.createElement('div');
+    d.innerHTML = html;
+    return (d.textContent || '').trim();
+}
+
+/** Ayarlar'da düzenlenen taslak yalnızca ekibe aittir; yine de çalıştırılabilir içerik ayıklanır. */
+function sanitizeHtml(html) {
+    const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+    doc.querySelectorAll('script, style, iframe, object, embed, link, meta, base, form').forEach(n => n.remove());
+    doc.body.querySelectorAll('*').forEach(node => {
+        [...node.attributes].forEach(a => {
+            const name = a.name.toLowerCase();
+            if (name.startsWith('on')) node.removeAttribute(a.name);
+            else if ((name === 'href' || name === 'src') && /^\s*javascript:/i.test(a.value)) node.removeAttribute(a.name);
+        });
+    });
+    return doc.body.innerHTML;
+}
 
 // ---------------------------------------------------------------------------
 // Arayüz
@@ -548,8 +669,9 @@ function recompute() {
 
     el('mailPrepAmountLabel').textContent = out.amountLabel;
     el('mailPrepAmount').textContent = `${fmtMoney(out.amount)} ₺`;
-    el('mailPrepSubject').value = out.subject;
-    el('mailPrepPreview').innerHTML = out.html;
+    const parts = getTemplateParts(currentTemplateKey());
+    el('mailPrepSubject').value = plainText(renderMailTemplate(parts.subject, out.vars));
+    el('mailPrepPreview').innerHTML = sanitizeHtml(renderMailTemplate(parts.body, out.vars));
     result.style.display = '';
     empty.style.display = 'none';
 }
@@ -814,4 +936,153 @@ export function initMailPrep() {
 
     initFeeSettingsModal();
     renderMailPrep();
+}
+
+// ---------------------------------------------------------------------------
+// Ayarlar > Mail Taslakları
+// ---------------------------------------------------------------------------
+
+let tplBound = false;
+let tplDirty = false;
+let tplLastKey = null;
+let tplRange = null; // editörde son imleç konumu (değişken eklemek için)
+
+function tplKey() {
+    const sel = el('mailTplSelect');
+    return sel && TEMPLATES[sel.value] ? sel.value : Object.keys(TEMPLATES)[0];
+}
+
+function loadTplEditor() {
+    const key = tplKey();
+    const tpl = TEMPLATES[key];
+    const parts = getTemplateParts(key);
+    tplLastKey = key;
+    el('mailTplSubject').value = parts.subject;
+    el('mailTplEditor').innerHTML = parts.body;
+    const custom = !!(Store.mailTemplates && Store.mailTemplates[key]);
+    el('mailTplState').textContent = custom ? '✏️ Bu mailin taslağı özelleştirilmiş.' : 'Varsayılan taslak kullanılıyor.';
+    el('mailTplVarList').innerHTML = tpl.variables
+        .map(([k, d]) => `<div><code>{{${k}}}</code> — ${esc(d)}</div>`).join('');
+    el('mailTplVarSelect').innerHTML = '<option value="">➕ Değişken ekle...</option>' +
+        tpl.variables.map(([k, d]) => `<option value="${k}">${esc(k)} — ${esc(d)}</option>`).join('');
+    el('mailTplPreview').style.display = 'none';
+    tplDirty = false;
+}
+
+function insertTplToken(token) {
+    const editor = el('mailTplEditor');
+    editor.focus();
+    const sel = window.getSelection();
+    if (tplRange) {
+        sel.removeAllRanges();
+        sel.addRange(tplRange);
+    }
+    document.execCommand('insertText', false, token);
+    tplDirty = true;
+}
+
+function previewTpl() {
+    const key = tplKey();
+    const tpl = TEMPLATES[key];
+    const out = tpl.compute(tpl.sample.values, tpl.sample.ctx);
+    const subject = plainText(renderMailTemplate(el('mailTplSubject').value, out.vars));
+    const html = sanitizeHtml(renderMailTemplate(el('mailTplEditor').innerHTML, out.vars));
+    const box = el('mailTplPreview');
+    box.innerHTML = `<p><strong>Konu:</strong> ${esc(subject)}</p><hr>${html}`;
+    box.style.display = 'block';
+}
+
+function saveTpl() {
+    const key = tplKey();
+    const tpl = TEMPLATES[key];
+    const subject = el('mailTplSubject').value.trim();
+    const body = sanitizeHtml(el('mailTplEditor').innerHTML).trim();
+    if (!subject || !body) {
+        showToast('Konu ve mail metni boş olamaz.', 'warning');
+        return;
+    }
+    const known = new Set(tpl.variables.map(([k]) => k));
+    const unknown = [...new Set([...`${subject}\n${body}`.matchAll(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi)].map(m => m[1]))]
+        .filter(k => !known.has(k));
+    if (unknown.length && !confirm(`Bu mailde tanınmayan değişken var: ${unknown.map(k => '{{' + k + '}}').join(', ')}.\nMailde olduğu gibi kalır. Yine de kaydedilsin mi?`)) {
+        return;
+    }
+    Store.setMailTemplates({ ...(Store.mailTemplates || {}), [key]: { subject, body } });
+    if (saveData()) {
+        showToast('Mail taslağı kaydedildi. Değişiklik herkes için geçerli.', 'success');
+        loadTplEditor();
+        recompute();
+    }
+}
+
+function resetTpl() {
+    const key = tplKey();
+    if (!(Store.mailTemplates && Store.mailTemplates[key])) {
+        showToast('Bu mail zaten varsayılan taslağı kullanıyor.', 'info');
+        loadTplEditor();
+        return;
+    }
+    if (!confirm('Bu mailin özelleştirilmiş taslağı silinip varsayılan metne dönülecek. Devam edilsin mi?')) return;
+    const next = { ...Store.mailTemplates };
+    delete next[key];
+    Store.setMailTemplates(next);
+    if (saveData()) {
+        showToast('Varsayılan taslağa dönüldü.', 'success');
+        loadTplEditor();
+        recompute();
+    }
+}
+
+function initMailTemplateSettings() {
+    const sel = el('mailTplSelect');
+    if (!sel || tplBound) return;
+    tplBound = true;
+
+    sel.innerHTML = Object.entries(TEMPLATES).map(([k, t]) => `<option value="${k}">${esc(t.label)}</option>`).join('');
+    sel.addEventListener('change', () => {
+        if (tplDirty && !confirm('Kaydedilmemiş değişiklikler silinecek. Devam edilsin mi?')) {
+            sel.value = tplLastKey;
+            return;
+        }
+        loadTplEditor();
+    });
+
+    const editor = el('mailTplEditor');
+    editor.addEventListener('input', () => { tplDirty = true; });
+    el('mailTplSubject').addEventListener('input', () => { tplDirty = true; });
+    const remember = () => {
+        const s = window.getSelection();
+        if (s.rangeCount && editor.contains(s.anchorNode)) tplRange = s.getRangeAt(0).cloneRange();
+    };
+    ['keyup', 'mouseup', 'focusout'].forEach(ev => editor.addEventListener(ev, remember));
+
+    document.querySelectorAll('#mailTemplatesCard [data-tpl-cmd]').forEach(btn => {
+        btn.addEventListener('mousedown', (e) => e.preventDefault()); // editörün seçimini kaybetme
+        btn.addEventListener('click', () => {
+            editor.focus();
+            document.execCommand(btn.getAttribute('data-tpl-cmd'));
+            tplDirty = true;
+        });
+    });
+
+    el('mailTplVarSelect').addEventListener('change', (e) => {
+        const key = e.target.value;
+        e.target.value = '';
+        if (key) insertTplToken(`{{${key}}}`);
+    });
+
+    el('mailTplSaveBtn').addEventListener('click', saveTpl);
+    el('mailTplPreviewBtn').addEventListener('click', previewTpl);
+    el('mailTplResetBtn').addEventListener('click', resetTpl);
+}
+
+/** Ayarlar sayfası her çizildiğinde çağrılır; yarım kalmış düzenlemeyi ezmez. */
+export function renderMailTemplateSettings() {
+    if (!el('mailTplSelect')) return;
+    if (!tplBound) {
+        initMailTemplateSettings();
+        loadTplEditor();
+        return;
+    }
+    if (!tplDirty) loadTplEditor(); // başka biri kaydettiyse güncel metni göster
 }

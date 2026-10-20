@@ -234,6 +234,9 @@ export async function syncToFirestore(customTimestamp) {
         // dokunma). Ayrı bir üst düzey alan olduğu için bu alanı bilmeyen eski bir
         // istemci üzerine yazamaz.
         if (Store.mailFeeSettings) payload.mailFeeSettings = Store.mailFeeSettings;
+        // Mail taslakları: aynı kural (null = dokunma). Boş nesne {} "hepsi varsayılan"
+        // demektir ve bulutta da öyle kalması için yazılır.
+        if (Store.mailTemplates) payload.mailTemplates = Store.mailTemplates;
 
         // merge:true so a field this build doesn't know about is left alone
         // instead of being deleted. A plain setDoc replaces the whole document,
@@ -333,6 +336,12 @@ export function initFirestoreSync() {
                 if (data.mailFeeSettings) {
                     Store.setMailFeeSettings(data.mailFeeSettings);
                     safeSetStorage('epdk_mailFeeSettings', data.mailFeeSettings);
+                }
+
+                // 6c. Mail taslakları (Ayarlar > Mail Taslakları)
+                if (data.mailTemplates) {
+                    Store.setMailTemplates(data.mailTemplates);
+                    safeSetStorage('epdk_mailTemplates', data.mailTemplates);
                 }
 
                 // 7. Pasif kullanıcılar (yalnızca cleanup_migration.js yazar; bu
@@ -796,6 +805,11 @@ export async function loadData() {
                     safeSetStorage('epdk_mailFeeSettings', data.mailFeeSettings);
                 }
 
+                if (data.mailTemplates) {
+                    Store.setMailTemplates(data.mailTemplates);
+                    safeSetStorage('epdk_mailTemplates', data.mailTemplates);
+                }
+
                 initFirestoreSync();
                 // Also fetch users
                 await fetchUsers();
@@ -873,6 +887,8 @@ export async function loadData() {
 
         const savedMailFee = safeGetStorage('epdk_mailFeeSettings');
         if (savedMailFee) Store.setMailFeeSettings(savedMailFee);
+        const savedMailTemplates = safeGetStorage('epdk_mailTemplates');
+        if (savedMailTemplates) Store.setMailTemplates(savedMailTemplates);
 
         if (Store.obligations.length > 0 && auth.currentUser) initFirestoreSync();
         return { obligations: Store.obligations, jobs: Store.jobs };
@@ -944,6 +960,7 @@ export function saveData(syncWithCloud = true) {
         safeSetStorage('epdk_teaFeeSettings', Store.teaFeeSettings); // And TEA fee calculator unit prices
         safeSetStorage('epdk_workflows', Store.workflows); // Workflow definitions
         safeSetStorage('epdk_stepMeta', Store.stepMeta); // Step responsibility / difficulty
+        if (Store.mailTemplates) safeSetStorage('epdk_mailTemplates', Store.mailTemplates); // Mail taslakları
         if (Store.mailFeeSettings) safeSetStorage('epdk_mailFeeSettings', Store.mailFeeSettings); // Mail bedel tablosu
         const timestamp = new Date().toISOString();
         localStorage.setItem('epdk_lastUpdate', timestamp);
